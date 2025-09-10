@@ -274,8 +274,8 @@ class NewsAnalyzer {
             right: 20px;
             background: var(--alert-danger);
             color: white;
-            padding: 1rem;
-            border-radius: 0.5rem;
+            padding: 16px;
+            border-radius: 8px;
             z-index: 1000;
             animation: fadeIn 0.3s ease;
         `;
@@ -378,7 +378,7 @@ class DemoButtonHandler {
         btn.style.background = 'var(--primary-color)';
         btn.style.color = 'white';
         btn.style.borderColor = 'var(--primary-color)';
-        btn.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.4)';
+        btn.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.4)';
         btn.style.transform = 'translateY(1px)';
     }
 

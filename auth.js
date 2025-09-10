@@ -260,13 +260,13 @@ class AuthManager {
             right: 20px;
             background: var(--alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'});
             color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 0.5rem;
+            padding: 16px 24px;
+            border-radius: 8px;
             box-shadow: var(--shadow-lg);
             z-index: 1000;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 8px;
             animation: slideIn 0.3s ease;
             max-width: 300px;
             word-wrap: break-word;
