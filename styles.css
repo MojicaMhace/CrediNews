@@ -53,7 +53,12 @@
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: radial-gradient(ellipse at top, #1a1a3e 0%, #0f0f23 50%, #0a0a1a 100%);
+  background: 
+    radial-gradient(ellipse at top left, rgba(30, 58, 138, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at top right, rgba(37, 99, 235, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom left, rgba(29, 78, 216, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(30, 64, 175, 0.18) 0%, transparent 50%),
+    linear-gradient(135deg, #050510 0%, #0a0a1a 25%, #1a1a2e 50%, #0f0f23 75%, #050510 100%);
   background-attachment: fixed;
   background-repeat: no-repeat;
   background-size: cover;
@@ -95,6 +100,13 @@ body {
 
 .nav-brand {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-logo {
+  flex-shrink: 0;
 }
 
 .brand-text {
@@ -207,16 +219,17 @@ body {
 }
 
 .hero-container {
-  max-width: 1400px;
+  max-width: 800px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .hero-left {
-  padding-right: 2rem;
+  text-align: center;
 }
 
 .hero-title {
@@ -242,12 +255,14 @@ body {
   gap: 1rem;
   margin-bottom: 3rem;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .stats-row {
   display: flex;
   gap: 2rem;
   margin-top: 2rem;
+  justify-content: center;
 }
 
 .stat-item {
@@ -274,27 +289,7 @@ body {
   align-items: center;
 }
 
-.shield-logo {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
 
-.shield-logo svg {
-  max-width: 100%;
-  height: auto;
-  filter: drop-shadow(0 10px 25px rgba(34, 197, 94, 0.4));
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
 
 .featured-nft {
   background: var(--card-background);
@@ -387,6 +382,106 @@ body {
   max-width: 1200px;
 }
 
+/* Statistics Section */
+.statistics-section {
+  padding: 4rem 2rem;
+  background: transparent;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.stat-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 3rem 2rem;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.stat-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%);
+  pointer-events: none;
+}
+
+.stat-box:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.stat-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.stat-box:nth-child(1) .stat-icon {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+}
+
+.stat-box:nth-child(2) .stat-icon {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.3);
+}
+
+.stat-box:nth-child(3) .stat-icon {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
+}
+
+.stat-content {
+  position: relative;
+  z-index: 1;
+}
+
+.stat-number {
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  opacity: 0.8;
+}
+
 .news-card {
   background: var(--card-background);
   border-radius: 1rem;
@@ -466,6 +561,169 @@ body {
   background: rgba(139, 92, 246, 0.1);
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
+}
+
+/* Latest Verified Facebook News Section */
+.latest-news-section {
+    padding: 80px 0;
+    background: transparent;
+}
+
+.news-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 24px;
+    margin-top: 40px;
+}
+
+.news-item {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.news-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.news-thumbnail {
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.thumbnail-placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    position: relative;
+}
+
+.thumbnail-placeholder.climate {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.thumbnail-placeholder.tech {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.thumbnail-placeholder.health {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.thumbnail-placeholder.economy {
+    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+}
+
+.thumbnail-placeholder.politics {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+
+.thumbnail-placeholder.science {
+    background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
+}
+
+.thumbnail-placeholder::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+}
+
+.news-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.news-headline {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.news-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.news-source {
+    font-size: 14px;
+    color: #a0a0a0;
+    font-weight: 500;
+}
+
+.verification-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 12px;
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.verification-badge.verified i {
+    font-size: 12px;
+}
+
+@media (max-width: 768px) {
+    .latest-news-section {
+        padding: 60px 0;
+    }
+    
+    .news-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-top: 30px;
+    }
+    
+    .news-item {
+        padding: 16px;
+        gap: 12px;
+    }
+    
+    .news-thumbnail {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .news-headline {
+        font-size: 15px;
+    }
+    
+    .news-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
 }
 
 /* Top Verifiers Section */
