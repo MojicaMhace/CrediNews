@@ -354,6 +354,43 @@ class NewsAnalyzer {
     }
 }
 
+// Demo Button Handler
+class DemoButtonHandler {
+    constructor() {
+        this.init();
+    }
+
+    init() {
+        const demoBtn = document.getElementById('demoBtn');
+        if (demoBtn) {
+            // Add mousedown and mouseup events for better control
+            demoBtn.addEventListener('mousedown', () => this.activateButton(demoBtn));
+            demoBtn.addEventListener('mouseup', () => this.deactivateButton(demoBtn));
+            demoBtn.addEventListener('mouseleave', () => this.deactivateButton(demoBtn));
+            
+            // Add touch events for mobile
+            demoBtn.addEventListener('touchstart', () => this.activateButton(demoBtn));
+            demoBtn.addEventListener('touchend', () => this.deactivateButton(demoBtn));
+        }
+    }
+
+    activateButton(btn) {
+        btn.style.background = 'var(--primary-color)';
+        btn.style.color = 'white';
+        btn.style.borderColor = 'var(--primary-color)';
+        btn.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.4)';
+        btn.style.transform = 'translateY(1px)';
+    }
+
+    deactivateButton(btn) {
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--text-secondary)';
+        btn.style.borderColor = 'var(--border-color)';
+        btn.style.boxShadow = 'none';
+        btn.style.transform = 'translateY(0)';
+    }
+}
+
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize managers
@@ -361,6 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.navigationManager = new NavigationManager();
     window.chartManager = new ChartManager();
     window.newsAnalyzer = new NewsAnalyzer();
+    window.demoButtonHandler = new DemoButtonHandler();
 
     // Hide results section initially
     const resultsSection = document.getElementById('resultsSection');
