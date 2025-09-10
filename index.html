@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrediNews - News Credibility Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="brand-text">CREDI NEWS</span>
+            </div>
+            <div class="nav-center">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Search">
+                </div>
+            </div>
+            <div class="nav-controls">
+                <button class="verify-btn">
+                    Verify
+                </button>
+                <button class="theme-toggle" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-container">
+                <div class="hero-left">
+                    <h1 class="hero-title">Discover, Collect<br>and Sell Dope<br>Art and NFTs</h1>
+                    <p class="hero-subtitle">The world's largest digital marketplace for crypto<br>collectibles and non-fungible tokens. Buy, sell, and discover exclusive digital items.</p>
+                    <div class="hero-buttons">
+                        <button class="btn-primary" id="exploreBtn">
+                            Explore
+                        </button>
+                        <button class="btn-secondary" id="createBtn">
+                            Create
+                        </button>
+                        <button class="btn-outline" id="sellBtn">
+                            Sell NFT
+                        </button>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <span class="stat-value">432K</span>
+                            <span class="stat-label">Articles Verified</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">200K</span>
+                            <span class="stat-label">Sources Analyzed</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">10K</span>
+                            <span class="stat-label">Active Users</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-right">
+                    <div class="featured-nft">
+                        <div class="nft-image">
+                            <div class="nft-placeholder"></div>
+                        </div>
+                        <div class="nft-info">
+                            <h3>Latest Verification Report</h3>
+                            <div class="nft-stats">
+                                <div class="nft-stat">
+                                    <span class="label">SCORE</span>
+                                    <span class="value">94%</span>
+                                </div>
+                                <div class="nft-stat">
+                                    <span class="label">STATUS</span>
+                                    <span class="value">VERIFIED</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Popular Section -->
+        <section class="popular-section">
+            <div class="container">
+                <h2 class="section-title">Popular this week</h2>
+                <div class="popular-grid">
+                    <div class="news-card">
+                        <div class="card-image purple"></div>
+                        <div class="card-content">
+                            <h4>Climate Change Report</h4>
+                            <div class="card-stats">
+                                <span class="credibility-score">92%</span>
+                                <span class="verification-badge">✓ Verified</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-card">
+                        <div class="card-image pink"></div>
+                        <div class="card-content">
+                            <h4>Tech Innovation News</h4>
+                            <div class="card-stats">
+                                <span class="credibility-score">88%</span>
+                                <span class="verification-badge">✓ Verified</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-card featured">
+                        <div class="card-image blue"></div>
+                        <div class="card-content">
+                            <h4>Economic Analysis</h4>
+                            <div class="card-stats">
+                                <span class="credibility-score">96%</span>
+                                <span class="verification-badge">✓ Verified</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-card">
+                        <div class="card-image orange"></div>
+                        <div class="card-content">
+                            <h4>Health Research</h4>
+                            <div class="card-stats">
+                                <span class="credibility-score">91%</span>
+                                <span class="verification-badge">✓ Verified</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-card">
+                        <div class="card-image teal"></div>
+                        <div class="card-content">
+                            <h4>Political Update</h4>
+                            <div class="card-stats">
+                                <span class="credibility-score">85%</span>
+                                <span class="verification-badge">⚠ Caution</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Top Verifiers Section -->
+        <section class="top-verifiers-section">
+            <div class="container">
+                <h2 class="section-title">Top Verifiers</h2>
+                <div class="verifiers-grid">
+                    <div class="verifier-card">
+                        <div class="verifier-avatar"></div>
+                        <div class="verifier-info">
+                            <h4>Dr. Sarah Chen</h4>
+                            <p>Fact-Check Expert</p>
+                            <div class="verifier-stats">
+                                <span>1.2K verifications</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="verifier-card">
+                        <div class="verifier-avatar"></div>
+                        <div class="verifier-info">
+                            <h4>Prof. Michael Torres</h4>
+                            <p>Media Analyst</p>
+                            <div class="verifier-stats">
+                                <span>980 verifications</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="verifier-card">
+                        <div class="verifier-avatar"></div>
+                        <div class="verifier-info">
+                            <h4>Dr. Emily Rodriguez</h4>
+                            <p>Research Specialist</p>
+                            <div class="verifier-stats">
+                                <span>856 verifications</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="verifier-card">
+                        <div class="verifier-avatar"></div>
+                        <div class="verifier-info">
+                            <h4>James Wilson</h4>
+                            <p>Investigative Journalist</p>
+                            <div class="verifier-stats">
+                                <span>743 verifications</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="verifier-card">
+                        <div class="verifier-avatar"></div>
+                        <div class="verifier-info">
+                            <h4>Dr. Lisa Park</h4>
+                            <p>Data Scientist</p>
+                            <div class="verifier-stats">
+                                <span>692 verifications</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="verifier-card">
+                        <div class="verifier-avatar"></div>
+                        <div class="verifier-info">
+                            <h4>Alex Thompson</h4>
+                            <p>News Analyst</p>
+                            <div class="verifier-stats">
+                                <span>634 verifications</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="verifier-card">
+                        <div class="verifier-avatar"></div>
+                        <div class="verifier-info">
+                            <h4>Dr. Maria Santos</h4>
+                            <p>Information Specialist</p>
+                            <div class="verifier-stats">
+                                <span>587 verifications</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="verifier-card">
+                        <div class="verifier-avatar"></div>
+                        <div class="verifier-info">
+                            <h4>Robert Kim</h4>
+                            <p>Tech Journalist</p>
+                            <div class="verifier-stats">
+                                <span>521 verifications</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section">
+            <div class="container">
+                <!-- Input Section -->
+                <div class="input-section">
+                    <div class="input-group">
+                        <textarea 
+                            id="newsInput" 
+                            placeholder="Paste a news link, headline, or full article text here..."
+                            rows="4"
+                        ></textarea>
+                        <button class="check-btn" id="checkBtn">
+                            <i class="fas fa-search"></i>
+                            Check News
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div class="results-section" id="resultsSection">
+                    <!-- Credibility Score -->
+                    <div class="result-card score-card">
+                        <h3>Credibility Score</h3>
+                        <div class="score-display">
+                            <div class="score-number" id="scoreNumber">85</div>
+                            <div class="score-chart">
+                                <canvas id="scoreChart" width="150" height="150"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Classification -->
+                    <div class="result-card classification-card">
+                        <h3>Classification</h3>
+                        <div class="classification-result real" id="classificationResult">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Likely Real</span>
+                        </div>
+                        <div class="confidence">
+                            <span>Confidence: <strong id="confidenceLevel">87%</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Fact Check Results -->
+                    <div class="result-card fact-check-card">
+                        <h3>Related Fact-Checks</h3>
+                        <div class="fact-check-list" id="factCheckList">
+                            <div class="fact-check-item">
+                                <div class="fact-check-source">Snopes</div>
+                                <div class="fact-check-verdict verified">Verified</div>
+                            </div>
+                            <div class="fact-check-item">
+                                <div class="fact-check-source">PolitiFact</div>
+                                <div class="fact-check-verdict mostly-true">Mostly True</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Poster Detection -->
+                    <div class="result-card poster-card">
+                        <h3>Source Analysis</h3>
+                        <div class="poster-info">
+                            <div class="poster-item">
+                                <span class="label">Source Type:</span>
+                                <span class="value">News Website</span>
+                            </div>
+                            <div class="poster-item">
+                                <span class="label">Domain Age:</span>
+                                <span class="value">5+ years</span>
+                            </div>
+                            <div class="poster-item">
+                                <span class="label">Reputation:</span>
+                                <span class="value trusted">Trusted</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Trends Section -->
+        <section id="trends" class="section">
+            <div class="container">
+                <h1 class="page-title">Misinformation Trends</h1>
+                <div class="trends-grid">
+                    <div class="trend-card">
+                        <h3>Weekly Misinformation Rate</h3>
+                        <canvas id="weeklyTrendChart" width="400" height="200"></canvas>
+                    </div>
+                    <div class="trend-card">
+                        <h3>Top Categories</h3>
+                        <canvas id="categoryChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings" class="section">
+            <div class="container">
+                <h1 class="page-title">Account Settings</h1>
+                <div class="settings-grid">
+                    <div class="setting-card">
+                        <h3>Profile Information</h3>
+                        <div class="setting-item">
+                            <label>Email</label>
+                            <input type="email" value="user@example.com" readonly>
+                        </div>
+                        <div class="setting-item">
+                            <label>Name</label>
+                            <input type="text" value="John Doe">
+                        </div>
+                    </div>
+                    <div class="setting-card">
+                        <h3>Preferences</h3>
+                        <div class="setting-item">
+                            <label>Theme</label>
+                            <select>
+                                <option>Auto</option>
+                                <option>Light</option>
+                                <option>Dark</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Notifications</label>
+                            <input type="checkbox" checked>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
