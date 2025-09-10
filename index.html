@@ -23,7 +23,7 @@
             </div>
             <div class="nav-controls">
                 <button class="verify-btn">
-                    Connect
+                    Verify
                 </button>
                 <button class="theme-toggle" id="themeToggle">
                     <i class="fas fa-moon"></i>
@@ -67,23 +67,78 @@
                     </div>
                 </div>
                 <div class="hero-right">
-                    <div class="featured-nft">
-                        <div class="nft-image">
-                            <div class="nft-placeholder"></div>
-                        </div>
-                        <div class="nft-info">
-                            <h3>Breaking News Report</h3>
-                            <div class="nft-stats">
-                                <div class="nft-stat">
-                                    <span class="label">Credibility Score</span>
-                                    <span class="value">94.5%</span>
-                                </div>
-                                <div class="nft-stat">
-                                    <span class="label">Verification Status</span>
-                                    <span class="value">VERIFIED</span>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="shield-logo">
+                        <svg width="300" height="350" viewBox="0 0 300 350" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <!-- Main shield gradient -->
+                                <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#22C55E;stop-opacity:1" />
+                                    <stop offset="30%" style="stop-color:#16A34A;stop-opacity:1" />
+                                    <stop offset="70%" style="stop-color:#15803D;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#166534;stop-opacity:1" />
+                                </linearGradient>
+                                <!-- Inner highlight gradient -->
+                                <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#4ADE80;stop-opacity:0.8" />
+                                    <stop offset="100%" style="stop-color:#22C55E;stop-opacity:0.3" />
+                                </linearGradient>
+                                <!-- Shadow filter -->
+                                <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                                    <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.3"/>
+                                </filter>
+                                <!-- Inner shadow -->
+                                <filter id="innerShadow">
+                                    <feOffset dx="0" dy="-2"/>
+                                    <feGaussianBlur stdDeviation="3" result="offset-blur"/>
+                                    <feFlood flood-color="#000000" flood-opacity="0.2"/>
+                                    <feComposite in2="offset-blur" operator="in"/>
+                                </filter>
+                            </defs>
+                            
+                            <!-- Main shield shadow -->
+                            <path d="M150 35 L245 75 L245 185 Q245 225 215 255 Q185 285 150 325 Q115 285 85 255 Q55 225 55 185 L55 75 Z" 
+                                  fill="#000000" 
+                                  opacity="0.2"/>
+                            
+                            <!-- Main shield body -->
+                            <path d="M150 30 L240 70 L240 180 Q240 220 210 250 Q180 280 150 320 Q120 280 90 250 Q60 220 60 180 L60 70 Z" 
+                                  fill="url(#shieldGradient)" 
+                                  stroke="#15803D" 
+                                  stroke-width="2" 
+                                  filter="url(#shadow)"/>
+                            
+                            <!-- Inner highlight -->
+                            <path d="M150 40 L220 75 L220 170 Q220 200 200 225 Q180 250 150 280 Q120 250 100 225 Q80 200 80 170 L80 75 Z" 
+                                  fill="url(#highlightGradient)" 
+                                  opacity="0.6"/>
+                            
+                            <!-- Border rim -->
+                            <path d="M150 30 L240 70 L240 180 Q240 220 210 250 Q180 280 150 320 Q120 280 90 250 Q60 220 60 180 L60 70 Z" 
+                                  fill="none" 
+                                  stroke="#065F46" 
+                                  stroke-width="3"/>
+                            
+                            <!-- Central emblem background -->
+                            <circle cx="150" cy="160" r="45" fill="#FFFFFF" opacity="0.9" stroke="#15803D" stroke-width="2"/>
+                            
+                            <!-- Checkmark -->
+                            <path d="M125 160 L140 175 L175 140" 
+                                  stroke="#15803D" 
+                                  stroke-width="6" 
+                                  stroke-linecap="round" 
+                                  stroke-linejoin="round" 
+                                  fill="none"/>
+                            
+                            <!-- Decorative elements -->
+                            <circle cx="150" cy="100" r="3" fill="#FFFFFF" opacity="0.8"/>
+                            <circle cx="150" cy="240" r="2" fill="#FFFFFF" opacity="0.6"/>
+                            
+                            <!-- Side ornaments -->
+                            <path d="M100 90 L100 110 M200 90 L200 110" stroke="#FFFFFF" stroke-width="2" opacity="0.7" stroke-linecap="round"/>
+                            
+                            <!-- Top ornament -->
+                            <path d="M140 50 L150 40 L160 50" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linejoin="round"/>
+                        </svg>
                     </div>
                 </div>
             </div>
