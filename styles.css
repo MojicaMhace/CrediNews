@@ -117,6 +117,53 @@ body {
   letter-spacing: -0.02em;
 }
 
+.nav-menu {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.nav-links {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  align-items: center;
+}
+
+.nav-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 12px 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex: 1;
+  text-align: center;
+  border-radius: 20px !important;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.nav-link:hover {
+  color: var(--primary-color);
+  background: rgba(34, 197, 94, 0.1);
+  transform: scale(1.02);
+  border-radius: 20px !important;
+}
+
+.nav-link.active {
+  color: var(--text-primary);
+  background: var(--primary-color);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+  border-radius: 20px !important;
+}
+
 .nav-center {
   flex: 2;
   display: flex;
@@ -126,17 +173,17 @@ body {
 .search-container {
   position: relative;
   width: 100%;
-  max-width: 500px;
+  max-width: 280px;
 }
 
 .search-input {
   width: 100%;
-  padding: 14px 16px 14px 48px;
+  padding: 10px 12px 10px 36px;
   background: rgba(30, 30, 60, 0.6);
   border: 1px solid var(--border-color);
-  border-radius: 32px;
+  border-radius: 24px;
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 14px;
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
 }
@@ -155,11 +202,11 @@ body {
 
 .search-icon {
   position: absolute;
-  left: 16px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .nav-controls {
@@ -167,7 +214,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 16px;
+  gap: 12px;
 }
 
 .verify-btn {
@@ -1737,6 +1784,92 @@ body {
 
 
 
+/* About Section Styles */
+.about-content {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.about-mission,
+.about-features,
+.about-contact {
+  margin-bottom: 48px;
+}
+
+.about-mission h3,
+.about-features h3,
+.about-contact h3 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.about-mission p,
+.about-contact p {
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 32px;
+  margin-top: 32px;
+}
+
+.feature-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(34, 197, 94, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.feature-card i {
+  font-size: 48px;
+  color: var(--primary-color);
+  margin-bottom: 16px;
+  display: block;
+}
+
+.feature-card h4 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.feature-card p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.about-contact a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.about-contact a:hover {
+  text-decoration: underline;
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .hero-container {
@@ -1766,24 +1899,52 @@ body {
   }
   
   .nav-brand,
+  .nav-menu,
   .nav-center,
   .nav-controls {
     flex: none;
   }
   
+  .nav-menu {
+    order: 2;
+    width: 100%;
+  }
+  
+  .nav-links {
+    justify-content: center;
+    gap: 0;
+    flex-wrap: nowrap;
+  }
+  
+  .nav-link {
+    font-size: 13px;
+    padding: 10px 12px;
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    border-radius: 20px !important;
+    display: inline-block;
+    overflow: hidden;
+  }
+  
+  .nav-link:hover {
+    transform: scale(1.01);
+    border-radius: 20px !important;
+  }
+  
   .nav-center {
     width: 100%;
-    order: 3;
+    order: 4;
   }
   
   .nav-controls {
-    order: 2;
+    order: 3;
     justify-content: center;
     gap: 12px;
   }
   
   .search-container {
-    max-width: none;
+    max-width: 200px;
   }
 
   .verify-btn {
@@ -1875,6 +2036,21 @@ body {
   .trends-grid,
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .feature-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  
+  .feature-card {
+    padding: 24px 20px;
+  }
+  
+  .about-mission h3,
+  .about-features h3,
+  .about-contact h3 {
+    font-size: 24px;
   }
 }
 
