@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit News - CrediNews</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="submit-news-page">
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <i class="fas fa-shield-alt"></i>
+                CrediNews
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="submit-news.html" class="nav-link active">Submit News</a></li>
+                <li><a href="#" class="nav-link">Verify News</a></li>
+                <li><a href="#" class="nav-link">About</a></li>
+            </ul>
+            <div class="user-menu">
+                <i class="fas fa-user"></i>
+                mhacemojica
+                <i class="fas fa-chevron-down"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-title-section">
+                <h1 class="page-title">Submit News Article</h1>
+                <div class="title-underline"></div>
+            </div>
+
+            <div class="submit-news-container">
+                <div class="submit-news-card">
+                    <form class="submit-form" id="submitForm">
+                        <div class="form-group">
+                            <label for="articleTitle" class="form-label" style="color: #000000 !important;">Article Title <span class="required">*</span></label>
+                            <input type="text" id="articleTitle" name="articleTitle" class="form-input" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="articleContent" class="form-label" style="color: #000000 !important;">Article Content <span class="required">*</span></label>
+                            <textarea id="articleContent" name="articleContent" class="form-textarea" rows="8" required></textarea>
+                            <div class="character-count" id="characterCount">0/5000 characters</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="source" class="form-label" style="color: #000000 !important;">Source <span class="required">*</span></label>
+                            <input type="text" id="source" name="source" class="form-input" placeholder="Website, newspaper, or original source" style="color: #000000 !important; --placeholder-color: #6b7280;" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="publicationDate" class="form-label" style="color: #000000 !important;">Publication Date</label>
+                            <input type="date" id="publicationDate" name="publicationDate" class="form-input">
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="encrypt" name="encrypt" class="form-checkbox">
+                                <span class="checkmark"></span>
+                                Encrypt this article (for sensitive content)
+                            </label>
+                        </div>
+
+                        <button type="submit" class="submit-btn">
+                            <i class="fas fa-paper-plane"></i>
+                            Submit Article
+                        </button>
+                    </form>
+                </div>
+
+                <div class="guidelines-card">
+                    <div class="guidelines-header">
+                        <i class="fas fa-info-circle"></i>
+                        <h3>Submission Guidelines</h3>
+                    </div>
+                    <ul class="guidelines-list">
+                        <li>All submissions are analyzed by our AI system for credibility.</li>
+                        <li>Provide accurate source information to improve credibility assessment.</li>
+                        <li>For sensitive content, use the encryption option to protect your data.</li>
+                        <li>Submitted articles will be reviewed by our team if flagged by the AI system.</li>
+                    </ul>
+                </div>
+
+                <!-- Divider -->
+                <div class="section-divider"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <div class="footer-logo">
+                        <span class="logo-icon"></span>
+                        <span class="logo-text">CrediNews</span>
+                    </div>
+                    <p class="footer-description">An AI-driven platform dedicated to combating fake news and misinformation through advanced verification technology.</p>
+                </div>
+                <div class="footer-right">
+                    <div class="footer-column">
+                        <h4>Links</h4>
+                        <ul>
+                            <li><a href="index.html">Home</a></li>
+                            <li><a href="#">About</a></li>
+                            <li><a href="#">Verify News</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Resources</h4>
+                        <ul>
+                            <li><a href="#">FAQ</a></li>
+                            <li><a href="#">Privacy Policy</a></li>
+                            <li><a href="#">Terms of Service</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 CrediNews. All rights reserved.</p>
+                <p>Designed with ❤️ for truth seekers</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="submit-news.js"></script>
+</body>
+</html>
