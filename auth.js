@@ -210,6 +210,13 @@ class AuthManager {
             
             console.log('✅ User created successfully:', user.uid);
             
+            // Update user profile with display name
+            console.log('👤 Setting user display name...');
+            await user.updateProfile({
+                displayName: fullName
+            });
+            console.log('✅ User display name set to:', fullName);
+            
             // Wait for auth state to be established
             await new Promise(resolve => {
                 const unsubscribe = firebase.auth().onAuthStateChanged(authUser => {
@@ -222,16 +229,40 @@ class AuthManager {
             
             console.log('✅ Auth state confirmed');
             
-            // Try to store user profile in Firestore
-            console.log('💾 Storing user profile in Firestore...');
+            // Try to store comprehensive user profile in Firestore
+            console.log('💾 Creating complete user account profile...');
+            const userProfile = {
+                fullName: fullName,
+                email: email,
+                displayName: fullName,
+                createdAt: new Date().toISOString(),
+                lastLoginAt: new Date().toISOString(),
+                role: 'user',
+                status: 'active',
+                emailVerified: user.emailVerified,
+                accountType: 'standard',
+                preferences: {
+                    notifications: true,
+                    newsletter: true,
+                    theme: 'light'
+                },
+                profile: {
+                    bio: '',
+                    location: '',
+                    website: '',
+                    avatar: ''
+                },
+                stats: {
+                    articlesSubmitted: 0,
+                    articlesVerified: 0,
+                    reputationScore: 0
+                }
+            };
+            
             try {
-                await firebase.firestore().collection('users').doc(user.uid).set({
-                    fullName: fullName,
-                    email: email,
-                    createdAt: new Date().toISOString(),
-                    role: 'user'
-                });
-                console.log('✅ User profile stored in Firestore');
+                await firebase.firestore().collection('users').doc(user.uid).set(userProfile);
+                console.log('✅ Complete user account profile created in Firestore');
+                console.log('📊 Account includes: profile, preferences, and stats tracking');
             } catch (firestoreError) {
                 console.warn('⚠️ Could not store user profile in Firestore:', firestoreError.message);
                 console.log('📝 This might be due to Firestore security rules, but registration still succeeded');
