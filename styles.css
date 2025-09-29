@@ -3451,7 +3451,13 @@ input#source {
 }
 
 input#source::placeholder {
-  color: #6b7280 !important;
+  color: var(--placeholder-color, #6b7280) !important;
+  opacity: 1 !important;
+}
+
+/* Additional fallback for stubborn green color */
+input[style*="--placeholder-color"]::placeholder {
+  color: var(--placeholder-color) !important;
   opacity: 1 !important;
 }
 

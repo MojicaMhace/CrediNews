@@ -1,5 +1,7 @@
 // CrediNews Submit News Page JavaScript
 
+// Firebase will be available globally after firebase-config.js loads
+
 // DOM Elements
 const form = document.getElementById('submitForm');
 const articleTitle = document.getElementById('articleTitle');
@@ -27,15 +29,54 @@ document.addEventListener('DOMContentLoaded', function() {
 function fixSourcePlaceholderColor() {
     const sourceInput = document.getElementById('source');
     if (sourceInput) {
-        // Add specific CSS rule for this input
-        const style = document.createElement('style');
-        style.textContent = `
-            #source::placeholder {
-                color: #6b7280 !important;
-                opacity: 1 !important;
+        const placeholderText = sourceInput.getAttribute('data-placeholder') || 'Website, newspaper, or original source';
+        
+        // Create custom placeholder functionality
+        function updatePlaceholder() {
+            if (sourceInput.value === '' || sourceInput.getAttribute('data-is-placeholder') === 'true') {
+                sourceInput.style.color = '#6b7280';
+                sourceInput.style.fontStyle = 'italic';
+                sourceInput.value = placeholderText;
+                sourceInput.setAttribute('data-is-placeholder', 'true');
             }
-        `;
-        document.head.appendChild(style);
+        }
+        
+        function clearPlaceholder() {
+            if (sourceInput.getAttribute('data-is-placeholder') === 'true') {
+                sourceInput.value = '';
+                sourceInput.style.color = '#000000';
+                sourceInput.style.fontStyle = 'normal';
+                sourceInput.removeAttribute('data-is-placeholder');
+            }
+        }
+        
+        // Force clear any existing value first
+        sourceInput.value = '';
+        sourceInput.removeAttribute('data-is-placeholder');
+        
+        // Initialize placeholder immediately
+        updatePlaceholder();
+        
+        // Also set with timeout as backup
+        setTimeout(() => {
+            if (sourceInput.value === '') {
+                updatePlaceholder();
+            }
+        }, 50);
+        
+        // Handle focus and blur events
+        sourceInput.addEventListener('focus', clearPlaceholder);
+        sourceInput.addEventListener('blur', updatePlaceholder);
+        
+        // Handle form submission to clear placeholder
+        const form = sourceInput.closest('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                if (sourceInput.getAttribute('data-is-placeholder') === 'true') {
+                    sourceInput.value = '';
+                }
+            });
+        }
     }
 }
 
@@ -307,29 +348,48 @@ function handleFormSubmission(e) {
     }
 }
 
-function submitForm() {
-    // Collect form data
-    const formData = {
-        articleTitle: document.getElementById('articleTitle').value.trim(),
-        articleContent: document.getElementById('articleContent').value.trim(),
-        source: document.getElementById('source').value.trim(),
-        publicationDate: document.getElementById('publicationDate').value,
-        encrypt: document.getElementById('encrypt').checked,
-        submittedAt: new Date().toISOString()
-    };
-    
-    // Simulate form submission
-    console.log('Submitting form data:', formData);
-    
-    // Show success message
-    showSuccessMessage();
-    
-    // Reset form after successful submission
-    setTimeout(() => {
-        form.reset();
-        updateCharacterCount();
-        clearAllErrors();
-    }, 2000);
+async function submitForm() {
+    try {
+        // Check if user is authenticated
+        if (!firebase.auth().currentUser) {
+            showFormError('You must be logged in to submit news articles.');
+            return;
+        }
+
+        // Collect form data
+        const formData = {
+            articleTitle: document.getElementById('articleTitle').value.trim(),
+            articleContent: document.getElementById('articleContent').value.trim(),
+            source: document.getElementById('source').value.trim(),
+            publicationDate: document.getElementById('publicationDate').value,
+            encrypt: document.getElementById('encrypt').checked,
+            submittedBy: firebase.auth().currentUser.uid,
+            submitterEmail: firebase.auth().currentUser.email,
+            status: 'pending', // pending, verified, rejected
+            submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            verificationScore: null,
+            verifiedBy: null,
+            verifiedAt: null
+        };
+        
+        // Add to Firestore
+        const docRef = await firebase.firestore().collection('news_submissions').add(formData);
+        console.log('News article submitted with ID:', docRef.id);
+        
+        // Show success message
+        showSuccessMessage();
+        
+        // Reset form after successful submission
+        setTimeout(() => {
+            form.reset();
+            updateCharacterCount();
+            clearAllErrors();
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error submitting news article:', error);
+        showFormError('Failed to submit news article. Please try again.');
+    }
 }
 
 function showSuccessMessage() {

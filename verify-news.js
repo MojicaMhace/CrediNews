@@ -1,5 +1,7 @@
 // Verify News Page JavaScript
 
+// Firebase will be available globally after firebase-config.js loads
+
 // DOM Elements
 const textVerifyBtn = document.getElementById('textVerifyBtn');
 const urlVerifyBtn = document.getElementById('urlVerifyBtn');
@@ -101,7 +103,29 @@ function extractDomain(url) {
 }
 
 // Show verification results
-function showVerificationResult(type, data) {
+async function showVerificationResult(type, data) {
+    // Store verification result in Firebase
+    try {
+        const verificationData = {
+            type: type, // 'text' or 'url'
+            content: type === 'text' ? articleContent.value.trim() : null,
+            url: type === 'url' ? articleUrl.value.trim() : null,
+            domain: data.domain || null,
+            credibilityScore: data.credibilityScore,
+            sourcesFound: data.sources,
+            factChecks: data.factChecks,
+            verifiedBy: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
+            verifierEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
+            verifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            summary: getScoreSummary(data.credibilityScore)
+        };
+        
+        await firebase.firestore().collection('verification_results').add(verificationData);
+        console.log('Verification result stored in Firebase');
+    } catch (error) {
+        console.error('Error storing verification result:', error);
+    }
+    
     const resultHtml = `
         <div class="verification-result">
             <h3>Verification Results</h3>
