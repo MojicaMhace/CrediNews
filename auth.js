@@ -1,6 +1,12 @@
+// Firebase will be available globally after firebase-config.js loads
+
+console.log('🔧 auth.js is loading...');
+
 // Authentication Manager
 class AuthManager {
     constructor() {
+        console.log('🔧 AuthManager constructor called');
+        this.googleProvider = new firebase.auth.GoogleAuthProvider();
         this.init();
     }
 
@@ -31,16 +37,24 @@ class AuthManager {
     }
 
     bindEvents() {
+        console.log('🔗 Binding events...');
+        
         // Login form
         const loginForm = document.getElementById('loginForm');
         if (loginForm) {
+            console.log('✅ Login form found, binding event');
             loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        } else {
+            console.log('ℹ️ Login form not found (this is normal on register page)');
         }
 
         // Register form
         const registerForm = document.getElementById('registerForm');
         if (registerForm) {
+            console.log('✅ Register form found, binding event');
             registerForm.addEventListener('submit', (e) => this.handleRegister(e));
+        } else {
+            console.log('❌ Register form NOT found!');
         }
 
         // Google Sign In
@@ -80,12 +94,14 @@ class AuthManager {
         this.setButtonLoading(submitBtn, true);
 
         try {
-            // Simulate API call
-            await this.simulateApiCall();
+            // Firebase authentication
+            const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+            const user = userCredential.user;
             
             // Store auth state
             const authData = {
-                email: email,
+                uid: user.uid,
+                email: user.email,
                 isAuthenticated: true,
                 loginTime: new Date().toISOString()
             };
@@ -98,13 +114,31 @@ class AuthManager {
 
             this.showSuccess('Login successful! Redirecting...');
             
-            // Redirect to dashboard
+            // Redirect after success
             setTimeout(() => {
                 window.location.href = 'index.html';
             }, 1500);
 
         } catch (error) {
-            this.showError('Login failed. Please check your credentials.');
+            console.error('Login error:', error);
+            let errorMessage = 'Login failed. Please try again.';
+            
+            switch (error.code) {
+                case 'auth/user-not-found':
+                    errorMessage = 'No account found with this email address.';
+                    break;
+                case 'auth/wrong-password':
+                    errorMessage = 'Incorrect password. Please try again.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Invalid email address format.';
+                    break;
+                case 'auth/too-many-requests':
+                    errorMessage = 'Too many failed attempts. Please try again later.';
+                    break;
+            }
+            
+            this.showError(errorMessage);
         } finally {
             this.setButtonLoading(submitBtn, false);
         }
@@ -112,6 +146,7 @@ class AuthManager {
 
     async handleRegister(e) {
         e.preventDefault();
+        console.log('🚀 Registration form submitted');
         
         const formData = new FormData(e.target);
         const fullName = formData.get('fullName');
@@ -120,50 +155,101 @@ class AuthManager {
         const confirmPassword = formData.get('confirmPassword');
         const terms = formData.get('terms');
 
+        console.log('📝 Form data:', { fullName, email, password: '***', confirmPassword: '***', terms });
+
         // Validate form
         if (!fullName || fullName.trim().length < 2) {
+            console.log('❌ Validation failed: Full name');
             this.showError('Please enter your full name.');
             return;
         }
 
         if (!this.validateEmail(email)) {
+            console.log('❌ Validation failed: Email');
             this.showError('Please enter a valid email address.');
             return;
         }
 
         if (!password || password.length < 6) {
+            console.log('❌ Validation failed: Password length');
             this.showError('Password must be at least 6 characters long.');
             return;
         }
 
         if (password !== confirmPassword) {
+            console.log('❌ Validation failed: Password mismatch');
             this.showError('Passwords do not match.');
             return;
         }
 
         if (!terms) {
+            console.log('❌ Validation failed: Terms not accepted');
             this.showError('Please accept the Terms of Service and Privacy Policy.');
             return;
         }
+
+        console.log('✅ All validations passed');
 
         // Show loading state
         const submitBtn = e.target.querySelector('button[type="submit"]');
         this.setButtonLoading(submitBtn, true);
 
         try {
-            // Simulate API call
-            await this.simulateApiCall();
+            console.log('🔥 Starting Firebase registration...');
+            
+            // Check if Firebase is available
+            if (typeof firebase === 'undefined') {
+                throw new Error('Firebase is not loaded');
+            }
+            
+            console.log('🔥 Firebase is available, creating user...');
+            
+            // Firebase authentication - create user
+            const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+            const user = userCredential.user;
+            
+            console.log('✅ User created successfully:', user.uid);
+            
+            // Wait for auth state to be established
+            await new Promise(resolve => {
+                const unsubscribe = firebase.auth().onAuthStateChanged(authUser => {
+                    if (authUser && authUser.uid === user.uid) {
+                        unsubscribe();
+                        resolve();
+                    }
+                });
+            });
+            
+            console.log('✅ Auth state confirmed');
+            
+            // Try to store user profile in Firestore
+            console.log('💾 Storing user profile in Firestore...');
+            try {
+                await firebase.firestore().collection('users').doc(user.uid).set({
+                    fullName: fullName,
+                    email: email,
+                    createdAt: new Date().toISOString(),
+                    role: 'user'
+                });
+                console.log('✅ User profile stored in Firestore');
+            } catch (firestoreError) {
+                console.warn('⚠️ Could not store user profile in Firestore:', firestoreError.message);
+                console.log('📝 This might be due to Firestore security rules, but registration still succeeded');
+            }
             
             // Store auth state
             const authData = {
-                email: email,
+                uid: user.uid,
+                email: user.email,
                 fullName: fullName,
                 isAuthenticated: true,
                 registrationTime: new Date().toISOString()
             };
             
             sessionStorage.setItem('authData', JSON.stringify(authData));
+            console.log('✅ Auth data stored in session storage');
 
+            console.log('🎉 Registration completed successfully!');
             this.showSuccess('Registration successful! Redirecting...');
             
             // Redirect to dashboard
@@ -172,9 +258,32 @@ class AuthManager {
             }, 1500);
 
         } catch (error) {
-            this.showError('Registration failed. Please try again.');
+            console.error('❌ Registration error:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
+            
+            let errorMessage = 'Registration failed. Please try again.';
+            
+            switch (error.code) {
+                case 'auth/email-already-in-use':
+                    errorMessage = 'An account with this email already exists.';
+                    break;
+                case 'auth/weak-password':
+                    errorMessage = 'Password is too weak. Please choose a stronger password.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Invalid email address format.';
+                    break;
+                case 'auth/configuration-not-found':
+                    errorMessage = 'Firebase configuration error. Please contact support.';
+                    break;
+            }
+            
+            console.log('📢 Showing error message:', errorMessage);
+            this.showError(errorMessage);
         } finally {
             this.setButtonLoading(submitBtn, false);
+            console.log('🔄 Button loading state reset');
         }
     }
 
@@ -184,13 +293,29 @@ class AuthManager {
         try {
             this.showInfo(`${actionText} with Google...`);
             
-            // Simulate Google OAuth flow
-            await this.simulateApiCall(2000);
+            // Firebase Google OAuth
+            const result = await firebase.auth().signInWithPopup(this.googleProvider);
+            const user = result.user;
             
-            // Mock Google user data
+            // Check if user exists in Firestore
+            const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
+            
+            if (!userDoc.exists && type === 'signup') {
+                // Create user profile for new users
+                await firebase.firestore().collection('users').doc(user.uid).set({
+                    fullName: user.displayName || 'Google User',
+                    email: user.email,
+                    createdAt: new Date().toISOString(),
+                    role: 'user',
+                    provider: 'google'
+                });
+            }
+            
+            // Store auth state
             const authData = {
-                email: 'user@gmail.com',
-                fullName: 'Google User',
+                uid: user.uid,
+                email: user.email,
+                fullName: user.displayName || 'Google User',
                 isAuthenticated: true,
                 provider: 'google',
                 loginTime: new Date().toISOString()
@@ -206,7 +331,16 @@ class AuthManager {
             }, 1500);
 
         } catch (error) {
-            this.showError(`${actionText} with Google failed. Please try again.`);
+            console.error('Google auth error:', error);
+            let errorMessage = `${actionText} with Google failed. Please try again.`;
+            
+            if (error.code === 'auth/popup-closed-by-user') {
+                errorMessage = 'Sign-in was cancelled. Please try again.';
+            } else if (error.code === 'auth/popup-blocked') {
+                errorMessage = 'Popup was blocked. Please allow popups and try again.';
+            }
+            
+            this.showError(errorMessage);
         }
     }
 
@@ -328,33 +462,42 @@ class AuthManager {
 
 // Check if user is already authenticated
 function checkAuthStatus() {
+    console.log('🔍 Checking auth status...');
     const authData = localStorage.getItem('authData') || sessionStorage.getItem('authData');
     
     if (authData) {
+        console.log('📄 Found auth data, parsing...');
         try {
             const parsed = JSON.parse(authData);
             if (parsed.isAuthenticated) {
+                console.log('✅ User is authenticated, redirecting to dashboard');
                 // User is already logged in, redirect to dashboard
                 window.location.href = 'index.html';
                 return;
             }
         } catch (error) {
+            console.log('❌ Invalid auth data, clearing...');
             // Invalid auth data, clear it
             localStorage.removeItem('authData');
             sessionStorage.removeItem('authData');
         }
+    } else {
+        console.log('ℹ️ No auth data found, user not logged in');
     }
 }
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOMContentLoaded event fired!');
+    
     // Check if user is already authenticated
     checkAuthStatus();
     
     // Initialize auth manager
+    console.log('🔧 Creating AuthManager...');
     window.authManager = new AuthManager();
     
-    console.log('Authentication system initialized!');
+    console.log('✅ Authentication system initialized!');
 });
 
 // Add some visual enhancements
