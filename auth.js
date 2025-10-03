@@ -65,23 +65,26 @@ class AuthManager {
 
     bindEvents() {
         console.log('🔗 Binding events...');
-
-         // --- Full Name input handling ---
+        
+         // Full Name input handling
           const fullNameInput = document.getElementById('fullName');
           if (fullNameInput) {
-          fullNameInput.addEventListener('input', (e) => {
-            let value = e.target.value;
+              fullNameInput.addEventListener('input', (e) => {
+                  let value = e.target.value;
 
-            // Prevent numbers (allow only letters and spaces)
-            value = value.replace(/[^a-zA-Z\s]/g, '');
+                  // Prevent numbers and special characters (allow only letters and spaces)
+                  value = value.replace(/[^a-zA-Z\s]/g, '');
 
-            // Capitalize only the first letter, keep the rest as typed
-            if (value.length > 0) {
-                value = value.charAt(0).toUpperCase() + value.slice(1);
-            }
+                  // Remove multiple consecutive spaces
+                  value = value.replace(/\s+/g, ' ');
 
-            e.target.value = value;
-        });
+                  // Capitalize the first letter of each word
+                  value = value.replace(/\b\w/g, (char) => char.toUpperCase());
+
+                  // Update the input value
+                  e.target.value = value;
+              });
+          }
         
         // Login form
         const loginForm = document.getElementById('loginForm');
