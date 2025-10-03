@@ -4,6 +4,7 @@ console.log('🚀 Script.js loaded successfully!');
 // Basic functionality for the main page
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 DOM Content Loaded - Starting initialization...');
+    alert('JavaScript loaded! DOM ready.');
     
     // Initialize smooth scrolling for navigation links
     initializeSmoothScrolling();
@@ -17,13 +18,13 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Initialization complete!');
 });
 
-// Function to update the auth button
+// Function to update the auth buttons
 function updateAuthButton() {
-    const btn = document.querySelector('.verify-btn');
-    console.log('🔍 Looking for verify button...', btn);
+    const navControls = document.querySelector('.nav-controls');
+    console.log('🔍 Looking for nav controls...', navControls);
     
-    if (btn) {
-        console.log('✅ Found button, updating...');
+    if (navControls) {
+        console.log('✅ Found nav controls, checking auth state...');
         
         // Check if user is logged in
         const authData = sessionStorage.getItem('authData');
@@ -31,36 +32,58 @@ function updateAuthButton() {
         if (authData) {
             try {
                 const userData = JSON.parse(authData);
-                // User is logged in - show user account button
-                btn.innerHTML = `
+                console.log('👤 User is logged in:', userData);
+                
+                // Hide login/signup buttons and show user account
+                const loginBtn = navControls.querySelector('.login-btn');
+                const signupBtn = navControls.querySelector('.signup-btn');
+                
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (signupBtn) signupBtn.style.display = 'none';
+                
+                // Create or update user account button
+                let userBtn = navControls.querySelector('.user-account-btn');
+                if (!userBtn) {
+                    userBtn = document.createElement('div');
+                    userBtn.className = 'user-account-btn';
+                    navControls.insertBefore(userBtn, navControls.querySelector('.theme-toggle'));
+                }
+                
+                userBtn.innerHTML = `
                     <i class="fas fa-user-circle"></i>
                     ${userData.displayName || userData.email}
                     <i class="fas fa-chevron-down"></i>
                 `;
-                btn.style.background = 'linear-gradient(135deg, #22C55E, #16A34A)';
-                btn.style.color = 'white';
-                console.log('👤 Showing user account button');
+                userBtn.style.display = 'flex';
+                
             } catch (error) {
                 console.error('Error parsing auth data:', error);
-                showSignInButton(btn);
+                showLoginSignupButtons();
             }
         } else {
-            // User is not logged in - show sign in button
-            showSignInButton(btn);
+            console.log('🔓 User is not logged in, showing login/signup buttons');
+            showLoginSignupButtons();
         }
     } else {
-        console.error('❌ Button not found!');
+        console.error('❌ Nav controls not found!');
     }
 }
 
-function showSignInButton(btn) {
-    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
-    btn.style.background = 'linear-gradient(135deg, #3B82F6, #2563EB)';
-    btn.style.color = 'white';
-    btn.onclick = function() { 
-        window.location.href = 'login.html'; 
-    };
+function showLoginSignupButtons() {
+    const navControls = document.querySelector('.nav-controls');
+    if (navControls) {
+        // Show login/signup buttons
+        const loginBtn = navControls.querySelector('.login-btn');
+        const signupBtn = navControls.querySelector('.signup-btn');
+        const userBtn = navControls.querySelector('.user-account-btn');
+        
+        if (loginBtn) loginBtn.style.display = 'flex';
+        if (signupBtn) signupBtn.style.display = 'flex';
+        if (userBtn) userBtn.style.display = 'none';
+    }
 }
+
+
 
 function initializeSmoothScrolling() {
     const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
@@ -82,6 +105,9 @@ function initializeSmoothScrolling() {
 }
 
 function initializeInteractiveElements() {
+    console.log('🔧 Initializing interactive elements...');
+    alert('initializeInteractiveElements called!');
+    
     // Add any interactive functionality for buttons, forms, etc.
     const buttons = document.querySelectorAll('.check-btn');
     
@@ -94,6 +120,112 @@ function initializeInteractiveElements() {
             }, 150);
         });
     });
+    
+    // Add redirect functionality for navigation buttons
+    initializeButtonRedirects();
+}
+
+// Initialize button redirect functionality
+function initializeButtonRedirects() {
+    console.log('🔗 Initializing button redirects...');
+    alert('initializeButtonRedirects called!');
+    
+    // Debug: Check if buttons exist
+    console.log('🔍 Looking for buttons...');
+    console.log('verifyBtn element:', document.getElementById('verifyBtn'));
+    console.log('analyzeBtn element:', document.getElementById('analyzeBtn'));
+    console.log('verifyNewsBtn element:', document.getElementById('verifyNewsBtn'));
+    console.log('demoBtn element:', document.getElementById('demoBtn'));
+    
+    // Verify button - redirect to verify-news.html
+    const verifyBtn = document.getElementById('verifyBtn');
+    if (verifyBtn) {
+        console.log('✅ Found verifyBtn, adding event listener...');
+        verifyBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('Verify button clicked via addEventListener! Redirecting to verify-news.html');
+            console.log('🔍 Verify button clicked - redirecting to verify-news.html');
+            window.location.href = 'verify-news.html';
+        });
+        console.log('✅ Verify button redirect initialized');
+    } else {
+        console.error('❌ verifyBtn not found!');
+    }
+    
+    // Analyze button - redirect to submit-news.html
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    if (analyzeBtn) {
+        console.log('✅ Found analyzeBtn, adding event listener...');
+        analyzeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('Analyze button clicked via addEventListener! Redirecting to submit-news.html');
+            console.log('📊 Analyze button clicked - redirecting to submit-news.html');
+            window.location.href = 'submit-news.html';
+        });
+        console.log('✅ Analyze button redirect initialized');
+    } else {
+        console.error('❌ analyzeBtn not found!');
+    }
+    
+    // Verify News button (in the verify news section) - redirect to verify-news.html
+    const verifyNewsBtn = document.getElementById('verifyNewsBtn');
+    if (verifyNewsBtn) {
+        console.log('✅ Found verifyNewsBtn, adding event listener...');
+        verifyNewsBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('📰 Verify News button clicked - redirecting to verify-news.html');
+            window.location.href = 'verify-news.html';
+        });
+        console.log('✅ Verify News button redirect initialized');
+    } else {
+        console.error('❌ verifyNewsBtn not found!');
+    }
+    
+    // Demo button - scroll to verify news section for demo
+    const demoBtn = document.getElementById('demoBtn');
+    if (demoBtn) {
+        console.log('✅ Found demoBtn, adding event listener...');
+        demoBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🎬 Demo button clicked - scrolling to verify news section');
+            const verifySection = document.getElementById('verify-news');
+            if (verifySection) {
+                verifySection.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            } else {
+                console.error('❌ verify-news section not found!');
+            }
+        });
+        console.log('✅ Demo button functionality initialized');
+    } else {
+        console.error('❌ demoBtn not found!');
+    }
+    
+    console.log('🎉 All button redirects initialized successfully');
+    
+    // Fallback: Add onclick handlers directly to test if buttons are responsive
+    const verifyBtnFallback = document.getElementById('verifyBtn');
+    const analyzeBtnFallback = document.getElementById('analyzeBtn');
+    
+    if (verifyBtnFallback) {
+        verifyBtnFallback.onclick = function() {
+            alert('Verify button clicked! Redirecting to verify-news.html');
+            console.log('🔍 FALLBACK: Verify button clicked via onclick');
+            window.location.href = 'verify-news.html';
+        };
+        console.log('✅ Fallback onclick handler added to verifyBtn');
+    }
+    
+    if (analyzeBtnFallback) {
+        analyzeBtnFallback.onclick = function() {
+            alert('Analyze button clicked! Redirecting to submit-news.html');
+            console.log('📊 FALLBACK: Analyze button clicked via onclick');
+            window.location.href = 'submit-news.html';
+        };
+        console.log('✅ Fallback onclick handler added to analyzeBtn');
+    }
 }
 
 // Firebase initialization
@@ -127,83 +259,19 @@ function checkAuthenticationState() {
 
 // Update UI for logged-in user
 function updateUIForLoggedInUser(userData) {
-    const verifyBtn = document.querySelector('.verify-btn');
-    if (verifyBtn) {
-        // Create user account button with dropdown
-        verifyBtn.innerHTML = `
-            <div class="user-account-container">
-                <button class="user-account-btn" id="userAccountBtn">
-                    <i class="fas fa-user-circle"></i>
-                    <span class="user-name">${userData.displayName || userData.email}</span>
-                    <i class="fas fa-chevron-down dropdown-arrow"></i>
-                </button>
-                <div class="user-dropdown" id="userDropdown">
-                    <div class="dropdown-header">
-                        <div class="user-info">
-                            <div class="user-avatar">
-                                <i class="fas fa-user-circle"></i>
-                            </div>
-                            <div class="user-details">
-                                <div class="user-display-name">${userData.displayName || 'User'}</div>
-                                <div class="user-email">${userData.email}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="dropdown-divider"></div>
-                    <div class="dropdown-menu">
-                        <a href="#" class="dropdown-item" id="profileBtn">
-                            <i class="fas fa-user"></i>
-                            <span>My Profile</span>
-                        </a>
-                        <a href="#" class="dropdown-item" id="settingsBtn">
-                            <i class="fas fa-cog"></i>
-                            <span>Settings</span>
-                        </a>
-                        <a href="#" class="dropdown-item" id="myNewsBtn">
-                            <i class="fas fa-newspaper"></i>
-                            <span>My News</span>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item logout-item" id="logoutBtn">
-                            <i class="fas fa-sign-out-alt"></i>
-                            <span>Sign Out</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Add event listeners for dropdown functionality
-        setupUserDropdown();
-    }
+    console.log('🔄 Updating UI for logged-in user...');
+    // For now, keep the original button functionality
+    // In the future, we could add a user dropdown in the navigation area
+    console.log('✅ User logged in:', userData.displayName || userData.email);
+    console.log('✅ Keeping original button functionality for logged-in users');
 }
 
 // Update UI for logged-out user
 function updateUIForLoggedOutUser() {
     console.log('🔄 Updating UI for logged-out user...');
-    const verifyBtn = document.querySelector('.verify-btn');
-    console.log('🎯 Found verify button:', verifyBtn);
-    
-    if (verifyBtn) {
-        console.log('✅ Replacing verify button with sign-in link');
-        
-        // Clear the button and replace with sign-in link
-        verifyBtn.style.background = 'linear-gradient(135deg, #3B82F6, #2563EB)';
-        verifyBtn.style.color = 'white';
-        verifyBtn.innerHTML = `
-            <i class="fas fa-sign-in-alt"></i>
-            Sign In
-        `;
-        
-        // Make it clickable to go to login page
-        verifyBtn.onclick = function() {
-            window.location.href = 'login.html';
-        };
-        
-        console.log('🎉 Sign-in button should now be visible');
-    } else {
-        console.error('❌ Could not find .verify-btn element');
-    }
+    // Don't override the verify button - let the redirect functionality work
+    // The button redirects should work regardless of authentication state
+    console.log('✅ Keeping original button functionality for logged-out users');
 }
 
 // Setup user dropdown functionality

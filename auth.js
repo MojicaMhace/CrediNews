@@ -13,6 +13,33 @@ class AuthManager {
     init() {
         this.bindEvents();
         this.initTheme();
+        this.checkForOTPVerification();
+    }
+
+    checkForOTPVerification() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const verifyOTP = urlParams.get('verify-otp');
+        
+        if (verifyOTP === 'true') {
+            console.log('🔐 OTP verification mode detected');
+            
+            // Check if we have pending verification data
+            const pendingData = JSON.parse(sessionStorage.getItem('pendingVerification') || '{}');
+            
+            if (pendingData.email) {
+                console.log('✅ Pending verification data found, showing OTP form');
+                this.showOTPForm();
+            } else {
+                console.log('❌ No pending verification data found');
+                this.showError('No pending verification found. Please register again.');
+                // Clear the URL parameter and show login form
+                window.history.replaceState({}, document.title, window.location.pathname);
+                this.showLoginForm();
+            }
+        } else {
+            // Ensure login form is visible by default
+            this.showLoginForm();
+        }
     }
 
     initTheme() {
@@ -38,6 +65,23 @@ class AuthManager {
 
     bindEvents() {
         console.log('🔗 Binding events...');
+
+         // --- Full Name input handling ---
+          const fullNameInput = document.getElementById('fullName');
+          if (fullNameInput) {
+          fullNameInput.addEventListener('input', (e) => {
+            let value = e.target.value;
+
+            // Prevent numbers (allow only letters and spaces)
+            value = value.replace(/[^a-zA-Z\s]/g, '');
+
+            // Capitalize only the first letter, keep the rest as typed
+            if (value.length > 0) {
+                value = value.charAt(0).toUpperCase() + value.slice(1);
+            }
+
+            e.target.value = value;
+        });
         
         // Login form
         const loginForm = document.getElementById('loginForm');
@@ -67,6 +111,31 @@ class AuthManager {
         const googleSignUp = document.getElementById('googleSignUp');
         if (googleSignUp) {
             googleSignUp.addEventListener('click', () => this.handleGoogleAuth('signup'));
+        }
+
+        // OTP Form
+        const otpForm = document.getElementById('otpForm');
+        if (otpForm) {
+            console.log('✅ OTP form found, binding event');
+            otpForm.addEventListener('submit', (e) => this.handleOTPVerification(e));
+        }
+
+        // OTP Input handling
+        const otpInputs = document.querySelectorAll('.otp-input');
+        if (otpInputs.length > 0) {
+            this.setupOTPInputs(otpInputs);
+        }
+
+        // Resend OTP button
+        const resendOtpBtn = document.getElementById('resendOtpBtn');
+        if (resendOtpBtn) {
+            resendOtpBtn.addEventListener('click', () => this.handleResendOTP());
+        }
+
+        // Back to login button
+        const backToLoginBtn = document.getElementById('backToLoginBtn');
+        if (backToLoginBtn) {
+            backToLoginBtn.addEventListener('click', () => this.showLoginForm());
         }
     }
 
@@ -98,11 +167,21 @@ class AuthManager {
             const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
             const user = userCredential.user;
             
+            // Check if email is verified
+            if (!user.emailVerified) {
+                this.showError('Please verify your email address before signing in. Check your inbox for the verification link.');
+                
+                // Show option to resend verification email (keep user signed in for this)
+                this.showResendVerificationOption(user.email);
+                return;
+            }
+            
             // Store auth state
             const authData = {
                 uid: user.uid,
                 email: user.email,
                 isAuthenticated: true,
+                emailVerified: user.emailVerified,
                 loginTime: new Date().toISOString()
             };
             
@@ -112,7 +191,7 @@ class AuthManager {
                 sessionStorage.setItem('authData', JSON.stringify(authData));
             }
 
-            this.showSuccess('Login successful! Redirecting...');
+            this.showSuccess('Login successful! Redirecting to homepage...');
             
             // Redirect after success
             setTimeout(() => {
@@ -210,6 +289,16 @@ class AuthManager {
             
             console.log('✅ User created successfully:', user.uid);
             
+            // Generate and send OTP
+            console.log('🔐 Generating OTP for email verification...');
+            const otp = window.otpManager.generateOTP();
+            window.otpManager.storeOTP(email, otp);
+            
+            // Send OTP via email
+            console.log('📧 Sending OTP email...');
+            await window.otpManager.sendOTPEmail(email, otp);
+            console.log('✅ OTP sent to:', email);
+            
             // Update user profile with display name
             console.log('👤 Setting user display name...');
             await user.updateProfile({
@@ -217,17 +306,15 @@ class AuthManager {
             });
             console.log('✅ User display name set to:', fullName);
             
-            // Wait for auth state to be established
-            await new Promise(resolve => {
-                const unsubscribe = firebase.auth().onAuthStateChanged(authUser => {
-                    if (authUser && authUser.uid === user.uid) {
-                        unsubscribe();
-                        resolve();
-                    }
-                });
-            });
+            // Store pending verification data
+            sessionStorage.setItem('pendingVerification', JSON.stringify({
+                email: email,
+                fullName: fullName,
+                uid: user.uid,
+                timestamp: Date.now()
+            }));
             
-            console.log('✅ Auth state confirmed');
+            console.log('✅ Registration data prepared for OTP verification');
             
             // Try to store comprehensive user profile in Firestore
             console.log('💾 Creating complete user account profile...');
@@ -281,12 +368,15 @@ class AuthManager {
             console.log('✅ Auth data stored in session storage');
 
             console.log('🎉 Registration completed successfully!');
-            this.showSuccess('Registration successful! Redirecting...');
+            this.showSuccess('Registration successful! Please check your email for the verification code.');
             
-            // Redirect to dashboard
+            // Sign out the user until they verify their email with OTP
+            await firebase.auth().signOut();
+            
+            // Redirect to login page with OTP verification
             setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 1500);
+                window.location.href = 'login.html?verify-otp=true';
+            }, 2000);
 
         } catch (error) {
             console.error('❌ Registration error:', error);
@@ -354,11 +444,11 @@ class AuthManager {
             
             sessionStorage.setItem('authData', JSON.stringify(authData));
             
-            this.showSuccess(`${actionText} with Google successful! Redirecting...`);
+            this.showSuccess(`${actionText} with Google successful! Redirecting to homepage...`);
             
-            // Redirect to dashboard
-            setTimeout(() => {
-                window.location.href = 'index.html';
+            // Redirect to homepage
+                setTimeout(() => {
+                    window.location.href = 'index.html';
             }, 1500);
 
         } catch (error) {
@@ -489,6 +579,403 @@ class AuthManager {
     showWarning(message) {
         this.showNotification(message, 'warning');
     }
+
+    showResendVerificationOption(email) {
+        // Create a resend verification button
+        const resendBtn = document.createElement('button');
+        resendBtn.textContent = 'Resend Verification Email';
+        resendBtn.className = 'auth-btn secondary';
+        resendBtn.style.marginTop = '10px';
+        resendBtn.style.width = '100%';
+        
+        resendBtn.addEventListener('click', async () => {
+            try {
+                resendBtn.disabled = true;
+                resendBtn.textContent = 'Sending...';
+                
+                // Get the current user (should still be signed in but not verified)
+                const user = firebase.auth().currentUser;
+                if (user) {
+                    await user.sendEmailVerification();
+                    this.showSuccess('Verification email sent! Please check your inbox.');
+                    resendBtn.remove();
+                } else {
+                    this.showError('Please try logging in again to resend verification email.');
+                }
+            } catch (error) {
+                console.error('Resend verification error:', error);
+                this.showError('Unable to resend verification email. Please try again.');
+                resendBtn.disabled = false;
+                resendBtn.textContent = 'Resend Verification Email';
+            }
+        });
+        
+        // Add button to the form
+        const form = document.querySelector('.auth-form');
+        if (form) {
+            form.appendChild(resendBtn);
+        }
+    }
+
+    setupOTPInputs(inputs) {
+        inputs.forEach((input, index) => {
+            input.addEventListener('input', (e) => {
+                const value = e.target.value;
+                
+                // Only allow numbers
+                if (!/^\d*$/.test(value)) {
+                    e.target.value = '';
+                    return;
+                }
+
+                // Move to next input if current is filled
+                if (value && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+
+                // Update visual state
+                this.updateOTPInputState(inputs);
+            });
+
+            input.addEventListener('keydown', (e) => {
+                // Handle backspace
+                if (e.key === 'Backspace' && !input.value && index > 0) {
+                    inputs[index - 1].focus();
+                }
+            });
+
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const paste = e.clipboardData.getData('text');
+                const digits = paste.replace(/\D/g, '').slice(0, 6);
+                
+                digits.split('').forEach((digit, i) => {
+                    if (inputs[i]) {
+                        inputs[i].value = digit;
+                    }
+                });
+                
+                this.updateOTPInputState(inputs);
+                
+                // Focus on the next empty input or last input
+                const nextEmpty = inputs.find(inp => !inp.value);
+                if (nextEmpty) {
+                    nextEmpty.focus();
+                } else {
+                    inputs[inputs.length - 1].focus();
+                }
+            });
+        });
+    }
+
+    updateOTPInputState(inputs) {
+        inputs.forEach(input => {
+            input.classList.remove('filled', 'error');
+            if (input.value) {
+                input.classList.add('filled');
+            }
+        });
+    }
+
+    async handleOTPVerification(e) {
+        e.preventDefault();
+        console.log('🔐 OTP verification submitted');
+
+        const otpInputs = document.querySelectorAll('.otp-input');
+        const otp = Array.from(otpInputs).map(input => input.value).join('');
+        
+        if (otp.length !== 6) {
+            this.showError('Please enter the complete 6-digit verification code.');
+            return;
+        }
+
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        this.setButtonLoading(submitBtn, true);
+
+        try {
+            // Get pending verification data
+            const pendingData = JSON.parse(sessionStorage.getItem('pendingVerification') || '{}');
+            
+            if (!pendingData.email) {
+                throw new Error('No pending verification found');
+            }
+
+            // Verify OTP
+            const result = window.otpManager.verifyOTP(pendingData.email, otp);
+            
+            if (result.success) {
+                console.log('✅ OTP verified successfully');
+                
+                // Sign in the user
+                const user = firebase.auth().currentUser;
+                if (user && user.uid === pendingData.uid) {
+                    // User is already signed in, just mark as verified
+                    console.log('✅ User verification completed');
+                } else {
+                    // Need to sign in the user (shouldn't happen in normal flow)
+                    console.log('⚠️ User not signed in, this is unexpected');
+                }
+
+                // Clear pending verification data
+                sessionStorage.removeItem('pendingVerification');
+                
+                // Show success message
+                this.showSuccess(result.message);
+                
+                // Redirect to main app
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+
+            } else {
+                console.log('❌ OTP verification failed:', result.message);
+                this.showError(result.message);
+                
+                // Mark inputs as error
+                otpInputs.forEach(input => {
+                    input.classList.add('error');
+                    input.value = '';
+                });
+                
+                // Focus first input
+                otpInputs[0].focus();
+            }
+
+        } catch (error) {
+            console.error('❌ OTP verification error:', error);
+            this.showError('Verification failed. Please try again.');
+        } finally {
+            this.setButtonLoading(submitBtn, false);
+        }
+    }
+
+    async handleResendOTP() {
+        console.log('🔄 Resending OTP...');
+        
+        const pendingData = JSON.parse(sessionStorage.getItem('pendingVerification') || '{}');
+        
+        if (!pendingData.email) {
+            this.showError('No pending verification found. Please register again.');
+            return;
+        }
+
+        const resendBtn = document.getElementById('resendOtpBtn');
+        this.setButtonLoading(resendBtn, true);
+
+        try {
+            // Generate new OTP
+            const otp = window.otpManager.generateOTP();
+            window.otpManager.storeOTP(pendingData.email, otp);
+            
+            // Send new OTP
+            await window.otpManager.sendOTPEmail(pendingData.email, otp);
+            
+            this.showSuccess('New verification code sent to your email.');
+            
+            // Clear current inputs
+            const otpInputs = document.querySelectorAll('.otp-input');
+            otpInputs.forEach(input => {
+                input.value = '';
+                input.classList.remove('filled', 'error');
+            });
+            
+            // Focus first input
+            otpInputs[0].focus();
+
+        } catch (error) {
+            console.error('❌ Resend OTP error:', error);
+            this.showError('Failed to resend verification code. Please try again.');
+        } finally {
+            this.setButtonLoading(resendBtn, false);
+        }
+    }
+
+    showLoginForm() {
+        // Hide OTP container and show login form
+        const otpContainer = document.getElementById('otpVerificationContainer');
+        const loginForm = document.getElementById('loginForm');
+        
+        if (otpContainer) otpContainer.style.display = 'none';
+        if (loginForm) loginForm.style.display = 'block';
+        
+        // Clear URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Clear pending verification data
+        sessionStorage.removeItem('pendingVerification');
+    }
+
+    showOTPForm() {
+        // Show OTP container and hide login form
+        const otpContainer = document.getElementById('otpVerificationContainer');
+        const loginForm = document.getElementById('loginForm');
+        
+        if (otpContainer) otpContainer.style.display = 'block';
+        if (loginForm) loginForm.style.display = 'none';
+        
+        // Set email in OTP form
+        const pendingData = JSON.parse(sessionStorage.getItem('pendingVerification') || '{}');
+        const otpEmailElement = document.getElementById('otpEmail');
+        if (otpEmailElement && pendingData.email) {
+            otpEmailElement.textContent = pendingData.email;
+        }
+        
+        // Focus first OTP input
+        const firstInput = document.querySelector('.otp-input');
+        if (firstInput) {
+            firstInput.focus();
+        }
+    }
+}
+
+// Check if user just verified their email}
+
+// OTP Management System
+class OTPManager {
+    constructor() {
+        this.otpStorage = new Map(); // In production, use Firebase Firestore
+        this.otpExpiry = 10 * 60 * 1000; // 10 minutes in milliseconds
+    }
+
+    generateOTP() {
+        return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+    }
+
+    storeOTP(email, otp) {
+        const expiryTime = Date.now() + this.otpExpiry;
+        this.otpStorage.set(email, {
+            code: otp,
+            expires: expiryTime,
+            attempts: 0,
+            maxAttempts: 3
+        });
+        console.log(`🔐 OTP stored for ${email}: ${otp} (expires in 10 minutes)`);
+    }
+
+    verifyOTP(email, inputOTP) {
+        const otpData = this.otpStorage.get(email);
+        
+        if (!otpData) {
+            return { success: false, message: 'No OTP found for this email. Please request a new one.' };
+        }
+
+        if (Date.now() > otpData.expires) {
+            this.otpStorage.delete(email);
+            return { success: false, message: 'OTP has expired. Please request a new one.' };
+        }
+
+        otpData.attempts++;
+
+        if (otpData.attempts > otpData.maxAttempts) {
+            this.otpStorage.delete(email);
+            return { success: false, message: 'Too many failed attempts. Please request a new OTP.' };
+        }
+
+        if (otpData.code === inputOTP) {
+            this.otpStorage.delete(email);
+            return { success: true, message: 'OTP verified successfully!' };
+        }
+
+        this.otpStorage.set(email, otpData);
+        const remainingAttempts = otpData.maxAttempts - otpData.attempts;
+        return { 
+            success: false, 
+            message: `Invalid OTP. ${remainingAttempts} attempts remaining.` 
+        };
+    }
+
+    async sendOTPEmail(email, otp) {
+        console.log(`📧 Sending OTP email to ${email}`);
+        
+        try {
+            // Check if EmailJS is available and configured
+            if (typeof emailjs === 'undefined') {
+                throw new Error('EmailJS library not loaded');
+            }
+            
+            if (!window.EMAILJS_CONFIG || 
+                window.EMAILJS_CONFIG.PUBLIC_KEY === 'YOUR_EMAILJS_PUBLIC_KEY' ||
+                window.EMAILJS_CONFIG.SERVICE_ID === 'YOUR_GMAIL_SERVICE_ID' ||
+                window.EMAILJS_CONFIG.TEMPLATE_ID === 'YOUR_OTP_TEMPLATE_ID') {
+                
+                console.warn('⚠️ EmailJS not configured, falling back to demo mode');
+                console.log(`🔐 Demo Mode - Your verification code is: ${otp}`);
+                
+                // Show demo notification
+                if (window.authManager) {
+                    window.authManager.showInfo(`Demo Mode: Your OTP is ${otp} (Configure EmailJS for real emails)`);
+                }
+                
+                return { success: true, message: 'OTP sent successfully (Demo Mode)!' };
+            }
+
+            // Prepare email template parameters
+            const templateParams = {
+                to_email: email,
+                to_name: email.split('@')[0], // Use email prefix as name
+                otp_code: otp,
+                app_name: 'CrediUI',
+                expiry_minutes: '10'
+            };
+
+            console.log('📤 Sending real email via EmailJS...');
+            
+            // Send email using EmailJS
+            const response = await emailjs.send(
+                window.EMAILJS_CONFIG.SERVICE_ID,
+                window.EMAILJS_CONFIG.TEMPLATE_ID,
+                templateParams
+            );
+
+            console.log('✅ Email sent successfully:', response);
+            return { 
+                success: true, 
+                message: 'Verification code sent to your email!' 
+            };
+
+        } catch (error) {
+            console.error('❌ Failed to send email:', error);
+            
+            // Fallback to demo mode if email sending fails
+            console.log(`🔐 Fallback Mode - Your verification code is: ${otp}`);
+            
+            if (window.authManager) {
+                window.authManager.showWarning(`Email sending failed. Demo Mode: Your OTP is ${otp}`);
+            }
+            
+            return { 
+                success: true, 
+                message: 'Email service unavailable. Check console for OTP.' 
+            };
+        }
+    }
+
+    isOTPPending(email) {
+        const otpData = this.otpStorage.get(email);
+        return otpData && Date.now() < otpData.expires;
+    }
+}
+
+// Global OTP Manager instance
+window.otpManager = new OTPManager();
+
+async function checkEmailVerificationStatus() {    try {
+        const user = firebase.auth().currentUser;
+        if (user) {
+            // Reload user data to get latest verification status
+            await user.reload();
+            
+            if (user.emailVerified) {
+                const verificationSuccessMessage = document.getElementById('verificationSuccessMessage');
+                if (verificationSuccessMessage) {
+                    verificationSuccessMessage.style.display = 'block';
+                    console.log('✅ Email verification confirmed for user:', user.email);
+                }
+            }
+        }
+    } catch (error) {
+        console.log('ℹ️ No current user or verification check failed:', error.message);
+    }
 }
 
 // Check if user is already authenticated
@@ -501,8 +988,8 @@ function checkAuthStatus() {
         try {
             const parsed = JSON.parse(authData);
             if (parsed.isAuthenticated) {
-                console.log('✅ User is authenticated, redirecting to dashboard');
-                // User is already logged in, redirect to dashboard
+                console.log('✅ User is authenticated, redirecting to homepage');
+                // User is already logged in, redirect to homepage
                 window.location.href = 'index.html';
                 return;
             }
@@ -521,8 +1008,56 @@ function checkAuthStatus() {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 DOMContentLoaded event fired!');
     
+    // Check for verification message parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('message') === 'verify-email') {
+            const verificationMessage = document.getElementById('verificationMessage');
+            if (verificationMessage) {
+                verificationMessage.style.display = 'block';
+            }
+        }
+        
+        // Check for verification success parameter
+        if (urlParams.get('verified') === 'true') {
+            const verificationSuccessMessage = document.getElementById('verificationSuccessMessage');
+            if (verificationSuccessMessage) {
+                verificationSuccessMessage.style.display = 'block';
+                // Clear the URL parameter
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+        
+        // Check if user just verified their email
+        checkEmailVerificationStatus();
+    
     // Check if user is already authenticated
     checkAuthStatus();
+    
+    // Set up auth state listener for email verification
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            // Reload user to get latest verification status
+            await user.reload();
+            
+            if (user.emailVerified) {
+                const verificationSuccessMessage = document.getElementById('verificationSuccessMessage');
+                if (verificationSuccessMessage && verificationSuccessMessage.style.display === 'none') {
+                    verificationSuccessMessage.style.display = 'block';
+                    console.log('✅ Email verification detected for:', user.email);
+                    
+                    // Hide any error messages
+                    const errorMessages = document.querySelectorAll('.notification.error');
+                    errorMessages.forEach(msg => msg.remove());
+                    
+                    // Remove resend button if it exists
+                    const resendBtn = document.querySelector('.auth-btn.secondary');
+                    if (resendBtn && resendBtn.textContent.includes('Resend')) {
+                        resendBtn.remove();
+                    }
+                }
+            }
+        }
+    });
     
     // Initialize auth manager
     console.log('🔧 Creating AuthManager...');
