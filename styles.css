@@ -49,6 +49,13 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  max-width: 100%;
+}
+
+html {
+  overflow-x: hidden;
+  background: #050510;
+  width: 100%;
 }
 
 body {
@@ -68,6 +75,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 
@@ -87,6 +95,8 @@ body {
   top: 0;
   z-index: 1000;
   transition: all 0.3s ease;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .nav-container {
@@ -96,6 +106,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .nav-brand {
@@ -210,25 +223,280 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 16px;
+  padding-right: 8px;
 }
 
-.verify-btn {
-  background: linear-gradient(135deg, #22C55E, #16A34A);
+.auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-controls .auth-buttons .login-btn, 
+.nav-controls .auth-buttons .signup-btn {
+  display: flex !important;
+  place-items: center !important;
+  gap: 6px !important;
+  padding: 10px 16px !important;
+  text-decoration: none !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.3s ease !important;
+  font-size: 14px !important;
+  border: 1px solid !important;
+  background: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  overflow: visible !important;
+  position: static !important;
+  height: auto !important;
+  line-height: 1 !important;
+}
+
+.nav-controls .auth-buttons .login-btn {
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  background: transparent !important;
+}
+
+.nav-controls .auth-buttons .login-btn:hover {
+  background: var(--primary-color) !important;
+  color: white !important;
+  transform: translateY(-1px) !important;
+}
+
+.nav-controls .auth-buttons .signup-btn {
+  background: var(--primary-color) !important;
+  color: white !important;
+  border-color: var(--primary-color) !important;
+}
+
+.nav-controls .auth-buttons .signup-btn:hover {
+  background: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Override for navbar auth buttons - ultra specific selector */
+nav.navbar .nav-controls .auth-buttons .login-btn,
+nav.navbar .nav-controls .auth-buttons .signup-btn {
+  all: unset !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 10px 16px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+  border: 1px solid !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  box-sizing: border-box !important;
+  position: static !important;
+  overflow: visible !important;
+  transform: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+nav.navbar .nav-controls .auth-buttons .login-btn::before,
+nav.navbar .nav-controls .auth-buttons .signup-btn::before,
+nav.navbar .nav-controls .auth-buttons .login-btn::after,
+nav.navbar .nav-controls .auth-buttons .signup-btn::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+}
+
+/* Simple clean button styles - override all decorative effects */
+nav.navbar .nav-controls .auth-buttons .login-btn,
+nav.navbar .nav-controls .auth-buttons .signup-btn {
+  /* Reset all decorative properties */
+  background: none !important;
+  background-image: none !important;
+  background-gradient: none !important;
+  box-shadow: none !important;
+  border-radius: 4px !important;
+  border: 1px solid #119982 !important;
+  transform: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  
+  /* Basic styling */
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+  color: #119982 !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+nav.navbar .nav-controls .auth-buttons .login-btn:hover,
+nav.navbar .nav-controls .auth-buttons .signup-btn:hover {
+  background: #119982 !important;
+  color: white !important;
+  transform: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+nav.navbar .nav-controls .auth-buttons .login-btn {
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  background: transparent !important;
+}
+
+nav.navbar .nav-controls .auth-buttons .signup-btn {
+  background: var(--primary-color) !important;
+  color: white !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* These hover styles are overridden by the comprehensive rules above */
+
+/* Login Button */
+.login-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border: none;
+  text-decoration: none;
   padding: 14px 28px;
-  border-radius: 32px;
+  border-radius: 50px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid transparent;
+  backdrop-filter: blur(10px);
 }
 
-.verify-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
+/* Completely disable all pseudo-elements for login button */
+.login-btn::before,
+.login-btn::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+}
+
+.login-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+  text-decoration: none;
+  color: white;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.login-btn:active {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.login-btn i {
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+
+.login-btn:hover i {
+  transform: rotate(5deg) scale(1.1);
+}
+
+/* Sign Up Button */
+.signup-btn {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+  text-decoration: none;
+  padding: 14px 28px;
+  border-radius: 50px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 30px rgba(17, 153, 142, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid transparent;
+  backdrop-filter: blur(10px);
+}
+
+/* Completely disable all pseudo-elements for signup button */
+.signup-btn::before,
+.signup-btn::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+}
+
+/* NUCLEAR OPTION: Completely eliminate all white effects */
+.login-btn,
+.signup-btn {
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+}
+
+.login-btn *,
+.signup-btn *,
+.login-btn::before,
+.login-btn::after,
+.signup-btn::before,
+.signup-btn::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Prevent any hover effects that might create white elements */
+.login-btn:hover::before,
+.login-btn:hover::after,
+.signup-btn:hover::before,
+.signup-btn:hover::after,
+.login-btn:focus::before,
+.login-btn:focus::after,
+.signup-btn:focus::before,
+.signup-btn:focus::after,
+.login-btn:active::before,
+.login-btn:active::after,
+.signup-btn:active::before,
+.signup-btn:active::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.signup-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 15px 40px rgba(17, 153, 142, 0.5);
+  text-decoration: none;
+  color: white;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.signup-btn:active {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.signup-btn i {
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+
+.signup-btn:hover i {
+  transform: rotate(-5deg) scale(1.1);
 }
 
 /* User Account Dropdown Styles */
@@ -417,20 +685,53 @@ body {
 }
 
 .theme-toggle {
-  background: rgba(30, 30, 60, 0.6);
-  border: 1px solid var(--border-color);
+  background: linear-gradient(135deg, rgba(30, 30, 60, 0.8), rgba(50, 50, 80, 0.9));
+  border: 2px solid rgba(255, 255, 255, 0.1);
   color: var(--text-secondary);
-  padding: 12px;
-  border-radius: 12px;
+  padding: 14px;
+  border-radius: 50px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  backdrop-filter: blur(15px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-toggle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s;
+}
+
+.theme-toggle:hover::before {
+  left: 100%;
 }
 
 .theme-toggle:hover {
-  background: rgba(30, 30, 60, 0.8);
+  background: linear-gradient(135deg, rgba(50, 50, 80, 0.9), rgba(70, 70, 100, 1));
   color: var(--primary-color);
-  transform: translateY(-1px);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.theme-toggle:active {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.theme-toggle i {
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover i {
+  transform: rotate(180deg) scale(1.1);
 }
 
 /* Main Content */
@@ -1912,6 +2213,8 @@ body {
   justify-content: center;
   gap: 8px;
   transition: all 0.3s ease;
+  width: 100%;          
+  margin: 8px 0;        
 }
 
 .auth-btn.primary {
@@ -1976,7 +2279,203 @@ body {
   right: 0;
 }
 
+/* Email Verification Message */
+.verification-message {
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  border: 1px solid #2196f3;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  text-align: center;
+}
 
+.verification-message .message-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.verification-message i {
+  font-size: 32px;
+  color: #2196f3;
+}
+
+.verification-message h3 {
+  color: #1976d2;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.verification-message p {
+  color: #424242;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Email Verification Success Message */
+.verification-success-message {
+  background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
+  border: 1px solid #4caf50;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.verification-success-message .message-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.verification-success-message i {
+  font-size: 32px;
+  color: #4caf50;
+}
+
+.verification-success-message h3 {
+  color: #2e7d32;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.verification-success-message p {
+  color: #424242;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* OTP Verification Styles */
+.otp-verification-container {
+  background: linear-gradient(135deg, #f8f9ff 0%, #e8f2ff 100%);
+  border: 1px solid #3b82f6;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.otp-header {
+  margin-bottom: 24px;
+}
+
+.otp-header i {
+  font-size: 32px;
+  color: #3b82f6;
+  margin-bottom: 12px;
+}
+
+.otp-header h3 {
+  color: #1e40af;
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.otp-header p {
+  color: #424242;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.otp-email {
+  color: #3b82f6 !important;
+  font-weight: 600 !important;
+  font-size: 15px !important;
+}
+
+.otp-form {
+  margin-bottom: 20px;
+}
+
+.otp-input-group {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.otp-input {
+  width: 45px;
+  height: 45px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.otp-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.otp-input.filled {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.otp-input.error {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.otp-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.otp-actions .auth-btn {
+  min-width: 120px;
+}
+
+/* Dark theme support for OTP */
+[data-theme="dark"] .otp-verification-container {
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .otp-header h3 {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .otp-header p {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .otp-input {
+  background: rgba(31, 41, 55, 0.8);
+  border-color: rgba(75, 85, 99, 0.6);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .otp-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .otp-input.filled {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+[data-theme="dark"] .otp-input.error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
 
 /* About Section Styles */
 .about-content {
@@ -3196,6 +3695,90 @@ body {
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
+/* Facebook Verification Specific Styles */
+.verify-news-page .facebook-card {
+  border-left: 4px solid #1877f2;
+  position: relative;
+}
+
+.verify-news-page .facebook-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(24, 119, 242, 0.02) 0%, rgba(24, 119, 242, 0.05) 100%);
+  pointer-events: none;
+  border-radius: 20px;
+}
+
+.verify-news-page .facebook-card .card-icon {
+  color: #1877f2;
+}
+
+.verify-news-page .input-help {
+  display: flex;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.verify-news-page .input-help i {
+  margin-right: 0.5rem;
+  color: #1877f2;
+}
+
+.verify-news-page .character-count {
+  text-align: right;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.verify-news-page .facebook-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: rgba(24, 119, 242, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(24, 119, 242, 0.1);
+}
+
+.verify-news-page .option-group {
+  display: flex;
+  align-items: center;
+}
+
+.verify-news-page .checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+  user-select: none;
+}
+
+.verify-news-page .checkbox-label input[type="checkbox"] {
+  margin-right: 0.5rem;
+  width: 16px;
+  height: 16px;
+  accent-color: #1877f2;
+}
+
+.verify-news-page .facebook-verify-btn {
+  background: linear-gradient(135deg, #1877f2 0%, #166fe5 100%);
+  color: white;
+}
+
+.verify-news-page .facebook-verify-btn:hover {
+  background: linear-gradient(135deg, #166fe5 0%, #1464d8 100%);
+  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
+}
+
 .verify-news-page .how-it-works {
   background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
   border-radius: 24px;
@@ -3669,7 +4252,7 @@ input[style*="--placeholder-color"]::placeholder {
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 2.5px;
   cursor: pointer;
   font-size: 14px;
   color: #065f46;

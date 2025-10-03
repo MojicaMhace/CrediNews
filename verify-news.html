@@ -96,6 +96,72 @@
                     Verify URL
                 </button>
             </div>
+
+            <!-- Verify Facebook News Section -->
+            <div class="verify-card facebook-card">
+                <div class="card-header">
+                    <i class="fab fa-facebook card-icon"></i>
+                    <h2 class="card-title">Verify Facebook News</h2>
+                </div>
+                <p class="card-description">Analyze Facebook posts, articles, and shared content for credibility and misinformation.</p>
+                
+                <div class="form-group">
+                    <label for="facebook-url" class="form-label">Facebook Post/Article URL</label>
+                    <input 
+                        type="url" 
+                        id="facebook-url" 
+                        class="form-input" 
+                        placeholder="https://www.facebook.com/post-url or https://facebook.com/page/posts/..."
+                    >
+                    <div class="input-help">
+                        <i class="fas fa-info-circle"></i>
+                        Supports Facebook posts, shared articles, and page content
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="facebook-content" class="form-label">Or Paste Facebook Content</label>
+                    <textarea 
+                        id="facebook-content" 
+                        class="form-textarea" 
+                        placeholder="Copy and paste the Facebook post content here..."
+                        rows="6"
+                        maxlength="3000"
+                    ></textarea>
+                    <div class="character-count">
+                        <span id="facebook-char-count">0</span>/3000 characters
+                    </div>
+                </div>
+
+                <div class="facebook-options">
+                    <div class="option-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="check-images" checked>
+                            <span class="checkmark"></span>
+                            Analyze attached images
+                        </label>
+                    </div>
+                    <div class="option-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="check-links" checked>
+                            <span class="checkmark"></span>
+                            Verify shared links
+                        </label>
+                    </div>
+                    <div class="option-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="check-source" checked>
+                            <span class="checkmark"></span>
+                            Check source credibility
+                        </label>
+                    </div>
+                </div>
+                
+                <button type="button" class="verify-btn facebook-verify-btn" id="verify-facebook-btn">
+                    <i class="fab fa-facebook"></i>
+                    Analyze Facebook Content
+                </button>
+            </div>
         </div>
 
         <!-- How It Works Section -->

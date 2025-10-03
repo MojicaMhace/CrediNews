@@ -19,6 +19,61 @@
                 <p>Sign in to your account to continue</p>
             </div>
 
+            <!-- Email verification message -->
+            <div id="verificationMessage" class="verification-message" style="display: none;">
+                <div class="message-content">
+                    <i class="fas fa-envelope-open-text"></i>
+                    <h3>Please Verify Your Email</h3>
+                    <p>We've sent a verification link to your email address. Please check your inbox and click the link to verify your account before signing in.</p>
+                </div>
+            </div>
+
+            <!-- Email verification success message -->
+            <div id="verificationSuccessMessage" class="verification-success-message" style="display: none;">
+                <div class="message-content">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>Email Verified Successfully!</h3>
+                    <p>Your email has been verified. You can now sign in to your account.</p>
+                </div>
+            </div>
+
+            <!-- OTP Verification Form -->
+            <div id="otpVerificationContainer" class="otp-verification-container" style="display: none;">
+                <div class="otp-header">
+                    <i class="fas fa-key"></i>
+                    <h3>Verify Your Email</h3>
+                    <p>Enter the 6-digit verification code sent to your email address.</p>
+                    <p class="otp-email" id="otpEmail"></p>
+                </div>
+                
+                <form class="otp-form" id="otpForm">
+                    <div class="otp-input-group">
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                    </div>
+                    
+                    <button type="submit" class="auth-btn primary">
+                        <i class="fas fa-check"></i>
+                        Verify Code
+                    </button>
+                </form>
+                
+                <div class="otp-actions">
+                    <button type="button" class="auth-btn secondary" id="resendOtpBtn">
+                        <i class="fas fa-redo"></i>
+                        Resend Code
+                    </button>
+                    <button type="button" class="auth-btn secondary" id="backToLoginBtn">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Login
+                    </button>
+                </div>
+            </div>
+
             <form class="auth-form" id="loginForm">
                 <div class="form-group">
                     <label for="email">Email Address</label>
@@ -66,12 +121,16 @@
         </div>
     </div>
 
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     
     <script src="firebase-config.js"></script>
+    <script src="emailjs-config.js"></script>
     <script src="auth.js"></script>
 </body>
 </html>

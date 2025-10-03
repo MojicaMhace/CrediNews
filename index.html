@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
 <body>
     <!-- Navigation -->
@@ -23,7 +24,7 @@
             <div class="nav-menu">
                 <ul class="nav-links">
                     <li><a href="submit-news.html" class="nav-link">Submit News</a></li>
-                    <li><a href="#verify-news" class="nav-link">Verify News</a></li>
+                    <li><a href="verify-news.html" class="nav-link">Verify News</a></li>
                     <li><a href="#about" class="nav-link">About</a></li>
                 </ul>
             </div>
@@ -34,9 +35,31 @@
                 </div>
             </div>
             <div class="nav-controls">
-                <button class="verify-btn">
-                    Verify
-                </button>
+                <!-- Authentication buttons for non-logged in users -->
+                <div class="auth-buttons" id="authButtons" style="display: flex; gap: 8px; align-items: center;">
+                    <a href="login.html" class="login-btn" style="display: flex !important; align-items: center !important; gap: 4px !important; padding: 6px 12px !important; font-size: 12px !important; font-weight: 500 !important; border-radius: 4px !important; border: 1px solid var(--primary-color) !important; color: var(--primary-color) !important; background: transparent !important; text-decoration: none !important; cursor: pointer !important; transition: none !important; box-shadow: none !important; backdrop-filter: none !important; transform: none !important; position: relative !important; overflow: hidden !important;">
+                        <i class="fas fa-sign-in-alt" style="font-size: 11px !important;"></i>
+                        Login
+                    </a>
+                    <a href="register.html" class="signup-btn" style="display: flex !important; align-items: center !important; gap: 4px !important; padding: 6px 12px !important; font-size: 12px !important; font-weight: 500 !important; border-radius: 4px !important; border: 1px solid var(--primary-color) !important; color: white !important; background: var(--primary-color) !important; text-decoration: none !important; cursor: pointer !important; transition: none !important; box-shadow: none !important; backdrop-filter: none !important; transform: none !important; position: relative !important; overflow: hidden !important;">
+                        <i class="fas fa-user-plus" style="font-size: 11px !important;"></i>
+                        Sign Up
+                    </a>
+                </div>
+                
+                <!-- User account dropdown for logged in users -->
+                <div class="user-account-btn" id="userAccountBtn" style="display: none;">
+                    <i class="fas fa-user"></i>
+                    <span class="user-name">Loading...</span>
+                    <i class="fas fa-chevron-down"></i>
+                    <div class="user-dropdown" id="userDropdown">
+                        <div class="dropdown-item" onclick="handleLogout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Logout
+                        </div>
+                    </div>
+                </div>
+                
                 <button class="theme-toggle" id="themeToggle">
                     <i class="fas fa-moon"></i>
                 </button>
@@ -53,10 +76,10 @@
                     <h1 class="hero-title">Discover, Analyze,<br>and Verify<br>News Credibility</h1>
                     <p class="hero-subtitle">CrediNews is a trusted digital platform dedicated to fighting misinformation on Facebook. Our mission is to verify and analyze posts, headlines, and shared content, helping users discover accurate and reliable news sources. With CrediNews, you can identify fake news, promote truth, and build a more informed digital community. In CrediNews – Facts Matter.</p>
                     <div class="hero-buttons">
-                        <button class="btn-primary" id="analyzeBtn">
+                        <button class="btn-primary" id="analyzeBtn" onclick="window.location.href='submit-news.html';">
                             Analyze
                         </button>
-                        <button class="btn-secondary" id="verifyBtn">
+                        <button class="btn-secondary" id="verifyBtn" onclick="window.location.href='verify-news.html';">
                             Verify
                         </button>
                         <button class="btn-outline" id="demoBtn">
@@ -577,5 +600,166 @@
     <script src="firebase-config.js"></script>
     
     <script src="script.js"></script>
+    
+    <!-- Homepage Authentication Script -->
+    <script>
+        // Function to handle logout
+        function handleLogout() {
+            console.log('🚪 Logging out user...');
+            
+            // Sign out from Firebase
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                firebase.auth().signOut().then(() => {
+                    console.log('✅ Firebase logout successful');
+                    // Clear session storage
+                    sessionStorage.removeItem('authData');
+                    // Redirect to login page
+                    window.location.href = 'login.html';
+                }).catch((error) => {
+                    console.error('❌ Firebase logout error:', error);
+                    // Still clear session and redirect
+                    sessionStorage.removeItem('authData');
+                    window.location.href = 'login.html';
+                });
+            } else {
+                // Fallback: just clear session storage
+                sessionStorage.removeItem('authData');
+                window.location.href = 'login.html';
+            }
+        }
+
+        // Function to display user information and toggle UI elements
+        function displayUserInfo() {
+            const userNameSpan = document.querySelector('.user-name');
+            const userAccountBtn = document.getElementById('userAccountBtn');
+            const authButtons = document.getElementById('authButtons');
+            
+            console.log('🔍 displayUserInfo called');
+            console.log('🔍 authButtons element:', authButtons);
+            console.log('🔍 userAccountBtn element:', userAccountBtn);
+            
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                console.log('🔥 Firebase auth available');
+                firebase.auth().onAuthStateChanged((user) => {
+                    console.log('🔍 Auth state changed. User:', user);
+                    if (user) {
+                        // User is logged in - show user dropdown, hide auth buttons
+                        console.log('👤 User is logged in, hiding auth buttons');
+                        const displayName = user.displayName || user.email || 'User';
+                        if (userNameSpan) {
+                            userNameSpan.textContent = displayName;
+                        }
+                        if (userAccountBtn) {
+                            userAccountBtn.style.display = 'flex';
+                        }
+                        if (authButtons) {
+                            authButtons.style.display = 'none';
+                        }
+                        console.log('👤 User info displayed:', displayName);
+                    } else {
+                        // User is not logged in - show auth buttons, hide user dropdown
+                        console.log('🚫 User is not logged in, showing auth buttons');
+                        if (userAccountBtn) {
+                            userAccountBtn.style.display = 'none';
+                        }
+                        if (authButtons) {
+                            authButtons.style.display = 'flex';
+                            console.log('✅ Auth buttons should now be visible');
+                        }
+                    }
+                });
+            } else {
+                // Fallback: check session storage
+                const authData = sessionStorage.getItem('authData');
+                if (authData) {
+                    try {
+                        const userData = JSON.parse(authData);
+                        const displayName = userData.displayName || userData.email || 'User';
+                        if (userNameSpan) {
+                            userNameSpan.textContent = displayName;
+                        }
+                        if (userAccountBtn) {
+                            userAccountBtn.style.display = 'flex';
+                        }
+                        if (authButtons) {
+                            authButtons.style.display = 'none';
+                        }
+                    } catch (error) {
+                        console.error('Error parsing auth data:', error);
+                        // Show auth buttons on error
+                        if (userAccountBtn) {
+                            userAccountBtn.style.display = 'none';
+                        }
+                        if (authButtons) {
+                            authButtons.style.display = 'flex';
+                        }
+                    }
+                } else {
+                    // No auth data - show auth buttons
+                    if (userAccountBtn) {
+                        userAccountBtn.style.display = 'none';
+                    }
+                    if (authButtons) {
+                        authButtons.style.display = 'flex';
+                    }
+                }
+            }
+        }
+
+        // Function to force clear authentication and show auth buttons
+        function forceShowAuthButtons() {
+            console.log('🔧 Force clearing authentication data...');
+            
+            // Clear session storage
+            sessionStorage.clear();
+            localStorage.clear();
+            
+            // Sign out from Firebase if available
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                firebase.auth().signOut().catch(error => {
+                    console.log('Firebase signout error (expected if not logged in):', error);
+                });
+            }
+            
+            // Force show auth buttons
+            const authButtons = document.getElementById('authButtons');
+            const userAccountBtn = document.getElementById('userAccountBtn');
+            
+            if (authButtons) {
+                authButtons.style.display = 'flex';
+                console.log('✅ Auth buttons forced to display');
+            }
+            if (userAccountBtn) {
+                userAccountBtn.style.display = 'none';
+            }
+        }
+
+        // Initialize user info display when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // First, force clear any cached auth data
+            forceShowAuthButtons();
+            
+            // Then initialize normal auth flow
+            setTimeout(() => {
+                displayUserInfo();
+            }, 100);
+            
+            // Setup dropdown toggle
+            const userAccountBtn = document.getElementById('userAccountBtn');
+            const userDropdown = document.getElementById('userDropdown');
+            
+            if (userAccountBtn && userDropdown) {
+                userAccountBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    userDropdown.classList.toggle('show');
+                });
+                
+                // Close dropdown when clicking outside
+                document.addEventListener('click', () => {
+                    userDropdown.classList.remove('show');
+                });
+            }
+        });
+    </script>
 </body>
 </html>
