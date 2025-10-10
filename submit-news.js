@@ -337,7 +337,8 @@ function handleFormSubmission(e) {
     });
     
     if (isFormValid) {
-        submitForm();
+        // First check facts with API before submitting
+        checkFactsAndSubmit();
     } else {
         showFormError('Please correct the errors above before submitting.');
         // Scroll to first error
@@ -348,7 +349,108 @@ function handleFormSubmission(e) {
     }
 }
 
-async function submitForm() {
+async function checkFactsAndSubmit() {
+    // Show checking facts state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking facts...';
+    
+    try {
+        // Call fact check API
+        const factCheckResult = await checkFactsWithAPI(
+            articleTitle.value.trim(),
+            articleContent.value.trim()
+        );
+        
+        // Update button text to show we're now submitting
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+        
+        // Continue with submission including fact check results
+        await submitForm(factCheckResult);
+    } catch (error) {
+        console.error('Error during fact checking:', error);
+        showFormError('Failed to check facts. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Submit Article';
+    }
+}
+
+async function checkFactsWithAPI(title, content) {
+    try {
+        // Call our Python backend service
+        const response = await fetch('http://192.168.18.129:5000/api/fact-check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                content: content
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Show fact check result to user
+        displayFactCheckResult(result.credibility);
+        
+        return result;
+    } catch (error) {
+        console.error('Fact check API error:', error);
+        // Return a neutral result if API fails
+        return {
+            status: 'error',
+            credibility: {
+                score: 0.5,
+                label: 'Unverified',
+                explanation: 'Unable to verify this content.'
+            }
+        };
+    }
+}
+
+// Display fact check results to the user
+function displayFactCheckResult(credibility) {
+    // Create or get the fact check result container
+    let factCheckContainer = document.getElementById('factCheckResult');
+    if (!factCheckContainer) {
+        factCheckContainer = document.createElement('div');
+        factCheckContainer.id = 'factCheckResult';
+        factCheckContainer.className = 'fact-check-result';
+        form.insertBefore(factCheckContainer, submitBtn.parentNode);
+    }
+    
+    // Determine color based on credibility score
+    let colorClass = '';
+    if (credibility.score >= 0.8) {
+        colorClass = 'high-credibility';
+    } else if (credibility.score >= 0.5) {
+        colorClass = 'medium-credibility';
+    } else if (credibility.score >= 0.3) {
+        colorClass = 'low-credibility';
+    } else {
+        colorClass = 'not-credible';
+    }
+    
+    // Update the container with the result
+    factCheckContainer.innerHTML = `
+        <div class="fact-check-header ${colorClass}">
+            <span class="fact-check-label">Fact Check Result: ${credibility.label}</span>
+            <div class="credibility-meter">
+                <div class="meter-fill" style="width: ${credibility.score * 100}%"></div>
+            </div>
+        </div>
+        <p class="fact-check-explanation">${credibility.explanation}</p>
+    `;
+    
+    // Make sure the container is visible
+    factCheckContainer.style.display = 'block';
+}
+
+async function submitForm(factCheckResult) {
     try {
         // Check if user is authenticated
         if (!firebase.auth().currentUser) {
@@ -369,7 +471,15 @@ async function submitForm() {
             submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
             verificationScore: null,
             verifiedBy: null,
-            verifiedAt: null
+            verifiedAt: null,
+            factCheck: factCheckResult || {
+                status: 'not_checked',
+                credibility: {
+                    score: 0.5,
+                    label: 'Unverified',
+                    explanation: 'This content has not been fact-checked.'
+                }
+            }
         };
         
         // Add to Firestore

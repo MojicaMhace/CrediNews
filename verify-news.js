@@ -3,8 +3,8 @@
 // Firebase will be available globally after firebase-config.js loads
 
 // DOM Elements
-const textVerifyBtn = document.getElementById('textVerifyBtn');
-const urlVerifyBtn = document.getElementById('urlVerifyBtn');
+const textVerifyBtn = document.getElementById('verify-text-btn');
+const urlVerifyBtn = document.getElementById('verify-url-btn');
 const facebookVerifyBtn = document.getElementById('verify-facebook-btn');
 const articleContent = document.getElementById('articleContent');
 const articleUrl = document.getElementById('articleUrl');
@@ -40,18 +40,39 @@ function handleTextVerification() {
     textVerifyBtn.disabled = true;
     textVerifyBtn.textContent = 'Verifying...';
     
-    // Simulate verification process
-    setTimeout(() => {
+    // Call the fact check API
+    fetch('http://192.168.18.129:5000/api/fact-check', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            title: '',
+            content: content
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(result => {
         showVerificationResult('text', {
-            credibilityScore: Math.floor(Math.random() * 40) + 60, // Random score between 60-100
-            sources: Math.floor(Math.random() * 5) + 3, // Random sources between 3-8
-            factChecks: Math.floor(Math.random() * 3) + 1 // Random fact checks between 1-4
+            credibilityScore: Math.round(result.credibility.score * 100),
+            sources: result.credibility.sources || 3,
+            factChecks: result.credibility.factChecks || 1
         });
-        
+    })
+    .catch(error => {
+        console.error('Fact check API error:', error);
+        showNotification('Error connecting to fact check service. Please try again later.', 'error');
+    })
+    .finally(() => {
         // Reset button
         textVerifyBtn.disabled = false;
         textVerifyBtn.textContent = 'Verify Content';
-    }, 2000);
+    });
 }
 
 // URL verification handler
@@ -72,19 +93,41 @@ function handleUrlVerification() {
     urlVerifyBtn.disabled = true;
     urlVerifyBtn.textContent = 'Verifying...';
     
-    // Simulate verification process
-    setTimeout(() => {
+    // Call the fact check API
+    fetch('http://192.168.18.129:5000/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            title: '',
+            content: `URL: ${url}`,
+            url: url
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(result => {
         showVerificationResult('url', {
-            credibilityScore: Math.floor(Math.random() * 40) + 60,
-            sources: Math.floor(Math.random() * 5) + 3,
-            factChecks: Math.floor(Math.random() * 3) + 1,
+            credibilityScore: Math.round(result.credibility.score * 100),
+            sources: result.credibility.sources || 3,
+            factChecks: result.credibility.factChecks || 1,
             domain: extractDomain(url)
         });
-        
+    })
+    .catch(error => {
+        console.error('Fact check API error:', error);
+        showNotification('Error connecting to fact check service. Please try again later.', 'error');
+    })
+    .finally(() => {
         // Reset button
         urlVerifyBtn.disabled = false;
         urlVerifyBtn.textContent = 'Verify URL';
-    }, 2000);
+    });
 }
 
 // URL validation
@@ -164,24 +207,62 @@ function handleFacebookVerification() {
     facebookVerifyBtn.disabled = true;
     facebookVerifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing Facebook Content...';
     
-    // Simulate Facebook verification process
-    setTimeout(() => {
+    // Call the fact check API for Facebook content
+    if (firebase.auth().currentUser) {
+        // Store verification request in Firebase
+        firebase.firestore().collection('facebook_verification_requests').add({
+            url: url || null,
+            content: content || null,
+            userId: firebase.auth().currentUser.uid,
+            userEmail: firebase.auth().currentUser.email,
+            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            options: {
+                checkImages,
+                checkLinks,
+                checkSource
+            }
+        });
+    }
+    
+    // Call the fact check API for Facebook content
+    fetch('http://192.168.18.129:5000/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            title: 'Facebook Content',
+            content: content || `Facebook URL: ${url}`,
+            url: url || null,
+            options: {
+                checkImages,
+                checkLinks,
+                checkSource
+            }
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(result => {
         const analysisType = url ? 'facebook-url' : 'facebook-content';
-        const baseScore = Math.floor(Math.random() * 40) + 50; // Random score between 50-90
         
-        // Adjust score based on analysis options
-        let adjustedScore = baseScore;
-        if (checkImages) adjustedScore += Math.floor(Math.random() * 5);
-        if (checkLinks) adjustedScore += Math.floor(Math.random() * 5);
-        if (checkSource) adjustedScore += Math.floor(Math.random() * 5);
+        // Calculate adjusted score based on options
+        let adjustedScore = Math.round(result.credibility.score * 100);
+        if (checkImages) adjustedScore += 3;
+        if (checkLinks) adjustedScore += 3;
+        if (checkSource) adjustedScore += 3;
         
         // Cap the score at 100
         adjustedScore = Math.min(adjustedScore, 100);
         
         showFacebookVerificationResult(analysisType, {
             credibilityScore: adjustedScore,
-            sources: Math.floor(Math.random() * 8) + 2, // Random sources between 2-10
-            factChecks: Math.floor(Math.random() * 4) + 1, // Random fact checks between 1-5
+            sources: result.credibility.sources || 3,
+            factChecks: result.credibility.factChecks || 1,
             imageAnalysis: checkImages,
             linkVerification: checkLinks,
             sourceCheck: checkSource,
@@ -189,11 +270,16 @@ function handleFacebookVerification() {
             contentType: url ? 'Post/Article URL' : 'Text Content',
             url: url || null
         });
-        
+    })
+    .catch(error => {
+        console.error('Fact check API error:', error);
+        showNotification('Error connecting to fact check service. Please try again later.', 'error');
+    })
+    .finally(() => {
         // Reset button
         facebookVerifyBtn.disabled = false;
         facebookVerifyBtn.innerHTML = '<i class="fab fa-facebook"></i> Analyze Facebook Content';
-    }, 3000); // Longer delay to simulate more complex analysis
+    });
 }
 
 // Show Facebook verification results
