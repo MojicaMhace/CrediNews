@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify News - CrediNews</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="fact_check_styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="verify-news-page">
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="index.html" class="logo">
+                    <svg width="24" height="28" viewBox="0 0 24 28" class="brand-logo">
+                        <path d="M12 2 L20 5 L20 14 Q20 18 17 21 Q14 24 12 26 Q10 24 7 21 Q4 18 4 14 L4 5 Z" 
+                              fill="white" stroke="white" stroke-width="1"/>
+                        <path d="M8 12 L11 15 L16 10" stroke="#2D3748" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="brand-text">CREDINEWS</span>
+                </a>
+            </div>
+            <div class="nav-menu">
+                <ul class="nav-links">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="submit-news.html" class="nav-link">Submit News</a></li>
+                <li><a href="verify-news.html" class="nav-link active">Verify News</a></li>
+                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="login.html" class="nav-link login-link">
+                    <i class="fas fa-user"></i>
+                    Login
+                </a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="page-title-section">
+                <h1 class="page-title">Verify News</h1>
+                <div class="title-underline"></div>
+            </div>
+
+            <div class="verify-news-container">
+            <!-- Verify by Text Section -->
+            <div class="verify-card">
+                <div class="card-header">
+                    <i class="fas fa-file-text card-icon"></i>
+                    <h2 class="card-title">Verify by Text</h2>
+                </div>
+                <p class="card-description">Paste the news article text to analyze its credibility.</p>
+                
+                <div class="form-group">
+                    <label for="article-content" class="form-label">Article Content</label>
+                    <textarea 
+                        id="article-content" 
+                        class="form-textarea" 
+                        placeholder="Paste the news article text here..."
+                        rows="8"
+                        maxlength="5000"
+                    ></textarea>
+                    <div class="character-count">
+                        <span id="text-char-count">0</span>/5000 characters
+                    </div>
+                </div>
+                
+                <button type="button" class="verify-btn" id="verify-text-btn">
+                    <i class="fas fa-search"></i>
+                    Verify Content
+                </button>
+            </div>
+
+            <!-- Verify by URL Section -->
+            <div class="verify-card">
+                <div class="card-header">
+                    <i class="fas fa-link card-icon"></i>
+                    <h2 class="card-title">Verify by URL</h2>
+                </div>
+                <p class="card-description">Enter the URL of a news article to analyze its credibility.</p>
+                
+                <div class="form-group">
+                    <label for="article-url" class="form-label">Article URL</label>
+                    <input 
+                        type="url" 
+                        id="article-url" 
+                        class="form-input" 
+                        placeholder="https://example.com/news-article"
+                    >
+                </div>
+                
+                <button type="button" class="verify-btn" id="verify-url-btn">
+                    <i class="fas fa-search"></i>
+                    Verify URL
+                </button>
+            </div>
+
+            <!-- Verify Facebook News Section -->
+            <div class="verify-card facebook-card">
+                <div class="card-header">
+                    <i class="fab fa-facebook card-icon"></i>
+                    <h2 class="card-title">Verify Facebook News</h2>
+                </div>
+                <p class="card-description">Analyze Facebook posts, articles, and shared content for credibility and misinformation.</p>
+                
+                <div class="form-group">
+                    <label for="facebook-url" class="form-label">Facebook Post/Article URL</label>
+                    <input 
+                        type="url" 
+                        id="facebook-url" 
+                        class="form-input" 
+                        placeholder="https://www.facebook.com/post-url or https://facebook.com/page/posts/..."
+                    >
+                    <div class="input-help">
+                        <i class="fas fa-info-circle"></i>
+                        Supports Facebook posts, shared articles, and page content
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="facebook-content" class="form-label">Or Paste Facebook Content</label>
+                    <textarea 
+                        id="facebook-content" 
+                        class="form-textarea" 
+                        placeholder="Copy and paste the Facebook post content here..."
+                        rows="6"
+                        maxlength="3000"
+                    ></textarea>
+                    <div class="character-count">
+                        <span id="facebook-char-count">0</span>/3000 characters
+                    </div>
+                </div>
+
+                <div class="facebook-options">
+                    <div class="option-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="check-images" checked>
+                            <span class="checkmark"></span>
+                            Analyze attached images
+                        </label>
+                    </div>
+                    <div class="option-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="check-links" checked>
+                            <span class="checkmark"></span>
+                            Verify shared links
+                        </label>
+                    </div>
+                    <div class="option-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="check-source" checked>
+                            <span class="checkmark"></span>
+                            Check source credibility
+                        </label>
+                    </div>
+                </div>
+                
+                <button type="button" class="verify-btn facebook-verify-btn" id="verify-facebook-btn">
+                    <i class="fab fa-facebook"></i>
+                    Analyze Facebook Content
+                </button>
+            </div>
+        </div>
+
+        <!-- How It Works Section -->
+        <div class="how-it-works-section">
+            <div class="section-header">
+                <i class="fas fa-info-circle section-icon"></i>
+                <h2 class="section-title">How It Works</h2>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3 class="feature-title">AI Analysis</h3>
+                    <p class="feature-description">Our advanced AI algorithms analyze the content for patterns associated with fake news.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3 class="feature-title">Credibility Score</h3>
+                    <p class="feature-description">Receive a credibility score from 0-100 based on multiple verification factors.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="feature-title">Secure Reports</h3>
+                    <p class="feature-description">All verification reports are digitally signed to ensure their integrity.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section (Initially Hidden) -->
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-card">
+                <div class="results-header">
+                    <h3 class="results-title">Verification Results</h3>
+                    <div class="credibility-score">
+                        <span class="score-label">Credibility Score:</span>
+                        <span class="score-value" id="score-value">--</span>
+                        <span class="score-max">/100</span>
+                    </div>
+                </div>
+                
+                <div class="results-content">
+                    <div class="analysis-details" id="analysis-details">
+                        <!-- Analysis results will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <div class="footer-brand">
+                        <svg width="24" height="28" viewBox="0 0 24 28" class="brand-logo">
+                            <path d="M12 2 L20 5 L20 14 Q20 18 17 21 Q14 24 12 26 Q10 24 7 21 Q4 18 4 14 L4 5 Z" 
+                                  fill="white" stroke="white" stroke-width="1"/>
+                            <path d="M8 12 L11 15 L16 10" stroke="#2D3748" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span class="brand-text">CREDINEWS</span>
+                    </div>
+                    <p class="footer-description">
+                        Empowering truth through AI-powered news verification. 
+                        Fight misinformation with cutting-edge technology.
+                    </p>
+                </div>
+                
+                <div class="footer-right">
+                    <div class="footer-links">
+                        <h4>Quick Links</h4>
+                        <ul>
+                            <li><a href="index.html">Home</a></li>
+                            <li><a href="submit-news.html">Submit News</a></li>
+                            <li><a href="verify-news.html">Verify News</a></li>
+                            <li><a href="#about">About</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="footer-contact">
+                        <h4>Contact</h4>
+                        <p>support@credinews.com</p>
+                        <p>+1 (555) 123-4567</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 CrediNews. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Firebase Configuration -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- JavaScript -->
+    <script src="verify-news.js"></script>
+</body>
+</html>

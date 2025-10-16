@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CrediNews - Facebook News Detector</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <svg width="24" height="28" viewBox="0 0 24 28" class="brand-logo">
+                    <path d="M12 2 L20 5 L20 14 Q20 18 17 21 Q14 24 12 26 Q10 24 7 21 Q4 18 4 14 L4 5 Z" 
+                          fill="white" stroke="white" stroke-width="1"/>
+                    <path d="M8 12 L11 15 L16 10" stroke="#2D3748" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-text">CREDINEWS</span>
+            </div>
+            <div class="nav-menu">
+                <ul class="nav-links">
+                    <li><a href="submit-news.html" class="nav-link">Submit News</a></li>
+                    <li><a href="verify-news.html" class="nav-link">Verify News</a></li>
+                    <li><a href="#about" class="nav-link">About</a></li>
+                </ul>
+            </div>
+            <div class="nav-center">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Search">
+                </div>
+            </div>
+            <div class="nav-controls">
+                <!-- Authentication buttons for non-logged in users -->
+                <div class="auth-buttons" id="authButtons" style="display: flex; gap: 8px; align-items: center;">
+                    <a href="login.html" class="login-btn" style="display: flex !important; align-items: center !important; gap: 4px !important; padding: 6px 12px !important; font-size: 12px !important; font-weight: 500 !important; border-radius: 4px !important; border: 1px solid var(--primary-color) !important; color: var(--primary-color) !important; background: transparent !important; text-decoration: none !important; cursor: pointer !important; transition: none !important; box-shadow: none !important; backdrop-filter: none !important; transform: none !important; position: relative !important; overflow: hidden !important;">
+                        <i class="fas fa-sign-in-alt" style="font-size: 11px !important;"></i>
+                        Login
+                    </a>
+                    <a href="register.html" class="signup-btn" style="display: flex !important; align-items: center !important; gap: 4px !important; padding: 6px 12px !important; font-size: 12px !important; font-weight: 500 !important; border-radius: 4px !important; border: 1px solid var(--primary-color) !important; color: white !important; background: var(--primary-color) !important; text-decoration: none !important; cursor: pointer !important; transition: none !important; box-shadow: none !important; backdrop-filter: none !important; transform: none !important; position: relative !important; overflow: hidden !important;">
+                        <i class="fas fa-user-plus" style="font-size: 11px !important;"></i>
+                        Sign Up
+                    </a>
+                </div>
+                
+                <!-- User account dropdown for logged in users -->
+                <div class="user-account-btn" id="userAccountBtn" style="display: none;">
+                    <i class="fas fa-user"></i>
+                    <span class="user-name">Loading...</span>
+                    <i class="fas fa-chevron-down"></i>
+                    <div class="user-dropdown" id="userDropdown">
+                        <div class="dropdown-item" onclick="handleLogout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Logout
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="theme-toggle" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-container">
+                <div class="hero-left">
+                    <h1 class="hero-title">Discover, Analyze,<br>and Verify<br>News Credibility</h1>
+                    <p class="hero-subtitle">CrediNews is a trusted digital platform dedicated to fighting misinformation on Facebook. Our mission is to verify and analyze posts, headlines, and shared content, helping users discover accurate and reliable news sources. With CrediNews, you can identify fake news, promote truth, and build a more informed digital community. In CrediNews – Facts Matter.</p>
+                    <div class="hero-buttons">
+                        <button class="btn-primary" id="analyzeBtn" onclick="window.location.href='submit-news.html';">
+                            Analyze
+                        </button>
+                        <button class="btn-secondary" id="verifyBtn" onclick="window.location.href='verify-news.html';">
+                            Verify
+                        </button>
+                        <button class="btn-outline" id="demoBtn">
+                            ▶ Watch a demo
+                        </button>
+                    </div>
+
+                </div>
+                <div class="hero-right">
+                </div>
+            </div>
+        </section>
+
+        <!-- Statistics Section -->
+        <section class="statistics-section">
+            <div class="container">
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-content">
+                             <div class="stat-number">12,847</div>
+                             <div class="stat-label">Facebook News Analyzed</div>
+                         </div>
+                     </div>
+                     <div class="stat-box">
+                         <div class="stat-icon">
+                             <i class="fas fa-check-circle"></i>
+                         </div>
+                         <div class="stat-content">
+                             <div class="stat-number">9,234</div>
+                             <div class="stat-label">Verified Facebook News</div>
+                        </div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number">3,613</div>
+                            <div class="stat-label">Fake News Detected</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Latest Verified Facebook News Section -->
+        <section class="latest-news-section">
+            <div class="container">
+                <h2 class="section-title">Latest Verified Facebook News</h2>
+                <div class="news-grid">
+                    <div class="news-item">
+                        <div class="news-thumbnail">
+                            <div class="thumbnail-placeholder climate"></div>
+                        </div>
+                        <div class="news-content">
+                            <h3 class="news-headline">Philippines Faces Severe Flooding as Typhoon Season Intensifies</h3>
+                            <div class="news-meta">
+                                <span class="news-source">ABS-CBN News</span>
+                                <span class="verification-badge verified">
+                                    <i class="fas fa-check-circle"></i>
+                                    Verified
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-thumbnail">
+                            <div class="thumbnail-placeholder economy"></div>
+                        </div>
+                        <div class="news-content">
+                            <h3 class="news-headline">Rising Inflation Affects Filipino Families as Food Prices Surge</h3>
+                            <div class="news-meta">
+                                <span class="news-source">Philippine Daily Inquirer</span>
+                                <span class="verification-badge verified">
+                                    <i class="fas fa-check-circle"></i>
+                                    Verified
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-thumbnail">
+                            <div class="thumbnail-placeholder politics"></div>
+                        </div>
+                        <div class="news-content">
+                            <h3 class="news-headline">Senate Investigates Alleged Corruption in Government Infrastructure Projects</h3>
+                            <div class="news-meta">
+                                <span class="news-source">GMA News</span>
+                                <span class="verification-badge verified">
+                                    <i class="fas fa-check-circle"></i>
+                                    Verified
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-thumbnail">
+                            <div class="thumbnail-placeholder health"></div>
+                        </div>
+                        <div class="news-content">
+                            <h3 class="news-headline">DOH Reports Increase in Dengue Cases Across Metro Manila</h3>
+                            <div class="news-meta">
+                                <span class="news-source">Manila Bulletin</span>
+                                <span class="verification-badge verified">
+                                    <i class="fas fa-check-circle"></i>
+                                    Verified
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-thumbnail">
+                            <div class="thumbnail-placeholder tech"></div>
+                        </div>
+                        <div class="news-content">
+                            <h3 class="news-headline">Philippines Launches Digital ID System to Improve Government Services</h3>
+                            <div class="news-meta">
+                                <span class="news-source">Rappler</span>
+                                <span class="verification-badge verified">
+                                    <i class="fas fa-check-circle"></i>
+                                    Verified
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-thumbnail">
+                            <div class="thumbnail-placeholder economy"></div>
+                        </div>
+                        <div class="news-content">
+                            <h3 class="news-headline">OFW Remittances Hit Record High Despite Global Economic Challenges</h3>
+                            <div class="news-meta">
+                                <span class="news-source">BusinessWorld</span>
+                                <span class="verification-badge verified">
+                                    <i class="fas fa-check-circle"></i>
+                                    Verified
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section class="how-it-works-section">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">How It Works</h2>
+                    <div class="title-accent"></div>
+                </div>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-icon">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <div class="step-number">1</div>
+                        <h3 class="step-title">Submit News</h3>
+                        <p class="step-description">Register and submit news articles or URLs for verification by our AI system.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="step-number">2</div>
+                        <h3 class="step-title">AI Analysis</h3>
+                        <p class="step-description">Our advanced AI algorithms analyze the content for credibility and authenticity.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-icon">
+                            <i class="fas fa-clipboard-check"></i>
+                        </div>
+                        <div class="step-number">3</div>
+                        <h3 class="step-title">Get Results</h3>
+                        <p class="step-description">Receive a detailed report with credibility score and verification status.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section">
+            <div class="container">
+                <!-- Input Section -->
+                <div class="input-section">
+                    <div class="input-group">
+                        <textarea 
+                            id="newsInput" 
+                            placeholder="Paste a news link, headline, or full article text here..."
+                            rows="4"
+                        ></textarea>
+                        <button class="check-btn" id="checkBtn">
+                            <i class="fas fa-search"></i>
+                            Check News
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div class="results-section" id="resultsSection">
+                    <!-- Credibility Score -->
+                    <div class="result-card score-card">
+                        <h3>Credibility Score</h3>
+                        <div class="score-display">
+                            <div class="score-number" id="scoreNumber">85</div>
+                            <div class="score-chart">
+                                <canvas id="scoreChart" width="150" height="150"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Classification -->
+                    <div class="result-card classification-card">
+                        <h3>Classification</h3>
+                        <div class="classification-result real" id="classificationResult">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Likely Real</span>
+                        </div>
+                        <div class="confidence">
+                            <span>Confidence: <strong id="confidenceLevel">87%</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Fact Check Results -->
+                    <div class="result-card fact-check-card">
+                        <h3>Related Fact-Checks</h3>
+                        <div class="fact-check-list" id="factCheckList">
+                            <div class="fact-check-item">
+                                <div class="fact-check-source">Snopes</div>
+                                <div class="fact-check-verdict verified">Verified</div>
+                            </div>
+                            <div class="fact-check-item">
+                                <div class="fact-check-source">PolitiFact</div>
+                                <div class="fact-check-verdict mostly-true">Mostly True</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Poster Detection -->
+                    <div class="result-card poster-card">
+                        <h3>Source Analysis</h3>
+                        <div class="poster-info">
+                            <div class="poster-item">
+                                <span class="label">Source Type:</span>
+                                <span class="value">News Website</span>
+                            </div>
+                            <div class="poster-item">
+                                <span class="label">Domain Age:</span>
+                                <span class="value">5+ years</span>
+                            </div>
+                            <div class="poster-item">
+                                <span class="label">Reputation:</span>
+                                <span class="value trusted">Trusted</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Trends Section -->
+        <section id="trends" class="section">
+            <div class="container">
+                <h1 class="page-title">Misinformation Trends</h1>
+                <div class="trends-grid">
+                    <div class="trend-card">
+                        <h3>Weekly Misinformation Rate</h3>
+                        <canvas id="weeklyTrendChart" width="400" height="200"></canvas>
+                    </div>
+                    <div class="trend-card">
+                        <h3>Top Categories</h3>
+                        <canvas id="categoryChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings" class="section">
+            <div class="container">
+                <h1 class="page-title">Account Settings</h1>
+                <div class="settings-grid">
+                    <div class="setting-card">
+                        <h3>Profile Information</h3>
+                        <div class="setting-item">
+                            <label>Email</label>
+                            <input type="email" value="user@example.com" readonly>
+                        </div>
+                        <div class="setting-item">
+                            <label>Name</label>
+                            <input type="text" value="John Doe">
+                        </div>
+                    </div>
+                    <div class="setting-card">
+                        <h3>Preferences</h3>
+                        <div class="setting-item">
+                            <label>Theme</label>
+                            <select>
+                                <option>Auto</option>
+                                <option>Light</option>
+                                <option>Dark</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Notifications</label>
+                            <input type="checkbox" checked>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ready to Verify News Section -->
+        <section class="ready-to-verify-section">
+            <div class="container">
+                <div class="ready-content">
+                    <div class="ready-left">
+                        <h2 class="ready-title">Ready to Verify News?</h2>
+                        <p class="ready-subtitle">Join thousands of users who trust our AI-powered fact-checking platform to separate truth from misinformation in real-time.</p>
+                        
+                        <div class="ready-features">
+                            <div class="feature-item">
+                                <i class="fas fa-shield-alt"></i>
+                                <span>AI-powered fact verification</span>
+                            </div>
+                            <div class="feature-item">
+                                <i class="fas fa-clock"></i>
+                                <span>Real-time news analysis</span>
+                            </div>
+                            <div class="feature-item">
+                                <i class="fas fa-users"></i>
+                                <span>Community-driven verification</span>
+                            </div>
+                            <div class="feature-item">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Credibility scoring system</span>
+                            </div>
+                        </div>
+                        
+                        <div class="ready-buttons">
+                            <button class="btn-signup">
+                                <i class="fas fa-rocket"></i>
+                                Get Started Today
+                            </button>
+                            <button class="btn-learn-more">
+                                <i class="fas fa-info-circle"></i>
+                                Learn More
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="ready-right">
+                        <div class="ready-card">
+                            <div class="ready-card-content">
+                                <h3>Platform Stats</h3>
+                                
+                                <div class="ready-stats">
+                                    <div class="ready-stat">
+                                        <div class="ready-stat-number">2.5K+</div>
+                                        <div class="ready-stat-label">Verified</div>
+                                    </div>
+                                    <div class="ready-stat">
+                                        <div class="ready-stat-number">92%</div>
+                                        <div class="ready-stat-label">Accuracy</div>
+                                    </div>
+                                    <div class="ready-stat">
+                                        <div class="ready-stat-number">24/7</div>
+                                        <div class="ready-stat-label">Monitoring</div>
+                                    </div>
+                                    <div class="ready-stat">
+                                        <div class="ready-stat-number">850+</div>
+                                        <div class="ready-stat-label">Users</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="ready-demo">
+                                    <div class="ready-demo-title">Recent Verifications</div>
+                                    <div class="ready-demo-item">
+                                        <span class="ready-demo-source">Reuters</span>
+                                        <span class="ready-demo-badge">Verified</span>
+                                    </div>
+                                    <div class="ready-demo-item">
+                                        <span class="ready-demo-source">AP News</span>
+                                        <span class="ready-demo-badge">Verified</span>
+                                    </div>
+                                    <div class="ready-demo-item">
+                                        <span class="ready-demo-source">BBC News</span>
+                                        <span class="ready-demo-badge">Verified</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+
+        <!-- Verify News Section -->
+        <section id="verify-news" class="section">
+            <div class="container">
+                <h2 class="page-title">Verify News Instantly</h2>
+                <div class="input-section">
+                    <div class="input-group">
+                        <label for="verifyInput">Enter News Text or URL</label>
+                        <textarea id="verifyInput" placeholder="Paste news content or URL here for instant verification..." rows="5"></textarea>
+                    </div>
+                    <button class="check-btn" id="verifyNewsBtn">
+                        <i class="fas fa-search"></i>
+                        Verify Now
+                    </button>
+                </div>
+                <div class="results-section" id="verifyResults" style="display: none;">
+                    <div class="result-card">
+                        <h3>Verification Results</h3>
+                        <div class="score-display">
+                            <div class="score-number" id="verifyScoreNumber">--</div>
+                            <div class="classification-result" id="verifyClassification">Analyzing...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section id="about" class="section">
+            <div class="container">
+                <h2 class="page-title">About CrediNews</h2>
+                <div class="about-content">
+                    <div class="about-mission">
+                        <h3>Our Mission</h3>
+                        <p>CrediNews is dedicated to fighting misinformation and promoting truth in the digital age. We provide AI-powered fact-checking tools to help users identify reliable news sources and verify the credibility of information shared on social media platforms.</p>
+                    </div>
+                    <div class="about-features">
+                        <h3>What We Do</h3>
+                        <div class="feature-grid">
+                            <div class="feature-card">
+                                <i class="fas fa-shield-alt"></i>
+                                <h4>AI-Powered Verification</h4>
+                                <p>Advanced algorithms analyze news content for credibility indicators</p>
+                            </div>
+                            <div class="feature-card">
+                                <i class="fas fa-search"></i>
+                                <h4>Real-time Analysis</h4>
+                                <p>Instant verification of news articles and social media posts</p>
+                            </div>
+                            <div class="feature-card">
+                                <i class="fas fa-users"></i>
+                                <h4>Community Driven</h4>
+                                <p>Collaborative fact-checking with trusted news sources</p>
+                            </div>
+                            <div class="feature-card">
+                                <i class="fas fa-chart-line"></i>
+                                <h4>Transparency</h4>
+                                <p>Clear credibility scores and detailed analysis reports</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="about-contact">
+                        <h3>Contact Us</h3>
+                        <p>Have questions or want to report misinformation? Reach out to our team at <a href="mailto:info@credinews.com">info@credinews.com</a></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Section Divider -->
+    <div class="section-divider"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <div class="footer-logo">
+                        <span class="logo-icon"></span>
+                        <span class="logo-text">CrediNews</span>
+                    </div>
+                    <p class="footer-description">An AI-driven platform dedicated to combating fake news and misinformation through advanced verification technology.</p>
+                </div>
+                <div class="footer-right">
+                    <div class="footer-column">
+                        <h4>Links</h4>
+                        <ul>
+                            <li><a href="index.html">Home</a></li>
+                            <li><a href="#">About</a></li>
+                            <li><a href="verify-news.html">Verify News</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Resources</h4>
+                        <ul>
+                            <li><a href="#">FAQ</a></li>
+                            <li><a href="#">Privacy Policy</a></li>
+                            <li><a href="#">Terms of Service</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 CrediNews. All rights reserved.</p>
+                <p>Designed with ❤️ for truth seekers</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="firebase-config.js"></script>
+    
+    <script src="script.js"></script>
+    
+    <!-- Homepage Authentication Script -->
+    <script>
+        // Function to handle logout
+        function handleLogout() {
+            console.log('🚪 Logging out user...');
+            
+            // Sign out from Firebase
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                firebase.auth().signOut().then(() => {
+                    console.log('✅ Firebase logout successful');
+                    // Clear session storage
+                    sessionStorage.removeItem('authData');
+                    // Redirect to login page
+                    window.location.href = 'login.html';
+                }).catch((error) => {
+                    console.error('❌ Firebase logout error:', error);
+                    // Still clear session and redirect
+                    sessionStorage.removeItem('authData');
+                    window.location.href = 'login.html';
+                });
+            } else {
+                // Fallback: just clear session storage
+                sessionStorage.removeItem('authData');
+                window.location.href = 'login.html';
+            }
+        }
+
+        // Function to display user information and toggle UI elements
+        function displayUserInfo() {
+            const userNameSpan = document.querySelector('.user-name');
+            const userAccountBtn = document.getElementById('userAccountBtn');
+            const authButtons = document.getElementById('authButtons');
+            
+            console.log('🔍 displayUserInfo called');
+            console.log('🔍 authButtons element:', authButtons);
+            console.log('🔍 userAccountBtn element:', userAccountBtn);
+            
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                console.log('🔥 Firebase auth available');
+                firebase.auth().onAuthStateChanged((user) => {
+                    console.log('🔍 Auth state changed. User:', user);
+                    if (user) {
+                        // User is logged in - show user dropdown, hide auth buttons
+                        console.log('👤 User is logged in, hiding auth buttons');
+                        const displayName = user.displayName || user.email || 'User';
+                        if (userNameSpan) {
+                            userNameSpan.textContent = displayName;
+                        }
+                        if (userAccountBtn) {
+                            userAccountBtn.style.display = 'flex';
+                        }
+                        if (authButtons) {
+                            authButtons.style.display = 'none';
+                        }
+                        console.log('👤 User info displayed:', displayName);
+                    } else {
+                        // User is not logged in - show auth buttons, hide user dropdown
+                        console.log('🚫 User is not logged in, showing auth buttons');
+                        if (userAccountBtn) {
+                            userAccountBtn.style.display = 'none';
+                        }
+                        if (authButtons) {
+                            authButtons.style.display = 'flex';
+                            console.log('✅ Auth buttons should now be visible');
+                        }
+                    }
+                });
+            } else {
+                // Fallback: check session storage
+                const authData = sessionStorage.getItem('authData');
+                if (authData) {
+                    try {
+                        const userData = JSON.parse(authData);
+                        const displayName = userData.displayName || userData.email || 'User';
+                        if (userNameSpan) {
+                            userNameSpan.textContent = displayName;
+                        }
+                        if (userAccountBtn) {
+                            userAccountBtn.style.display = 'flex';
+                        }
+                        if (authButtons) {
+                            authButtons.style.display = 'none';
+                        }
+                    } catch (error) {
+                        console.error('Error parsing auth data:', error);
+                        // Show auth buttons on error
+                        if (userAccountBtn) {
+                            userAccountBtn.style.display = 'none';
+                        }
+                        if (authButtons) {
+                            authButtons.style.display = 'flex';
+                        }
+                    }
+                } else {
+                    // No auth data - show auth buttons
+                    if (userAccountBtn) {
+                        userAccountBtn.style.display = 'none';
+                    }
+                    if (authButtons) {
+                        authButtons.style.display = 'flex';
+                    }
+                }
+            }
+        }
+
+        // Function to force clear authentication and show auth buttons
+        function forceShowAuthButtons() {
+            console.log('🔧 Force clearing authentication data...');
+            
+            // Clear session storage
+            sessionStorage.clear();
+            localStorage.clear();
+            
+            // Sign out from Firebase if available
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                firebase.auth().signOut().catch(error => {
+                    console.log('Firebase signout error (expected if not logged in):', error);
+                });
+            }
+            
+            // Force show auth buttons
+            const authButtons = document.getElementById('authButtons');
+            const userAccountBtn = document.getElementById('userAccountBtn');
+            
+            if (authButtons) {
+                authButtons.style.display = 'flex';
+                console.log('✅ Auth buttons forced to display');
+            }
+            if (userAccountBtn) {
+                userAccountBtn.style.display = 'none';
+            }
+        }
+
+        // Initialize user info display when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // First, force clear any cached auth data
+            forceShowAuthButtons();
+            
+            // Then initialize normal auth flow
+            setTimeout(() => {
+                displayUserInfo();
+            }, 100);
+            
+            // Setup dropdown toggle
+            const userAccountBtn = document.getElementById('userAccountBtn');
+            const userDropdown = document.getElementById('userDropdown');
+            
+            if (userAccountBtn && userDropdown) {
+                userAccountBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    userDropdown.classList.toggle('show');
+                });
+                
+                // Close dropdown when clicking outside
+                document.addEventListener('click', () => {
+                    userDropdown.classList.remove('show');
+                });
+            }
+        });
