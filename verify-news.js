@@ -41,7 +41,7 @@ function handleTextVerification() {
     textVerifyBtn.textContent = 'Verifying...';
     
     // Call the fact check API
-    fetch('http://192.168.18.6:5000/api/fact-check', {
+    fetch('http://192.168.18.6:5000/api/fact-check', {  // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -94,7 +94,7 @@ function handleUrlVerification() {
     urlVerifyBtn.textContent = 'Verifying...';
     
     // Call the fact check API
-    fetch('http://192.168.18.6:5000/api/fact-check', {
+    fetch('http://192.168.18.6:5000/api/fact-check', { // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -225,7 +225,7 @@ function handleFacebookVerification() {
     }
     
     // Call the fact check API for Facebook content
-    fetch('http://192.168.18.6:5000/api/fact-check', {
+    fetch('http://192.168.18.6:5000/api/fact-check', { // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
