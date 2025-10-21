@@ -9,10 +9,6 @@ from nltk.corpus import stopwords
 import re
 
 
-# Download NLTK resources (uncomment first time)
-# nltk.download('punkt')
-# nltk.download('stopwords')
-
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
