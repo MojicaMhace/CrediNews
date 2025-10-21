@@ -6,20 +6,29 @@
 const textVerifyBtn = document.getElementById('verify-text-btn');
 const urlVerifyBtn = document.getElementById('verify-url-btn');
 const facebookVerifyBtn = document.getElementById('verify-facebook-btn');
-const articleContent = document.getElementById('articleContent');
-const articleUrl = document.getElementById('articleUrl');
+const articleContent = document.getElementById('article-content');
+const articleUrl = document.getElementById('article-url');
 const facebookUrl = document.getElementById('facebook-url');
 const facebookContent = document.getElementById('facebook-content');
 const facebookCharCount = document.getElementById('facebook-char-count');
+const textCharCount = document.getElementById('text-char-count');
 
 // Character counter for text area
 function updateCharacterCount() {
-    const maxLength = 5000;
-    const currentLength = articleContent.value.length;
-    const remaining = maxLength - currentLength;
     
-    // You can add a character counter display here if needed
-    console.log(`Characters remaining: ${remaining}`);
+    if (articleContent && textCharCount) {
+       const currentLength = articleContent.value.length;
+        textCharCount.textContent = currentLength;
+        
+    // Change color based on character count
+        if (currentLength > 2800) {
+            textCharCount.style.color = '#ef4444';
+        } else if (currentLength > 2500) {
+            textCharCount.style.color = '#f59e0b';
+        } else {
+            textCharCount.style.color = '#6b7280';
+        }
+    }
 }
 
 // Text verification handler
@@ -41,7 +50,7 @@ function handleTextVerification() {
     textVerifyBtn.textContent = 'Verifying...';
     
     // Call the fact check API
-    fetch('http://192.168.18.6:5000/api/fact-check', {  // Replace with your actual API endpoint
+    fetch('http://127.0.0.1:5000/api/fact-check', {  // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -58,10 +67,15 @@ function handleTextVerification() {
         return response.json();
     })
     .then(result => {
+
+        // Cap the score at 100
+        const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
+
         showVerificationResult('text', {
-            credibilityScore: Math.round(result.credibility.score * 100),
+            credibilityScore: adjustedScore,
             sources: result.credibility.sources || 3,
             factChecks: result.credibility.factChecks || 1
+            
         });
     })
     .catch(error => {
@@ -94,7 +108,7 @@ function handleUrlVerification() {
     urlVerifyBtn.textContent = 'Verifying...';
     
     // Call the fact check API
-    fetch('http://192.168.18.6:5000/api/fact-check', { // Replace with your actual API endpoint
+    fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -112,8 +126,12 @@ function handleUrlVerification() {
         return response.json();
     })
     .then(result => {
+        
+        // Cap the score at 100
+       const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
+
         showVerificationResult('url', {
-            credibilityScore: Math.round(result.credibility.score * 100),
+            credibilityScore: adjustedScore,
             sources: result.credibility.sources || 3,
             factChecks: result.credibility.factChecks || 1,
             domain: extractDomain(url)
@@ -225,7 +243,7 @@ function handleFacebookVerification() {
     }
     
     // Call the fact check API for Facebook content
-    fetch('http://192.168.18.6:5000/api/fact-check', { // Replace with your actual API endpoint
+    fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -356,13 +374,13 @@ function showFacebookVerificationResult(type, data) {
 // Get Facebook-specific score summary
 function getFacebookScoreSummary(score) {
     if (score >= 80) {
-        return 'High credibility - Content appears reliable and trustworthy';
-    } else if (score >= 60) {
-        return 'Moderate credibility - Some concerns identified, verify with additional sources';
-    } else if (score >= 40) {
-        return 'Low credibility - Multiple red flags detected, approach with caution';
+        return 'Credible - Content appears reliable and trustworthy';
+    } else if (score >= 50) {
+        return 'Mixed - Some concerns identified, verify with additional sources';
+    } else if (score >= 30) {
+        return 'Likely Fake - Multiple red flags detected, approach with caution';
     } else {
-        return 'Very low credibility - High likelihood of misinformation';
+        return 'low credibility - High likelihood of misinformation';
     }
 }
 
@@ -432,7 +450,7 @@ async function showVerificationResult(type, data) {
     `;
     
     // Create and show modal or insert result into page
-    showModal('Verification Complete', resultHtml);
+    showModal('Credibility Analysis Complete', resultHtml);
 }
 
 // Get score class for styling
@@ -668,6 +686,7 @@ const additionalStyles = `
 
 .verification-result {
     text-align: left;
+    color: #1f2937;
 }
 
 .result-grid {
@@ -712,6 +731,7 @@ const additionalStyles = `
     background: #f9fafb;
     border-radius: 8px;
     border-left: 4px solid #3b82f6;
+    color: #374151;    
 }
 
 .btn {
