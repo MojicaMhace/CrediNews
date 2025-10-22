@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Verification - CrediNews</title>
+  <link rel="stylesheet" href="email_verification.css">
+</head>
+<body>
+  <div class="card" id="verifyCard">
+    <h2>Verifying your email...</h2>
+    <p>Please wait while we confirm your account.</p>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="firebase-config.js"></script>
+
+  <script>
+  const auth = firebase.auth();
+  const params = new URLSearchParams(window.location.search);
+  const oobCode = params.get('oobCode');
+  const mode = params.get('mode');
+  const card = document.getElementById('verifyCard');
+
+  if (mode === 'verifyEmail' && oobCode) {
+    auth.applyActionCode(oobCode)
+      .then(() => {
+        card.innerHTML = `
+          <h2>✅ Your email has been verified!</h2>
+          <p>You’ll be redirected to the login page in <span id="countdown">3</span> seconds...</p>
+        `;
+
+        // Countdown + redirect
+        let timeLeft = 3;
+        const countdownEl = document.getElementById('countdown');
+        const timer = setInterval(() => {
+          timeLeft--;
+          countdownEl.textContent = timeLeft;
+          if (timeLeft <= 0) {
+            clearInterval(timer);
+            window.location.href = 'login.html';
+          }
+        }, 1000);
+      })
+      .catch((error) => {
+        card.innerHTML = `
+          <h2 class="error">❌ Verification failed</h2>
+          <p>The link may have expired or is invalid.</p>
+          <button onclick="window.location.href='register.html'">Back to Register</button>
+        `;
+        console.error("Verification error:", error);
+      });
+  } else {
+    card.innerHTML = `
+      <h2 class="error">❌ Invalid link</h2>
+      <p>This page can only be accessed from a valid email verification link.</p>
+      <button onclick="window.location.href='register.html'">Back to Register</button>
+    `;
+  }
+</script>
+
+</body>
+</html>
