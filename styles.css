@@ -2851,8 +2851,6 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 }
 
 
-  margin-top: 4px;
-}
 
 .checkbox-group {
   flex-direction: row;
@@ -2976,7 +2974,7 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   .submit-btn {
     padding: 14px 24px;
   }
-}
+
 
 /* Ready to Verify News Section */
 .ready-to-verify-section {

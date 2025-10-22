@@ -149,73 +149,73 @@ def calculate_credibility_score(fact_check_results):
         "explanation": explanation
     }
 
-@app.route('/api/fact-check', methods=['POST'])
-def fact_check():
-    """API endpoint to fact check news content."""
-    data = request.json
+# @app.route('/api/fact-check', methods=['POST'])
+# def fact_check():
+#     """API endpoint to fact check news content."""
+#     data = request.json
     
-    if not data or 'content' not in data:
-        return jsonify({
-            "error": "Missing required fields",
-            "status": "error"
-        }), 400
+#     if not data or 'content' not in data:
+#         return jsonify({
+#             "error": "Missing required fields",
+#             "status": "error"
+#         }), 400
     
-    content = data.get('content', '')
-    title = data.get('title', '')
+#     content = data.get('content', '')
+#     title = data.get('title', '')
     
-    # Extract claims from the content
-    claims = extract_claims(content, title)
+#     # Extract claims from the content
+#     claims = extract_claims(content, title)
     
-    # Check each claim
-    all_results = []
-    for claim in claims:
-        result = check_claim_with_google_api(claim)
-        if result:
-            all_results.append({
-                "claim": claim,
-                "fact_check_result": result
-            })
+#     # Check each claim
+#     all_results = []
+#     for claim in claims:
+#         result = check_claim_with_google_api(claim)
+#         if result:
+#             all_results.append({
+#                 "claim": claim,
+#                 "fact_check_result": result
+#             })
     
-    # Calculate overall credibility score
-    overall_score = 0.5  # Default neutral score
-    overall_label = "Unverified"
-    overall_explanation = "No fact check data available."
+#     # Calculate overall credibility score
+#     overall_score = 0.5  # Default neutral score
+#     overall_label = "Unverified"
+#     overall_explanation = "No fact check data available."
     
-    if all_results:
-        scores = []
-        for result in all_results:
-            if "fact_check_result" in result:
-                score_data = calculate_credibility_score(result["fact_check_result"])
-                scores.append(score_data["score"])
+#     if all_results:
+#         scores = []
+#         for result in all_results:
+#             if "fact_check_result" in result:
+#                 score_data = calculate_credibility_score(result["fact_check_result"])
+#                 scores.append(score_data["score"])
         
-        if scores:
-            overall_score = sum(scores) / len(scores)
+#         if scores:
+#             overall_score = sum(scores) / len(scores)
             
-            # Determine overall label
-            if overall_score >= CREDIBILITY_THRESHOLDS["high"]:
-                overall_label = "Highly Credible"
-                overall_explanation = "This news appears to be factually accurate based on available fact checks."
-            elif overall_score >= CREDIBILITY_THRESHOLDS["medium"]:
-                overall_label = "Somewhat Credible"
-                overall_explanation = "This news contains some verified information but may have minor inaccuracies."
-            elif overall_score >= CREDIBILITY_THRESHOLDS["low"]:
-                overall_label = "Low Credibility"
-                overall_explanation = "This news contains several disputed claims or inaccuracies."
-            else:
-                overall_label = "Not Credible"
-                overall_explanation = "This news contains multiple false claims according to fact checkers."
+#             # Determine overall label
+#             if overall_score >= CREDIBILITY_THRESHOLDS["high"]:
+#                 overall_label = "Highly Credible"
+#                 overall_explanation = "This news appears to be factually accurate based on available fact checks."
+#             elif overall_score >= CREDIBILITY_THRESHOLDS["medium"]:
+#                 overall_label = "Somewhat Credible"
+#                 overall_explanation = "This news contains some verified information but may have minor inaccuracies."
+#             elif overall_score >= CREDIBILITY_THRESHOLDS["low"]:
+#                 overall_label = "Low Credibility"
+#                 overall_explanation = "This news contains several disputed claims or inaccuracies."
+#             else:
+#                 overall_label = "Not Credible"
+#                 overall_explanation = "This news contains multiple false claims according to fact checkers."
     
-    response = {
-        "status": "success",
-        "credibility": {
-            "score": overall_score,
-            "label": overall_label,
-            "explanation": overall_explanation
-        },
-        "detailed_results": all_results
-    }
+#     response = {
+#         "status": "success",
+#         "credibility": {
+#             "score": overall_score,
+#             "label": overall_label,
+#             "explanation": overall_explanation
+#         },
+#         "detailed_results": all_results
+#     }
     
-    return jsonify(response)
+#     return jsonify(response)
 
 @app.route('/api/fact-check', methods=['POST'])
 def fact_check_endpoint():
