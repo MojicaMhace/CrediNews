@@ -217,7 +217,6 @@ function handleFacebookVerification() {
     }
     
     // Get analysis options
-    const checkImages = document.getElementById('check-images').checked;
     const checkLinks = document.getElementById('check-links').checked;
     const checkSource = document.getElementById('check-source').checked;
     
@@ -235,7 +234,6 @@ function handleFacebookVerification() {
             userEmail: firebase.auth().currentUser.email,
             requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
             options: {
-                checkImages,
                 checkLinks,
                 checkSource
             }
@@ -253,7 +251,6 @@ function handleFacebookVerification() {
             content: content || `Facebook URL: ${url}`,
             url: url || null,
             options: {
-                checkImages,
                 checkLinks,
                 checkSource
             }
@@ -270,7 +267,6 @@ function handleFacebookVerification() {
         
         // Calculate adjusted score based on options
         let adjustedScore = Math.round(result.credibility.score * 100);
-        if (checkImages) adjustedScore += 3;
         if (checkLinks) adjustedScore += 3;
         if (checkSource) adjustedScore += 3;
         
@@ -281,7 +277,7 @@ function handleFacebookVerification() {
             credibilityScore: adjustedScore,
             sources: result.credibility.sources || 3,
             factChecks: result.credibility.factChecks || 1,
-            imageAnalysis: checkImages,
+            
             linkVerification: checkLinks,
             sourceCheck: checkSource,
             platform: 'Facebook',
@@ -344,11 +340,7 @@ function showFacebookVerificationResult(type, data) {
             <div class="analysis-features">
                 <h4>Analysis Features Used:</h4>
                 <div class="feature-list">
-                    <div class="feature-item ${data.imageAnalysis ? 'enabled' : 'disabled'}">
-                        <i class="fas fa-image"></i>
-                        <span>Image Analysis</span>
-                        ${data.imageAnalysis ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>'}
-                    </div>
+                
                     <div class="feature-item ${data.linkVerification ? 'enabled' : 'disabled'}">
                         <i class="fas fa-link"></i>
                         <span>Link Verification</span>
@@ -387,7 +379,6 @@ function getFacebookScoreSummary(score) {
 // Get detailed Facebook analysis summary
 function getFacebookDetailedSummary(data) {
     const features = [];
-    if (data.imageAnalysis) features.push('image content analysis');
     if (data.linkVerification) features.push('embedded link verification');
     if (data.sourceCheck) features.push('source credibility assessment');
     
