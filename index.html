@@ -96,7 +96,6 @@
         </section>
 
 
-
         <!-- How It Works Section -->
         <section class="how-it-works-section">
             <div class="container">
@@ -576,57 +575,36 @@
             }
         }
 
-        // Function to force clear authentication and show auth buttons
+         // Function to force show auth buttons without clearing auth or signing out
         function forceShowAuthButtons() {
-            console.log('🔧 Force clearing authentication data...');
-            
-            // Clear session storage
-            sessionStorage.clear();
-            localStorage.clear();
-            
-            // Sign out from Firebase if available
-            if (typeof firebase !== 'undefined' && firebase.auth) {
-                firebase.auth().signOut().catch(error => {
-                    console.log('Firebase signout error (expected if not logged in):', error);
-                });
-            }
-            
-            // Force show auth buttons
+            console.log('🔧 Defaulting UI to show auth buttons...');
             const authButtons = document.getElementById('authButtons');
             const userAccountBtn = document.getElementById('userAccountBtn');
-            
-            if (authButtons) {
-                authButtons.style.display = 'flex';
-                console.log('✅ Auth buttons forced to display');
-            }
-            if (userAccountBtn) {
-                userAccountBtn.style.display = 'none';
-            }
+            if (authButtons) authButtons.style.display = 'flex';
+            if (userAccountBtn) userAccountBtn.style.display = 'none';
         }
 
         // Initialize user info display when page loads
         document.addEventListener('DOMContentLoaded', () => {
-            // First, force clear any cached auth data
+            // Default UI while waiting for auth state
             forceShowAuthButtons();
+
+            // Initialize auth-driven UI
+            displayUserInfo();
             
-            // Then initialize normal auth flow
-            setTimeout(() => {
-                displayUserInfo();
-            }, 100);
-            
+
             // Setup dropdown toggle
             const userAccountBtn = document.getElementById('userAccountBtn');
             const userDropdown = document.getElementById('userDropdown');
-            
             if (userAccountBtn && userDropdown) {
-                userAccountBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    userDropdown.classList.toggle('show');
-                });
-                
-                // Close dropdown when clicking outside
-                document.addEventListener('click', () => {
-                    userDropdown.classList.remove('show');
+                document.addEventListener('click', (e) => {
+                    if (!userAccountBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+                        userDropdown.classList.remove('show');
+                        userDropdown.style.visibility = 'hidden';
+                        userDropdown.style.opacity = '0';
+                        userDropdown.style.pointerEvents = 'none';
+                        userDropdown.style.transform = 'translateY(-10px)';
+                    }
                 });
             }
         });

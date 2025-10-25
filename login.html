@@ -8,7 +8,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body class="auth-body">
-    <div class="auth-container">
+    <div class="auth-container auth-split">
+        <aside class="auth-hero has-image" style="background-image: url('images/credinews1.jpg');"></aside>
         <div class="auth-card">
             <div class="auth-header">
                 <div class="auth-logo">
@@ -18,6 +19,7 @@
                 <h2>Welcome Back</h2>
                 <p>Sign in to your account to continue</p>
             </div>
+            
 
             <!-- Email verification message -->
             <div id="verificationMessage" class="verification-message" style="display: none;">
@@ -91,7 +93,7 @@
                         <span class="checkmark"></span>
                         Remember me
                     </label>
-                    <a href="#" class="forgot-link">Forgot password?</a>
+                    <a href="forgot-password.html" class="forgot-link">Forgot password?</a>
                 </div>
 
                 <button type="submit" class="auth-btn primary">
@@ -114,23 +116,47 @@
             </div>
         </div>
 
-        <div class="theme-toggle-auth">
-            <button class="theme-toggle" id="themeToggle">
-                <i class="fas fa-moon"></i>
-            </button>
-        </div>
     </div>
 
     <!-- EmailJS SDK -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDK v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <script src="firebase-config.js"></script>
     <script src="emailjs-config.js"></script>
     <script src="auth.js"></script>
-</body>
+    <script>
+      // Handle Firebase email verification link directly on login page
+      (function() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const mode = params.get('mode');
+          const oobCode = params.get('oobCode');
+          if (mode === 'verifyEmail' && oobCode) {
+            const auth = firebase.auth();
+            auth.applyActionCode(oobCode)
+              .then(() => {
+                const successEl = document.getElementById('verificationSuccessMessage');
+                if (successEl) successEl.style.display = 'block';
+                // Clear query params after applying code
+                window.history.replaceState({}, document.title, window.location.pathname);
+              })
+              .catch((error) => {
+                console.error('Verification error:', error);
+                const msgEl = document.getElementById('verificationMessage');
+                if (msgEl) {
+                  msgEl.style.display = 'block';
+                }
+              });
+          }
+        } catch (err) {
+          console.error('Verification handler error:', err);
+        }
+      })();
+    </script>
+  </body>
 </html>
