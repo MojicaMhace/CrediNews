@@ -108,7 +108,7 @@ body {
   justify-content: space-between;
   width: 100%;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .nav-brand {
@@ -520,11 +520,21 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   align-items: center;
   gap: 8px;
   min-width: 160px;
+  position: relative;
+  z-index: 2;
+  user-select: none;
 }
 
 .user-account-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
+}
+
+/* Prevent flicker: when dropdown is open, lock button position */
+.user-account-btn.open,
+.user-account-btn.open:hover {
+  transform: none;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);
 }
 
 .user-account-btn .fas.fa-user-circle {
@@ -549,27 +559,55 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   transform: rotate(180deg);
 }
 
+/* Arrow hover UX: pointer cursor and rotation state */
+.user-account-btn .fa-chevron-down {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.user-account-btn .fa-chevron-down.rotated {
+  transform: rotate(180deg);
+}
+
 .user-dropdown {
   position: absolute;
   top: 100%;
   right: 0;
-  background: rgba(15, 15, 35, 0.95);
+  background: rgba(15, 15, 35, 0.96);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
-  box-shadow: var(--shadow-lg);
-  min-width: 280px;
-  z-index: 1000;
-  opacity: 0;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.40);
+  min-width: 280px !important;  /* ⬅️ make wider */
+  width: 280px !important;      /* ⬅️ force width */
+  padding: 10px !important; 
   visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
   transform: translateY(-10px);
-  transition: all 0.3s ease;
-  margin-top: 8px;
+  transition: all 0.2s ease;
+  z-index: 999;
+}
+
+.user-dropdown::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: var(--notch-left, 20px);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  transform: rotate(45deg);
+  border-top: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -2px -2px 8px rgba(0, 0, 0, 0.18);
 }
 
 .user-dropdown.show {
   opacity: 1;
   visibility: visible;
+  transform: translateY(0);
+  display: block;
+  pointer-events: auto;
   transform: translateY(0);
 }
 
@@ -619,45 +657,86 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 .dropdown-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
+  gap: 8px;
+  padding: 8px 8px 8px 10px; /* tighter right padding */
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   border: none;
   background: none;
   width: 100%;
   text-align: left;
   cursor: pointer;
+  border-radius: 10px;
 }
 
 .dropdown-item:hover {
-  background: rgba(34, 197, 94, 0.1);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
 }
 
 .dropdown-item i {
-  width: 16px;
+  width: 14px;
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .dropdown-item.logout-item {
   color: var(--alert-danger);
+  font-weight: 600;
+}
+
+.dropdown-item.logout-item i {
+  color: var(--alert-danger);
 }
 
 .dropdown-item.logout-item:hover {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.12);
   color: var(--alert-danger);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.25);
 }
+
 
 .dropdown-divider {
   height: 1px;
   background: var(--border-color);
   margin: 8px 0;
 }
+
+/* --- FIX DROPDOWN FLICKER --- */
+.user-account-container:hover .user-dropdown,
+.user-account-container:focus-within .user-dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.user-account-container:hover .dropdown-arrow,
+.user-account-container:focus-within .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+/* Prevent flicker caused by transition overlap */
+.user-dropdown {
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0s;
+  z-index: 9999;
+}
+
+/* Optional: makes dropdown stay solid (not transparent flicker) */
+.user-dropdown,
+.user-dropdown::after {
+  background-color: rgba(15, 15, 35, 0.98);
+}
+
+/* Keep smooth open/close without blinking */
+.user-account-container {
+  position: relative;
+  display: inline-block;
+}
+
 
 /* Login Link Styles (for logged-out users) */
 .login-link {
@@ -3242,7 +3321,6 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   .ready-stats {
     grid-template-columns: 1fr;
   }
-}
 }
 
 /* Footer */
