@@ -35,7 +35,12 @@
 
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required aria-describedby="passwordHelp">
+                    <div class="input-with-toggle">
+                        <input type="password" id="password" name="password" required aria-describedby="passwordHelp">
+                        <button type="button" class="toggle-visibility" aria-label="Show password" data-target="password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                     <ul class="password-hints" id="passwordHelp">
                         <li id="req-length" class="invalid">• At least 8 characters</li>
                         <li id="req-upper" class="invalid">• Uppercase letter (A–Z)</li>
@@ -47,7 +52,12 @@
 
                 <div class="form-group">
                     <label for="confirmPassword">Confirm Password</label>
-                    <input type="password" id="confirmPassword" name="confirmPassword" required aria-describedby="confirmHint">
+                    <div class="input-with-toggle">
+                        <input type="password" id="confirmPassword" name="confirmPassword" required aria-describedby="confirmHint">
+                        <button type="button" class="toggle-visibility" aria-label="Show password" data-target="confirmPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                     <div id="confirmHint" class="match-hint" style="display:none">• Passwords must match</div>
                 </div>
 
@@ -186,6 +196,72 @@
         confirmInput.addEventListener('input', () => updateConfirmHint(pwdInput.value, confirmInput.value));
     }
 
+    // Password visibility toggles
+    document.querySelectorAll('.toggle-visibility').forEach((btn) => {
+        const targetId = btn.dataset.target;
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        btn.addEventListener('click', () => {
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-eye', isHidden);
+                icon.classList.toggle('fa-eye-slash', !isHidden);
+            }
+        });
+    });
+
+    // Simple notification helpers
+    function showInlineMessage(text, type = 'info') {
+        // Remove existing messages
+        document.querySelectorAll('.notification.inline').forEach(n => n.remove());
+        const box = document.createElement('div');
+        box.className = `notification inline ${type}`;
+        box.style.marginBottom = '12px';
+        box.style.padding = '12px';
+        box.style.borderRadius = '8px';
+        box.style.display = 'flex';
+        box.style.alignItems = 'center';
+        box.style.gap = '8px';
+        box.innerHTML = `<span>${type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️'}</span><span>${text}</span>`;
+        const form = document.getElementById('registerForm');
+        form.parentNode.insertBefore(box, form);
+    }
+
+    // Cooldowns for anti-abuse
+    const COOLDOWN_MS = 60 * 1000; // after success
+    const BLOCK_COOLDOWN_MS = 5 * 60 * 1000; // on too-many-requests
+    const cooldownKey = 'register_cooldown_until';
+    let countdownTimer = null;
+    function startCountdown(untilTs) {
+        const submitBtn = document.querySelector('#registerForm button[type="submit"]');
+        const update = () => {
+            const remaining = Math.max(0, untilTs - Date.now());
+            const secs = Math.ceil(remaining / 1000);
+            if (remaining <= 0) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+                }
+                return;
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `<i class=\"fas fa-ban\"></i> Wait ${secs}s`;
+            }
+        };
+        update();
+        countdownTimer = setInterval(update, 1000);
+    }
+    const existingUntil = parseInt(localStorage.getItem(cooldownKey) || '0', 10);
+    if (existingUntil > Date.now()) {
+        startCountdown(existingUntil);
+    }
+
     document.getElementById("registerForm").addEventListener("submit", function (e) {
         e.preventDefault();
 
@@ -195,17 +271,17 @@
         const confirmPassword = document.getElementById("confirmPassword").value;
 
         if (!isValidFullName(fullName)) {
-            alert("⚠️ Please enter a valid full name using letters only (spaces, hyphens, apostrophes allowed).");
+            showInlineMessage("Please enter a valid full name using letters only (spaces, hyphens, apostrophes allowed).", 'error');
             return;
         }
 
         if (!isStrongPassword(password)) {
-            alert("⚠️ Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.");
+            showInlineMessage("Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.", 'error');
             return;
         }
 
         if (password !== confirmPassword) {
-            alert("⚠️ Passwords do not match!");
+            showInlineMessage("Passwords do not match!", 'error');
             return;
         }
 
@@ -236,11 +312,32 @@
                     });
             })
             .then(() => {
-                alert("✅ Account created successfully! A verification email was sent to " + email + ". Please verify your email before logging in.");
-                // Optional: Keep them on register page until verification
+                showInlineMessage(`Account created! A verification email was sent to ${email}. Please verify your email before logging in.`, 'success');
+                const until = Date.now() + COOLDOWN_MS;
+                localStorage.setItem(cooldownKey, String(until));
+                startCountdown(until);
             })
             .catch((error) => {
-                alert("❌ " + error.message);
+                console.error('Registration error:', error);
+                let msg = 'Registration failed. Please try again.';
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                        msg = 'This email is already registered. Try signing in or resetting your password.';
+                        break;
+                    case 'auth/invalid-email':
+                        msg = 'Invalid email address.';
+                        break;
+                    case 'auth/weak-password':
+                        msg = 'Password is too weak. Please choose a stronger password.';
+                        break;
+                    case 'auth/too-many-requests':
+                        msg = 'We have blocked requests from this device due to unusual activity. Please wait and try again later.';
+                        const blockUntil = Date.now() + BLOCK_COOLDOWN_MS;
+                        localStorage.setItem(cooldownKey, String(blockUntil));
+                        startCountdown(blockUntil);
+                        break;
+                }
+                showInlineMessage(`${msg} (${error.code || 'unknown'})`, 'error');
             });
     });
 </script>
