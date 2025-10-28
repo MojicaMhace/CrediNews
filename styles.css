@@ -310,10 +310,9 @@ nav.navbar .nav-controls .auth-buttons .signup-btn::after {
   background: none !important;
 }
 
-/* Simple clean button styles - override all decorative effects */
 nav.navbar .nav-controls .auth-buttons .login-btn,
 nav.navbar .nav-controls .auth-buttons .signup-btn {
-  /* Reset all decorative properties */
+  
   background: none !important;
   background-image: none !important;
   background-gradient: none !important;
@@ -324,7 +323,7 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   transition: none !important;
   backdrop-filter: none !important;
   
-  /* Basic styling */
+  
   padding: 8px 16px !important;
   font-size: 14px !important;
   color: #119982 !important;
@@ -428,7 +427,6 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   backdrop-filter: blur(10px);
 }
 
-/* Completely disable all pseudo-elements for signup button */
 .signup-btn::before,
 .signup-btn::after {
   display: none !important;
@@ -436,7 +434,6 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   background: none !important;
 }
 
-/* NUCLEAR OPTION: Completely eliminate all white effects */
 .login-btn,
 .signup-btn {
   position: relative !important;
@@ -458,7 +455,6 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   visibility: hidden !important;
 }
 
-/* Prevent any hover effects that might create white elements */
 .login-btn:hover::before,
 .login-btn:hover::after,
 .signup-btn:hover::before,
@@ -1172,7 +1168,6 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   border: 1px solid var(--border-color);
 }
 
-/* Latest Verified Facebook News Section */
 .latest-news-section {
     padding: 80px 0;
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(37, 99, 235, 0.05) 100%);
@@ -2159,14 +2154,112 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   color: var(--text-primary);
 }
 
-/* Authentication Styles */
+/* Authentication Styles (login.html, register.html, forgot-password.html) */
 .auth-body {
   background: linear-gradient(135deg, #0F172A 0%, #1E293B 25%, #334155 50%, #1E3A8A 75%, #1E40AF 100%);
-  min-height: 100vh;
+  min-height: 100vh;           /* full-height background */
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
+  align-items: center;         
+  justify-content: center;     /* center horizontally */
+  padding: 24px;               /* breathing space around the card */
+  overflow: hidden;            /* avoid page scroll for compact layout */
+}
+
+/* Register Page Overrides (register.html): single viewport, compact layout, form-only scroll */
+.register-page.auth-body {
+  height: 100vh;              
+  padding: 16px;              
+}
+
+.register-page .auth-container.auth-split {
+  max-width: 800px;            /* narrower than login */
+  height: 680px;               /* extra height for more breathing room */
+}
+
+.register-page .auth-hero {
+  min-height: 680px;           /* match taller container height */
+}
+
+.register-page .auth-card {
+  min-height: 680px;           /* match taller hero/container */
+  height: 100%;                /* stretch to container height */
+  padding: 24px;               /* tighter inner padding */
+  display: grid;               /* header, scrollable form, footer */
+  grid-template-rows: auto 1fr auto;
+}
+
+.register-page .auth-header {
+  margin-bottom: 16px;         /* tighter header spacing */
+}
+
+.register-page .auth-header h2 {
+  font-size: 24px;             /* smaller title */
+}
+
+.register-page .auth-form {
+  gap: 10px;                   /* reduce gaps further */
+  overflow-y: auto;            /* make only the form scroll */
+  max-height: 100%;
+  width: 100%;                 /* fill the card width */
+  box-sizing: border-box;      /* include padding in width calc */
+  padding-right: 0;            /* align with card padding */
+  scrollbar-gutter: stable;    /* avoid content shift from scrollbar */
+}
+
+.register-page .form-group {
+  margin-bottom: 12px;         /* tighter group spacing */
+  gap: 6px;
+}
+
+.register-page .form-group input {
+  padding: 9px 12px;           /* more compact inputs */
+  font-size: 14px;
+}
+
+.register-page .auth-btn {
+  padding: 9px 12px;           /* compact buttons */
+  font-size: 14px;
+  margin: 6px 0;
+}
+
+/* Compact hints list for password requirements */
+.register-page .password-hints {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+  margin: 6px 0 4px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #9CA3AF;
+}
+
+.register-page .password-hints li.valid { color: #22C55E; }
+.register-page .password-hints li.invalid { color: #9CA3AF; }
+
+.register-page .match-hint {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.register-page .form-options p {
+  font-size: 12px;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .register-page .auth-container.auth-split {
+    max-width: 460px;          /* compact on mobile */
+    height: 360px;             /* unified mobile height */
+  }
+  .register-page .auth-hero {
+    min-height: 200px;
+  }
+  .register-page .auth-card {
+    min-height: 320px;
+    height: 100%;              /* stretch to container height on mobile */
+  }
 }
 
 .auth-container {
@@ -2175,18 +2268,55 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   max-width: 400px;
 }
 
-.auth-card {
-  background-color: var(--surface-color);
-  backdrop-filter: blur(10px);
+/* Auth Split Layout (login.html, register.html, forgot-password.html): hero left, form right */
+.auth-container.auth-split {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  max-width: 820px;            /* narrower overall card */
+  width: 100%;
+  height: auto;               /* compact height, not full screen */
   border-radius: 16px;
-  padding: 32px;
+  overflow: hidden;
   box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border-color);
+}
+
+.auth-hero {
+  flex: 1 1 50%;
+  min-height: 460px;          /* smaller hero height */
+  background: linear-gradient(180deg, rgba(16, 24, 40, 0.6), rgba(16, 24, 40, 0.9));
+}
+
+.auth-hero.has-image {
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.auth-hero.has-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 15, 25, 0.3), rgba(10, 15, 25, 0.7));
+}
+
+.auth-card {
+  background-color: #121826; /* Deep dark surface to match screenshot */
+  backdrop-filter: blur(10px);
+  border-radius: 0; /* flush edge when split */
+  padding: 28px;               /* slightly tighter padding */
+  box-shadow: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  flex: 1 1 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 460px;          /* match smaller hero panel */
 }
 
 .auth-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 20px;         /* tighter header spacing */
 }
 
 .auth-logo {
@@ -2201,27 +2331,27 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 }
 
 .auth-header h2 {
-  font-size: 28px;
+  font-size: 26px;             /* slightly smaller title */
   font-weight: 700;
-  color: var(--text-primary);
+  color: #E5E7EB;
   margin-bottom: 8px;
 }
 
 .auth-header p {
-  color: var(--text-secondary);
+  color: #9CA3AF;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;                   /* reduce vertical gaps */
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 24px;
+  gap: 6px;
+  margin-bottom: 16px;         /* tighter group spacing */
 }
 
 .form-group label {
@@ -2229,29 +2359,28 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   font-weight: 500;
 }
 
-/* Override for submit-news page labels specifically */
 .submit-news-page .form-group label {
   color: #000000 !important;
 }
 
-/* Additional override for specific labels */
 .submit-news-page .form-group label[for="articleTitle"],
 .submit-news-page .form-group label[for="articleContent"] {
   color: #000000 !important;
 }
 
 .form-group input {
-  padding: 12px;
-  border: 1px solid var(--border-color);
+  padding: 10px 12px;          /* smaller inputs */
+  border: 1px solid #2A3445;
   border-radius: 8px;
-  background-color: var(--background-color);
-  color: var(--text-primary);
-  font-size: 16px;
+  background-color: #0F1625; /* dark input */
+  color: #E5E7EB;
+  font-size: 15px;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-color: #22C55E; /* green focus */
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
 }
 
 .form-options {
@@ -2271,20 +2400,20 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 }
 
 .forgot-link {
-  color: var(--primary-color);
+  color: #9CA3AF;
   text-decoration: none;
   font-size: 14px;
 }
 
 .forgot-link:hover {
-  text-decoration: underline;
+  color: #E5E7EB;
 }
 
 .auth-btn {
-  padding: 12px 16px;
+  padding: 10px 14px;          /* smaller buttons */
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -2293,31 +2422,31 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   gap: 8px;
   transition: all 0.3s ease;
   width: 100%;          
-  margin: 8px 0;        
+  margin: 6px 0;        
 }
 
 .auth-btn.primary {
-  background-color: var(--primary-color);
-  color: white;
+  background-color: #22C55E; /* vibrant green */
+  color: #0B1220;
 }
 
 .auth-btn.primary:hover {
-  background-color: #1E40AF;
+  background-color: #16A34A;
 }
 
 .auth-btn.google {
-  background-color: var(--surface-color);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background-color: #0F1625;
+  color: #E5E7EB;
+  border: 1px solid #2A3445;
 }
 
 .auth-btn.google:hover {
-  background-color: var(--background-color);
+  background-color: #121826;
 }
 
 .divider {
   text-align: center;
-  margin: 16px 0;
+  margin: 12px 0;              /* smaller divider spacing */
   position: relative;
   color: var(--text-muted);
 }
@@ -2333,7 +2462,7 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 }
 
 .divider span {
-  background-color: var(--surface-color);
+  background-color: #121826;
   padding: 0 16px;
 }
 
@@ -2356,6 +2485,24 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   position: absolute;
   top: -60px;
   right: 0;
+}
+
+/* Responsive adjustments for split layout */
+@media (max-width: 768px) {
+  .auth-container.auth-split {
+    flex-direction: column;
+    max-width: 480px;
+    height: auto;
+  }
+  .auth-card {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    min-height: 320px;        /* smaller form height on mobile */
+  }
+  .auth-hero {
+    min-height: 200px;        /* smaller hero height on mobile */
+  }
 }
 
 /* Email Verification Message */
@@ -3055,7 +3202,7 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   }
 
 
-/* Ready to Verify News Section */
+/* Home Page (index.html): Ready to Verify News section */
 .ready-to-verify-section {
   padding: 80px 0;
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.03) 0%, rgba(22, 163, 74, 0.05) 100%);
@@ -3645,6 +3792,7 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   border-radius: 2px;
 }
 
+/* Verify News Page (verify-news.html) */
 .verify-news-page .verify-news-container {
   max-width: 850px;
   margin: 0 auto;
@@ -3771,7 +3919,6 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
-/* Facebook Verification Specific Styles */
 .verify-news-page .facebook-card {
   border-left: 4px solid #1877f2;
   position: relative;
