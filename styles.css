@@ -2487,6 +2487,36 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   right: 0;
 }
 
+/* Password visibility toggle */
+.input-with-toggle {
+  position: relative;
+  width: 100%;
+}
+.input-with-toggle input[type="password"],
+.input-with-toggle input[type="text"] {
+  width: 100%;
+  padding-right: 48px; /* room for eye button inside field */
+}
+.toggle-visibility {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #9CA3AF;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  z-index: 2;
+}
+.toggle-visibility:hover {
+  color: #E5E7EB;
+}
+.toggle-visibility:focus {
+  outline: none;
+}
+
 /* Responsive adjustments for split layout */
 @media (max-width: 768px) {
   .auth-container.auth-split {
