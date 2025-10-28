@@ -1,7 +1,4 @@
-// Firebase will be available globally after firebase-config.js loads
-
 console.log('🔧 auth.js is loading...');
-
 // Authentication Manager
 class AuthManager {
     constructor() {
@@ -41,6 +38,7 @@ class AuthManager {
             this.showLoginForm();
         }
     }
+
 
     initTheme() {
         const theme = localStorage.getItem('theme') || 'light';
@@ -98,10 +96,9 @@ class AuthManager {
         // Register form
         const registerForm = document.getElementById('registerForm');
         if (registerForm) {
-            console.log('✅ Register form found, binding event');
-            registerForm.addEventListener('submit', (e) => this.handleRegister(e));
+            console.log('ℹ️ Register form detected; registration handled in register.html, skipping auth.js handler.');
         } else {
-            console.log('❌ Register form NOT found!');
+            console.log('ℹ️ Register form not found on this page.');
         }
 
         // Google Sign In
@@ -142,6 +139,7 @@ class AuthManager {
         }
     }
 
+    // Login flow: i-validate email/password, i-check email verification, at mag-redirect (validations))
     async handleLogin(e) {
         e.preventDefault();
         
@@ -156,8 +154,8 @@ class AuthManager {
             return;
         }
 
-        if (!password || password.length < 6) {
-            this.showError('Password must be at least 6 characters long.');
+        if (!this.validatePasswordComplexity(password)) {
+            this.showError('Password must be at least 6 characters and include one uppercase letter and one special character.');
             return;
         }
 
@@ -172,7 +170,13 @@ class AuthManager {
             
             // Check if email is verified
             if (!user.emailVerified) {
-                this.showError('Please verify your email address before signing in. Check your inbox for the verification link.');
+                this.showError('Your email is not verified. Please check your inbox or resend the verification email.');
+                
+                // Also show the inline verification message block on the page
+                const verificationMessageEl = document.getElementById('verificationMessage');
+                if (verificationMessageEl) {
+                    verificationMessageEl.style.display = 'block';
+                }
                 
                 // Show option to resend verification email (keep user signed in for this)
                 this.showResendVerificationOption(user.email);
@@ -195,7 +199,6 @@ class AuthManager {
             }
 
             this.showSuccess('Login successful! Redirecting to homepage...');
-            
             // Redirect after success
             setTimeout(() => {
                 window.location.href = 'index.html';
@@ -207,7 +210,7 @@ class AuthManager {
             
             switch (error.code) {
                 case 'auth/user-not-found':
-                    errorMessage = 'No account found with this email address.';
+                    errorMessage = 'No account found for this email. Please sign up to create one.';
                     break;
                 case 'auth/wrong-password':
                     errorMessage = 'Incorrect password. Please try again.';
@@ -218,6 +221,9 @@ class AuthManager {
                 case 'auth/too-many-requests':
                     errorMessage = 'Too many failed attempts. Please try again later.';
                     break;
+                case 'auth/user-disabled':
+                    errorMessage = 'This account has been disabled. Please contact support.';
+                    break;
             }
             
             this.showError(errorMessage);
@@ -226,191 +232,14 @@ class AuthManager {
         }
     }
 
+    // Registration flow: nasa register.html ang full validation at OTP; placeholder lang dito
     async handleRegister(e) {
         e.preventDefault();
-        console.log('🚀 Registration form submitted');
-        
-        const formData = new FormData(e.target);
-        const fullName = formData.get('fullName');
-        const email = formData.get('email');
-        const password = formData.get('password');
-        const confirmPassword = formData.get('confirmPassword');
-        const terms = formData.get('terms');
-
-        console.log('📝 Form data:', { fullName, email, password: '***', confirmPassword: '***', terms });
-
-        // Validate form
-        if (!fullName || fullName.trim().length < 2) {
-            console.log('❌ Validation failed: Full name');
-            this.showError('Please enter your full name.');
-            return;
-        }
-
-        if (!this.validateEmail(email)) {
-            console.log('❌ Validation failed: Email');
-            this.showError('Please enter a valid email address.');
-            return;
-        }
-
-        if (!password || password.length < 6) {
-            console.log('❌ Validation failed: Password length');
-            this.showError('Password must be at least 6 characters long.');
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            console.log('❌ Validation failed: Password mismatch');
-            this.showError('Passwords do not match.');
-            return;
-        }
-
-        if (!terms) {
-            console.log('❌ Validation failed: Terms not accepted');
-            this.showError('Please accept the Terms of Service and Privacy Policy.');
-            return;
-        }
-
-        console.log('✅ All validations passed');
-
-        // Show loading state
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        this.setButtonLoading(submitBtn, true);
-
-        try {
-            console.log('🔥 Starting Firebase registration...');
-            
-            // Check if Firebase is available
-            if (typeof firebase === 'undefined') {
-                throw new Error('Firebase is not loaded');
-            }
-            
-            console.log('🔥 Firebase is available, creating user...');
-            
-            // Firebase authentication - create user
-            const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
-            const user = userCredential.user;
-            
-            console.log('✅ User created successfully:', user.uid);
-            
-            // Generate and send OTP
-            console.log('🔐 Generating OTP for email verification...');
-            const otp = window.otpManager.generateOTP();
-            window.otpManager.storeOTP(email, otp);
-            
-            // Send OTP via email
-            console.log('📧 Sending OTP email...');
-            await window.otpManager.sendOTPEmail(email, otp);
-            console.log('✅ OTP sent to:', email);
-            
-            // Update user profile with display name
-            console.log('👤 Setting user display name...');
-            await user.updateProfile({
-                displayName: fullName
-            });
-            console.log('✅ User display name set to:', fullName);
-            
-            // Store pending verification data
-            sessionStorage.setItem('pendingVerification', JSON.stringify({
-                email: email,
-                fullName: fullName,
-                uid: user.uid,
-                timestamp: Date.now()
-            }));
-            
-            console.log('✅ Registration data prepared for OTP verification');
-            
-            // Try to store comprehensive user profile in Firestore
-            console.log('💾 Creating complete user account profile...');
-            const userProfile = {
-                fullName: fullName,
-                email: email,
-                displayName: fullName,
-                createdAt: new Date().toISOString(),
-                lastLoginAt: new Date().toISOString(),
-                role: 'user',
-                status: 'active',
-                emailVerified: user.emailVerified,
-                accountType: 'standard',
-                preferences: {
-                    notifications: true,
-                    newsletter: true,
-                    theme: 'light'
-                },
-                profile: {
-                    bio: '',
-                    location: '',
-                    website: '',
-                    avatar: ''
-                },
-                stats: {
-                    articlesSubmitted: 0,
-                    articlesVerified: 0,
-                    reputationScore: 0
-                }
-            };
-            
-            try {
-                await firebase.firestore().collection('users').doc(user.uid).set(userProfile);
-                console.log('✅ Complete user account profile created in Firestore');
-                console.log('📊 Account includes: profile, preferences, and stats tracking');
-            } catch (firestoreError) {
-                console.warn('⚠️ Could not store user profile in Firestore:', firestoreError.message);
-                console.log('📝 This might be due to Firestore security rules, but registration still succeeded');
-            }
-            
-            // Store auth state
-            const authData = {
-                uid: user.uid,
-                email: user.email,
-                fullName: fullName,
-                isAuthenticated: true,
-                registrationTime: new Date().toISOString()
-            };
-            
-            sessionStorage.setItem('authData', JSON.stringify(authData));
-            console.log('✅ Auth data stored in session storage');
-
-            console.log('🎉 Registration completed successfully!');
-            this.showSuccess('Registration successful! Please check your email for the verification code.');
-            
-            // Sign out the user until they verify their email with OTP
-            await firebase.auth().signOut();
-            
-            // Redirect to login page with OTP verification
-            setTimeout(() => {
-                window.location.href = 'login.html?verify-otp=true';
-            }, 2000);
-
-        } catch (error) {
-            console.error('❌ Registration error:', error);
-            console.error('Error code:', error.code);
-            console.error('Error message:', error.message);
-            
-            let errorMessage = 'Registration failed. Please try again.';
-            
-            switch (error.code) {
-                case 'auth/email-already-in-use':
-                    errorMessage = 'An account with this email already exists.';
-                    break;
-                case 'auth/weak-password':
-                    errorMessage = 'Password is too weak. Please choose a stronger password.';
-                    break;
-                case 'auth/invalid-email':
-                    errorMessage = 'Invalid email address format.';
-                    break;
-                case 'auth/configuration-not-found':
-                    errorMessage = 'Firebase configuration error. Please contact support.';
-                    break;
-            }
-            
-            console.log('📢 Showing error message:', errorMessage);
-            this.showError(errorMessage);
-        } finally {
-            this.setButtonLoading(submitBtn, false);
-            console.log('🔄 Button loading state reset');
-        }
+        console.log('Registration handled by register.html. OTP flow removed.');
+        return;
     }
 
+    // Google OAuth (Sign-In/Sign-Up): auth + Firestore profile (kung bagong user)
     async handleGoogleAuth(type) {
         const actionText = type === 'signin' ? 'Signing in' : 'Signing up';
         
@@ -468,11 +297,53 @@ class AuthManager {
         }
     }
 
+    // Email validation helper (basic format check)
     validateEmail(email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
     }
 
+    // Password validation helper para sa LOGIN (mas simple kaysa register.html)
+    validatePasswordComplexity(password) {
+        const hasUppercase = /[A-Z]/.test(password || '');
+        const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>\/?]/.test(password || '');
+        const hasMinLength = (password || '').length >= 6;
+        return hasUppercase && hasSpecial && hasMinLength;
+    }
+
+    // Password reset helper using Firebase
+    async handlePasswordReset(email) {
+        try {
+            if (!email || !this.validateEmail(email)) {
+                throw new Error('Please enter a valid email address');
+            }
+
+            await firebase.auth().sendPasswordResetEmail(email);
+            this.showSuccess(`Password reset link sent to ${email}`);
+            return true;
+        } catch (error) {
+            console.error('Password reset error:', error);
+            
+            let errorMessage = 'Failed to send reset email. Please try again.';
+            
+            switch (error.code) {
+                case 'auth/user-not-found':
+                    errorMessage = 'No account found with this email address.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Please enter a valid email address.';
+                    break;
+                case 'auth/too-many-requests':
+                    errorMessage = 'Too many requests. Please try again later.';
+                    break;
+            }
+            
+            this.showError(errorMessage);
+            return false;
+        }
+    }
+
+    // Button loading state helper (disable + spinner)
     setButtonLoading(button, isLoading) {
         if (isLoading) {
             button.disabled = true;
@@ -485,6 +356,7 @@ class AuthManager {
         }
     }
 
+    // Demo-only API call simulator
     simulateApiCall(delay = 1500) {
         return new Promise((resolve, reject) => {
             setTimeout(() => {
@@ -498,6 +370,7 @@ class AuthManager {
         });
     }
 
+    // UI notification helper (ephemeral toast messages)
     showNotification(message, type = 'info') {
         // Remove existing notifications
         const existingNotifications = document.querySelectorAll('.notification');
@@ -583,6 +456,7 @@ class AuthManager {
         this.showNotification(message, 'warning');
     }
 
+    // Button para mag-resend ng email verification kapag hindi pa verified ang user
     showResendVerificationOption(email) {
         // Create a resend verification button
         const resendBtn = document.createElement('button');
@@ -599,7 +473,20 @@ class AuthManager {
                 // Get the current user (should still be signed in but not verified)
                 const user = firebase.auth().currentUser;
                 if (user) {
-                    await user.sendEmailVerification();
+                    const safeOrigin = (window.location.origin && window.location.origin.startsWith('http'))
+                      ? window.location.origin
+                      : `${window.location.protocol}//${window.location.host}`;
+                    const actionCodeSettings = {
+                        url: `${safeOrigin}/login.html`,
+                        handleCodeInApp: true
+                    };
+                    console.log('📧 Resend verification with continue URL:', actionCodeSettings.url);
+                    try {
+                        await user.sendEmailVerification(actionCodeSettings);
+                    } catch (err) {
+                        console.warn('⚠️ Resend failed with actionCodeSettings, retrying without settings:', err && err.message);
+                        await user.sendEmailVerification();
+                    }
                     this.showSuccess('Verification email sent! Please check your inbox.');
                     resendBtn.remove();
                 } else {
@@ -620,6 +507,7 @@ class AuthManager {
         }
     }
 
+    // OTP input UX helpers (auto-advance, paste handling, visual state)
     setupOTPInputs(inputs) {
         inputs.forEach((input, index) => {
             input.addEventListener('input', (e) => {
@@ -671,6 +559,7 @@ class AuthManager {
         });
     }
 
+    // Markahan ang filled/error state ng OTP inputs
     updateOTPInputState(inputs) {
         inputs.forEach(input => {
             input.classList.remove('filled', 'error');
@@ -680,6 +569,7 @@ class AuthManager {
         });
     }
 
+    // OTP verification flow: kolektahin ang 6-digit code, i-verify, at mag-redirect
     async handleOTPVerification(e) {
         e.preventDefault();
         console.log('🔐 OTP verification submitted');
@@ -752,6 +642,7 @@ class AuthManager {
         }
     }
 
+    // Resend OTP flow: gumawa ng bagong code at magpadala via EmailJS (o demo fallback)
     async handleResendOTP() {
         console.log('🔄 Resending OTP...');
         
@@ -793,6 +684,7 @@ class AuthManager {
         }
     }
 
+    // Ipakita ang login form at i-clear ang pending OTP state
     showLoginForm() {
         // Hide OTP container and show login form
         const otpContainer = document.getElementById('otpVerificationContainer');
@@ -808,6 +700,7 @@ class AuthManager {
         sessionStorage.removeItem('pendingVerification');
     }
 
+    // Ipakita ang OTP form at itago ang login form
     showOTPForm() {
         // Show OTP container and hide login form
         const otpContainer = document.getElementById('otpVerificationContainer');
@@ -831,9 +724,7 @@ class AuthManager {
     }
 }
 
-// Check if user just verified their email}
-
-// OTP Management System
+// OTP Management System (demo): nag-iimbak at nagbe-beripika ng OTP sa memory
 class OTPManager {
     constructor() {
         this.otpStorage = new Map(); // In production, use Firebase Firestore
@@ -887,6 +778,7 @@ class OTPManager {
         };
     }
 
+    // Magpadala ng OTP via EmailJS kung naka-config; kung hindi, demo fallback sa console/UI
     async sendOTPEmail(email, otp) {
         console.log(`📧 Sending OTP email to ${email}`);
         
@@ -984,6 +876,21 @@ async function checkEmailVerificationStatus() {    try {
 // Check if user is already authenticated
 function checkAuthStatus() {
     console.log('🔍 Checking auth status...');
+    
+    // Check for clearAuth URL parameter first
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('clearAuth') === '1') {
+        console.log('🧹 clearAuth parameter detected, clearing auth data');
+        localStorage.removeItem('authData');
+        sessionStorage.removeItem('authData');
+        // Clear the URL parameter
+        urlParams.delete('clearAuth');
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, document.title, newUrl);
+        console.log('✅ Auth data cleared, allowing login form to show');
+        return; // Don't redirect, allow the login form to show
+    }
+    
     const authData = localStorage.getItem('authData') || sessionStorage.getItem('authData');
     
     if (authData) {
@@ -1069,7 +976,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('✅ Authentication system initialized!');
 });
 
-// Add some visual enhancements
+// UI polish (hindi kritikal sa auth): maliit na visual enhancements sa inputs at checkbox
 document.addEventListener('DOMContentLoaded', () => {
     // Add focus effects to form inputs
     const inputs = document.querySelectorAll('input');
