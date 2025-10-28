@@ -50,7 +50,7 @@ function handleTextVerification() {
     textVerifyBtn.textContent = 'Verifying...';
     
     // Call the fact check API
-    fetch('http://192.168.100.157:5000/api/fact-check', {  // Replace with your actual API endpoint
+    fetch('http://127.0.0.1:5000/api/fact-check', {  // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -108,7 +108,7 @@ function handleUrlVerification() {
     urlVerifyBtn.textContent = 'Verifying...';
     
     // Call the fact check API
-    fetch('http://192.168.100.157:5000/api/fact-check', { // Replace with your actual API endpoint
+    fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -132,9 +132,15 @@ function handleUrlVerification() {
 
         showVerificationResult('url', {
             credibilityScore: adjustedScore,
-            sources: result.credibility.sources || 3,
-            factChecks: result.credibility.factChecks || 1,
-            domain: extractDomain(url)
+            sources: (result.credibility && result.credibility.sources) ?? 0,
+            factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
+            domain: extractDomain(url),
+            credibilityExplanation: result.credibility.explanation,
+            credibilityLabel: result.credibility.label,
+            fakeClaims: Array.isArray(result.fake_claims) ? result.fake_claims : [],
+            realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
+            claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
+            claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : []
         });
     })
     .catch(error => {
@@ -211,8 +217,8 @@ function handleFacebookVerification() {
     }
     
     // Validate content length if provided
-    if (content && content.length < 10) {
-        showNotification('Facebook content is too short. Please provide at least 10 characters.', 'error');
+    if (content && content.length < 60) {
+        showNotification('Facebook content is too short. Please provide at least 60 characters.', 'error');
         return;
     }
     
@@ -241,7 +247,7 @@ function handleFacebookVerification() {
     }
     
     // Call the fact check API for Facebook content
-    fetch('http://192.168.100.157:5000/api/fact-check', { // Replace with your actual API endpoint
+    fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -275,14 +281,20 @@ function handleFacebookVerification() {
         
         showFacebookVerificationResult(analysisType, {
             credibilityScore: adjustedScore,
-            sources: result.credibility.sources || 3,
-            factChecks: result.credibility.factChecks || 1,
+            sources: (result.credibility && result.credibility.sources) ?? 0,
+            factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
             
             linkVerification: checkLinks,
             sourceCheck: checkSource,
             platform: 'Facebook',
             contentType: url ? 'Post/Article URL' : 'Text Content',
-            url: url || null
+            url: url || null,
+            credibilityExplanation: result.credibility.explanation,
+            credibilityLabel: result.credibility.label,
+            fakeClaims: Array.isArray(result.fake_claims) ? result.fake_claims : [],
+            realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
+            claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
+            claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : []
         });
     })
     .catch(error => {
@@ -298,6 +310,43 @@ function handleFacebookVerification() {
 
 // Show Facebook verification results
 function showFacebookVerificationResult(type, data) {
+    const fakeClaimsSection = (Array.isArray(data.fakeClaims) && data.fakeClaims.length > 0) ? `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Fake Claims Identified</h4>
+            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                ${data.fakeClaims.slice(0, 2).map(fc => `
+                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                        <div><strong>Claim:</strong> ${fc.claim || 'N/A'}</div>
+                        <div><strong>Explanation:</strong> ${fc.explanation || 'No explanation'}</div>
+                        ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : ''}
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    ` : '';
+
+    const realClaimsSection = (Array.isArray(data.realClaims) && data.realClaims.length > 0) ? `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">True Claims Identified</h4>
+            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                ${data.realClaims.slice(0, 2).map(rc => `
+                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                        <div><strong>Claim:</strong> ${rc.claim || 'N/A'}</div>
+                        <div><strong>Explanation:</strong> ${rc.explanation || 'No explanation'}</div>
+                        ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : ''}
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    ` : '';
+
+    const explanationSection = data.credibilityExplanation ? `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Explanation</h4>
+            <p>${data.credibilityExplanation}</p>
+        </div>
+    ` : '';
+
     const resultHtml = `
         <div class="verification-result facebook-result">
             <div class="result-header">
@@ -305,7 +354,7 @@ function showFacebookVerificationResult(type, data) {
                     <i class="fab fa-facebook"></i>
                     <span>Facebook Analysis</span>
                 </div>
-                <div class="content-type">${data.contentType}</div>
+                <div class="content-type">${data.contentType || 'Post'}</div>
             </div>
             <div class="result-score">
                 <div class="score-circle score-${getScoreClass(data.credibilityScore)}">
@@ -313,22 +362,22 @@ function showFacebookVerificationResult(type, data) {
                     <span class="score-label">%</span>
                 </div>
                 <div class="score-description">
-                    <h3>Credibility Score</h3>
+                    <h3>Credibility Score (${data.credibilityLabel || ''})</h3>
                     <p>${getFacebookScoreSummary(data.credibilityScore)}</p>
                 </div>
             </div>
             <div class="result-details">
                 <div class="result-item">
                     <span class="result-label">Platform:</span>
-                    <span class="result-value">${data.platform}</span>
+                    <span class="result-value">${data.platform || 'Facebook'}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">Sources Found:</span>
-                    <span class="result-value">${data.sources}</span>
+                    <span class="result-value">${data.sources ?? 0}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">Fact Checks:</span>
-                    <span class="result-value">${data.factChecks}</span>
+                    <span class="result-value">${data.factChecks ?? 0}</span>
                 </div>
                 ${data.url ? `
                 <div class="result-item">
@@ -340,7 +389,6 @@ function showFacebookVerificationResult(type, data) {
             <div class="analysis-features">
                 <h4>Analysis Features Used:</h4>
                 <div class="feature-list">
-                
                     <div class="feature-item ${data.linkVerification ? 'enabled' : 'disabled'}">
                         <i class="fas fa-link"></i>
                         <span>Link Verification</span>
@@ -356,6 +404,9 @@ function showFacebookVerificationResult(type, data) {
             <div class="result-summary facebook-summary">
                 <p>${getFacebookDetailedSummary(data)}</p>
             </div>
+            ${explanationSection}
+            ${realClaimsSection}
+            ${fakeClaimsSection}
         </div>
     `;
     
@@ -411,43 +462,114 @@ async function showVerificationResult(type, data) {
         console.error('Error storing verification result:', error);
     }
     
+    const fakeClaimsSection = (Array.isArray(data.fakeClaims) && data.fakeClaims.length > 0) ? `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Fake Claims Identified</h4>
+            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                ${data.fakeClaims.slice(0, 2).map(fc => `
+                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                        <div><strong>Claim:</strong> ${fc.claim || 'N/A'}</div>
+                        <div><strong>Explanation:</strong> ${fc.explanation || 'No explanation'}</div>
+                        ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : ''}
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    ` : '';
+
+    const realClaimsSection = (Array.isArray(data.realClaims) && data.realClaims.length > 0) ? `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">True Claims Identified</h4>
+            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                ${data.realClaims.slice(0, 2).map(rc => `
+                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                        <div><strong>Claim:</strong> ${rc.claim || 'N/A'}</div>
+                        <div><strong>Explanation:</strong> ${rc.explanation || 'No explanation'}</div>
+                        ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : ''}
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    ` : '';
+
+    const explanationSection = data.credibilityExplanation ? `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Explanation</h4>
+            <p>${data.credibilityExplanation}</p>
+        </div>
+    ` : '';
+    
     const resultHtml = `
-        <div class="verification-result">
-            <h3>Verification Results</h3>
-            <div class="result-grid">
+        <div class="verification-result url-result">
+            <div class="result-header">
+                <div class="platform-badge">
+                    <i class="fas fa-globe"></i>
+                    <span>Web Analysis</span>
+                </div>
+                <div class="content-type">${data.domain || 'Article'}</div>
+            </div>
+            <div class="result-score">
+                <div class="score-circle score-${getScoreClass(data.credibilityScore)}">
+                    <span class="score-number">${data.credibilityScore}</span>
+                    <span class="score-label">%</span>
+                </div>
+                <div class="score-description">
+                    <h3>Credibility Score (${data.credibilityLabel || ''})</h3>
+                    <p>${getScoreSummary(data.credibilityScore)}</p>
+                </div>
+            </div>
+            <div class="result-details">
                 <div class="result-item">
-                    <span class="result-label">Credibility Score:</span>
-                    <span class="result-value score-${getScoreClass(data.credibilityScore)}">${data.credibilityScore}%</span>
+                    <span class="result-label">Platform:</span>
+                    <span class="result-value">Web</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">Sources Found:</span>
-                    <span class="result-value">${data.sources}</span>
+                    <span class="result-value">${data.sources ?? 0}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">Fact Checks:</span>
-                    <span class="result-value">${data.factChecks}</span>
+                    <span class="result-value">${data.factChecks ?? 0}</span>
                 </div>
-                ${data.domain ? `
+                ${type === 'url' && articleUrl && articleUrl.value ? `
                 <div class="result-item">
-                    <span class="result-label">Domain:</span>
-                    <span class="result-value">${data.domain}</span>
+                    <span class="result-label">URL:</span>
+                    <span class="result-value url-value">${articleUrl.value}</span>
                 </div>
                 ` : ''}
+            </div>
+            <div class="analysis-features">
+                <h4>Analysis Features Used:</h4>
+                <div class="feature-list">
+                    <div class="feature-item enabled">
+                        <i class="fas fa-link"></i>
+                        <span>Link Verification</span>
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="feature-item enabled">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Source Credibility</span>
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
             </div>
             <div class="result-summary">
                 <p>${getScoreSummary(data.credibilityScore)}</p>
             </div>
+            ${explanationSection}
+            ${realClaimsSection}
+            ${fakeClaimsSection}
         </div>
     `;
     
-    // Create and show modal or insert result into page
+    // Create and show modal
     showModal('Credibility Analysis Complete', resultHtml);
 }
 
 // Get score class for styling
 function getScoreClass(score) {
     if (score >= 80) return 'high';
-    if (score >= 60) return 'medium';
+    if (score >= 50) return 'medium';
     return 'low';
 }
 
@@ -566,6 +688,20 @@ document.addEventListener('DOMContentLoaded', function() {
         facebookContent.addEventListener('input', updateFacebookCharacterCount);
     }
     
+    // Toggle between URL and Facebook sections
+    if (showUrlVerifyBtn) {
+        showUrlVerifyBtn.addEventListener('click', function() {
+            switchVerifySection('url');
+        });
+    }
+    if (showFacebookVerifyBtn) {
+        showFacebookVerifyBtn.addEventListener('click', function() {
+            switchVerifySection('facebook');
+        });
+    }
+    // Default to URL section visible on load
+    switchVerifySection('url');
+    
     // Close modal when clicking outside
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('modal-overlay')) {
@@ -580,6 +716,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Toggle controls
+const showUrlVerifyBtn = document.getElementById('show-url-verify');
+const showFacebookVerifyBtn = document.getElementById('show-facebook-verify');
+const urlVerifySection = document.getElementById('url-verify-section');
+const facebookVerifySection = document.getElementById('facebook-verify-section');
+
+function switchVerifySection(section) {
+    if (!urlVerifySection || !facebookVerifySection) return;
+    const showUrl = section === 'url';
+    urlVerifySection.style.display = showUrl ? 'block' : 'none';
+    facebookVerifySection.style.display = showUrl ? 'none' : 'block';
+    if (showUrlVerifyBtn && showFacebookVerifyBtn) {
+        showUrlVerifyBtn.classList.toggle('active', showUrl);
+        showFacebookVerifyBtn.classList.toggle('active', !showUrl);
+    }
+}
+
+// Default to URL section visible
+switchVerifySection('url');
 
 // Add CSS for notifications and modal
 const additionalStyles = `
@@ -635,7 +791,7 @@ const additionalStyles = `
 .modal-content {
     background: white;
     border-radius: 12px;
-    max-width: 500px;
+    max-width: 550px;
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
@@ -725,6 +881,25 @@ const additionalStyles = `
     color: #374151;    
 }
 
+.toggle-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.toggle-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #374151;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.toggle-btn.active {
+    background: #3b82f6;
+    color: #fff;
+    border-color: #2563eb;
+}
 .btn {
     padding: 0.5rem 1rem;
     border: none;
