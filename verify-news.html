@@ -48,119 +48,101 @@
 
             <div class="verify-news-container">
 
+                <div class="toggle-buttons">
+                    <button id="show-url-verify" class="toggle-btn active">Verify by URL</button>
+                    <button id="show-facebook-verify" class="toggle-btn">Verify Facebook News</button>
+                </div>
+
+                <!-- Verify by URL Section -->
+                <div id="url-verify-section">
+                    <div class="verify-card">
+                        <div class="card-header">
+                            <i class="fas fa-link card-icon"></i>
+                            <h2 class="card-title">Verify by URL</h2>
+                        </div>
+                        <p class="card-description">Enter the URL of a news article to analyze its credibility.</p>
+                        
+                        <div class="form-group">
+                            <label for="article-url" class="form-label">Article URL</label>
+                            <input 
+                                type="url" 
+                                id="article-url" 
+                                class="form-input" 
+                                placeholder="https://example.com/news-article"
+                            >
+                        </div>
+                        
+                        <button type="button" class="verify-btn" id="verify-url-btn">
+                            <i class="fas fa-search"></i>
+                            Verify URL
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Verify Facebook News Section -->
-            <div class="verify-card facebook-card">
-                <div class="card-header">
-                    <i class="fab fa-facebook card-icon"></i>
-                    <h2 class="card-title">Verify Facebook News</h2>
-                </div>
-                <p class="card-description">Analyze Facebook posts, articles, and shared content for credibility and misinformation.</p>
-                
-                <div class="form-group">
-                    <label for="facebook-url" class="form-label">Facebook Post/Article URL</label>
-                    <input 
-                        type="url" 
-                        id="facebook-url" 
-                        class="form-input" 
-                        placeholder="https://www.facebook.com/post-url or https://facebook.com/page/posts/..."
-                    >
-                    <div class="input-help">
-                        <i class="fas fa-info-circle"></i>
-                        Supports Facebook posts, shared articles, and page content
+                <div id="facebook-verify-section" style="display: none;">
+                    <div class="verify-card facebook-card">
+                        <div class="card-header">
+                            <i class="fab fa-facebook card-icon"></i>
+                            <h2 class="card-title">Verify Facebook News</h2>
+                        </div>
+                        <p class="card-description">Analyze Facebook posts, articles, and shared content for credibility and misinformation.</p>
+                        
+                        <div class="form-group">
+                            <label for="facebook-url" class="form-label">Facebook Post/Article URL</label>
+                            <input 
+                                type="url" 
+                                id="facebook-url" 
+                                class="form-input" 
+                                placeholder="https://www.facebook.com/post-url or https://facebook.com/page/posts/..."
+                            >
+                            <div class="input-help">
+                                <i class="fas fa-info-circle"></i>
+                                Supports Facebook posts, shared articles, and page content
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="facebook-content" class="form-label">Or Paste Facebook Content</label>
+                            <textarea 
+                                id="facebook-content" 
+                                class="form-textarea" 
+                                placeholder="Copy and paste the Facebook post content here..."
+                                rows="6"
+                                maxlength="3000"
+                            ></textarea>
+                            <div class="character-count">
+                                <span id="facebook-char-count">0</span>/3000 characters
+                            </div>
+                        </div>
+
+                        <div class="facebook-options">
+                            <div class="option-group">
+                            
+                            </div>
+                            <div class="option-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="check-links" checked>
+                                    <span class="checkmark"></span>
+                                    Verify shared links
+                                </label>
+                            </div>
+                            <div class="option-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="check-source" checked>
+                                    <span class="checkmark"></span>
+                                    Check source credibility
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="verify-btn facebook-verify-btn" id="verify-facebook-btn">
+                            <i class="fab fa-facebook"></i>
+                            Analyze Facebook Content
+                        </button>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="facebook-content" class="form-label">Or Paste Facebook Content</label>
-                    <textarea 
-                        id="facebook-content" 
-                        class="form-textarea" 
-                        placeholder="Copy and paste the Facebook post content here..."
-                        rows="6"
-                        maxlength="3000"
-                    ></textarea>
-                    <div class="character-count">
-                        <span id="facebook-char-count">0</span>/3000 characters
-                    </div>
-                </div>
-
-                <div class="facebook-options">
-                    <div class="option-group">
-                    
-                    </div>
-                    <div class="option-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="check-links" checked>
-                            <span class="checkmark"></span>
-                            Verify shared links
-                        </label>
-                    </div>
-                    <div class="option-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="check-source" checked>
-                            <span class="checkmark"></span>
-                            Check source credibility
-                        </label>
-                    </div>
-                </div>
-                
-                <button type="button" class="verify-btn facebook-verify-btn" id="verify-facebook-btn">
-                    <i class="fab fa-facebook"></i>
-                    Analyze Facebook Content
-                </button>
-            </div>
-
-            <!-- Verify by Text Section -->
-            <div class="verify-card">
-                <div class="card-header">
-                    <i class="fas fa-file-text card-icon"></i>
-                    <h2 class="card-title">Verify by Text</h2>
-                </div>
-                <p class="card-description">Paste the news article text to analyze its credibility.</p>
-                
-                <div class="form-group">
-                    <label for="article-content" class="form-label">Article Content</label>
-                    <textarea 
-                        id="article-content" 
-                        class="form-textarea" 
-                        placeholder="Paste the news article text here..."
-                        rows="8"
-                        maxlength="5000"
-                    ></textarea>
-                    <div class="character-count">
-                        <span id="text-char-count">0</span>/5000 characters
-                    </div>
-                </div>
-                
-                <button type="button" class="verify-btn" id="verify-text-btn">
-                    <i class="fas fa-search"></i>
-                    Verify Content
-                </button>
-            </div>
-
-            <!-- Verify by URL Section -->
-            <div class="verify-card">
-                <div class="card-header">
-                    <i class="fas fa-link card-icon"></i>
-                    <h2 class="card-title">Verify by URL</h2>
-                </div>
-                <p class="card-description">Enter the URL of a news article to analyze its credibility.</p>
-                
-                <div class="form-group">
-                    <label for="article-url" class="form-label">Article URL</label>
-                    <input 
-                        type="url" 
-                        id="article-url" 
-                        class="form-input" 
-                        placeholder="https://example.com/news-article"
-                    >
-                </div>
-                
-                <button type="button" class="verify-btn" id="verify-url-btn">
-                    <i class="fas fa-search"></i>
-                    Verify URL
-                </button>
-            </div>
 
         </div>
 
