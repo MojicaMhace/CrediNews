@@ -109,7 +109,7 @@ function updateAuthButton() {
                 <div class="dropdown-menu">
                     <button class="dropdown-item"><i class="fas fa-user-cog"></i> Profile Settings</button>
                     <button class="dropdown-item"><i class="fas fa-shield-alt"></i> My Verifications</button>
-                    <button class="dropdown-item"><i class="fas fa-chart-line"></i> Credibility Score</button>
+                    <button class="dropdown-item"><i class="fas fa-chart-line"></i> Poser Detection History</button>
                     <button class="dropdown-item"><i class="fas fa-bell"></i> Notifications</button>
                     <div class="dropdown-divider"></div>
                     <div class="dropdown-item logout-item" id="logoutMenuItem"><i class="fas fa-sign-out-alt"></i> Logout</div>
@@ -347,15 +347,15 @@ function initializeButtonRedirects() {
         console.error('❌ verifyBtn not found!');
     }
     
-    // Analyze button - redirect to submit-news.html
+    // Analyze button - redirect to verify-news.html (submit-news removed)
     const analyzeBtn = document.getElementById('analyzeBtn');
     if (analyzeBtn) {
         console.log('✅ Found analyzeBtn, adding event listener...');
         analyzeBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            alert('Analyze button clicked via addEventListener! Redirecting to submit-news.html');
-            console.log('📊 Analyze button clicked - redirecting to submit-news.html');
-            window.location.href = 'submit-news.html';
+            alert('Analyze button clicked! Redirecting to verify-news.html');
+            console.log('📊 Analyze button clicked - redirecting to verify-news.html');
+            window.location.href = 'verify-news.html';
         });
         console.log('✅ Analyze button redirect initialized');
     } else {
