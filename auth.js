@@ -183,6 +183,24 @@ class AuthManager {
                 return;
             }
             
+            // Ensure Firestore user profile exists only after verification
+            try {
+                const db = firebase.firestore();
+                const userRef = db.collection('users').doc(user.uid);
+                const snap = await userRef.get();
+                if (!snap.exists) {
+                    await userRef.set({
+                        fullName: user.displayName || 'User',
+                        email: user.email,
+                        createdAt: new Date().toISOString(),
+                        role: 'user',
+                        provider: (user.providerData && user.providerData[0] && user.providerData[0].providerId) || 'password'
+                    });
+                }
+            } catch (profileErr) {
+                console.warn('Profile creation warning:', profileErr && profileErr.message);
+            }
+            
             // Store auth state
             const authData = {
                 uid: user.uid,
@@ -456,17 +474,54 @@ class AuthManager {
         this.showNotification(message, 'warning');
     }
 
-    // Button para mag-resend ng email verification kapag hindi pa verified ang user
+    // Button para mag-resend ng email verification with cooldown
     showResendVerificationOption(email) {
+        const COOLDOWN_MS = 60 * 1000; // 60 seconds
+        const cooldownKey = `resend_verif_cooldown_${email}`;
+        
         // Create a resend verification button
         const resendBtn = document.createElement('button');
         resendBtn.textContent = 'Resend Verification Email';
         resendBtn.className = 'auth-btn secondary';
         resendBtn.style.marginTop = '10px';
         resendBtn.style.width = '100%';
-        
+
+        let countdownTimer = null;
+
+        const startCountdown = (untilTs) => {
+            const update = () => {
+                const remaining = Math.max(0, untilTs - Date.now());
+                const secs = Math.ceil(remaining / 1000);
+                if (remaining <= 0) {
+                    clearInterval(countdownTimer);
+                    countdownTimer = null;
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = 'Resend Verification Email';
+                    return;
+                }
+                resendBtn.disabled = true;
+                resendBtn.textContent = `Resend Verification Email (wait ${secs}s)`;
+            };
+            update();
+            countdownTimer = setInterval(update, 1000);
+        };
+
+        // Check existing cooldown
+        const existingUntil = parseInt(localStorage.getItem(cooldownKey) || '0', 10);
+        if (existingUntil > Date.now()) {
+            startCountdown(existingUntil);
+        }
+
         resendBtn.addEventListener('click', async () => {
             try {
+                // Respect cooldown
+                const now = Date.now();
+                const until = parseInt(localStorage.getItem(cooldownKey) || '0', 10);
+                if (until > now) {
+                    this.showInfo('Please wait before resending the verification email.');
+                    return;
+                }
+
                 resendBtn.disabled = true;
                 resendBtn.textContent = 'Sending...';
                 
@@ -488,9 +543,14 @@ class AuthManager {
                         await user.sendEmailVerification();
                     }
                     this.showSuccess('Verification email sent! Please check your inbox.');
-                    resendBtn.remove();
+                    // Set cooldown
+                    const cooldownUntil = Date.now() + COOLDOWN_MS;
+                    localStorage.setItem(cooldownKey, String(cooldownUntil));
+                    startCountdown(cooldownUntil);
                 } else {
                     this.showError('Please try logging in again to resend verification email.');
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = 'Resend Verification Email';
                 }
             } catch (error) {
                 console.error('Resend verification error:', error);

@@ -18,6 +18,7 @@ try {
     firebase.initializeApp(firebaseConfig);
     console.log('✅ Firebase initialized successfully');
     
+    
     // Export for global access
     window.firebaseAuth = firebase.auth();
     window.firebaseDb = firebase.firestore();
