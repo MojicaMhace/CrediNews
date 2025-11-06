@@ -3,94 +3,16 @@
 // Firebase will be available globally after firebase-config.js loads
 
 // DOM Elements
-const textVerifyBtn = document.getElementById('verify-text-btn');
 const urlVerifyBtn = document.getElementById('verify-url-btn');
 const facebookVerifyBtn = document.getElementById('verify-facebook-btn');
-const articleContent = document.getElementById('article-content');
 const articleUrl = document.getElementById('article-url');
 const facebookUrl = document.getElementById('facebook-url');
 const facebookContent = document.getElementById('facebook-content');
 const facebookCharCount = document.getElementById('facebook-char-count');
-const textCharCount = document.getElementById('text-char-count');
 
-// Character counter for text area
-function updateCharacterCount() {
-    
-    if (articleContent && textCharCount) {
-       const currentLength = articleContent.value.length;
-        textCharCount.textContent = currentLength;
-        
-    // Change color based on character count
-        if (currentLength > 2800) {
-            textCharCount.style.color = '#ef4444';
-        } else if (currentLength > 2500) {
-            textCharCount.style.color = '#f59e0b';
-        } else {
-            textCharCount.style.color = '#6b7280';
-        }
-    }
-}
-
-// Text verification handler
-function handleTextVerification() {
-    const content = articleContent.value.trim();
-    
-    if (!content) {
-        showNotification('Please enter article content to verify.', 'error');
-        return;
-    }
-    
-    if (content.length < 50) {
-        showNotification('Article content is too short. Please provide at least 50 characters.', 'error');
-        return;
-    }
-    
-    // Disable button and show loading state
-    textVerifyBtn.disabled = true;
-    textVerifyBtn.textContent = 'Verifying...';
-    
-    // Call the fact check API
-    fetch('http://127.0.0.1:5000/api/fact-check', {  // Replace with your actual API endpoint
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            title: '',
-            content: content
-        })
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(result => {
-
-        // Cap the score at 100
-        const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
-
-        showVerificationResult('text', {
-            credibilityScore: adjustedScore,
-            sources: result.credibility.sources || 3,
-            factChecks: result.credibility.factChecks || 1
-            
-        });
-    })
-    .catch(error => {
-        console.error('Fact check API error:', error);
-        showNotification('Error connecting to fact check service. Please try again later.', 'error');
-    })
-    .finally(() => {
-        // Reset button
-        textVerifyBtn.disabled = false;
-        textVerifyBtn.textContent = 'Verify Content';
-    });
-}
 
 // URL verification handler
-function handleUrlVerification() {
+async function handleUrlVerification() {
     const url = articleUrl.value.trim();
     
     if (!url) {
@@ -107,51 +29,41 @@ function handleUrlVerification() {
     urlVerifyBtn.disabled = true;
     urlVerifyBtn.textContent = 'Verifying...';
     
-    // Call the fact check API
-    fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            title: '',
-            content: `URL: ${url}`,
-            url: url
-        })
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(result => {
-        
-        // Cap the score at 100
-       const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
+    try {
+        const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: '', content: `URL: ${url}`, url })
+        });
+        if (!fcResp.ok) throw new Error(`API error: ${fcResp.status}`);
+        const result = await fcResp.json();
+
+        const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
 
         showVerificationResult('url', {
             credibilityScore: adjustedScore,
             sources: (result.credibility && result.credibility.sources) ?? 0,
             factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
             domain: extractDomain(url),
-            credibilityExplanation: result.credibility.explanation,
-            credibilityLabel: result.credibility.label,
+            credibilityExplanation: result.credibility && result.credibility.explanation,
+            credibilityLabel: result.credibility && result.credibility.label,
+            mlDetails: result.ml_details || null,
+            slangDetected: Array.isArray(result.slang_detected) ? result.slang_detected : [],
+            sarcasmPercent: (typeof result.sarcasm_percent === 'number') ? result.sarcasm_percent : null,
+            sarcasmRisk: result.sarcasm_risk || null,
+            tone: result.tone || null,
             fakeClaims: Array.isArray(result.fake_claims) ? result.fake_claims : [],
             realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
             claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : []
         });
-    })
-    .catch(error => {
-        console.error('Fact check API error:', error);
-        showNotification('Error connecting to fact check service. Please try again later.', 'error');
-    })
-    .finally(() => {
-        // Reset button
+    } catch (error) {
+        console.error('Verification error:', error);
+        showNotification('Error connecting to verification services. Please try again later.', 'error');
+    } finally {
         urlVerifyBtn.disabled = false;
         urlVerifyBtn.textContent = 'Verify URL';
-    });
+    }
 }
 
 // URL validation
@@ -187,6 +99,51 @@ function isFacebookUrl(url) {
     }
 }
 
+// Facebook content quality validation
+// Blocks random letters or low-context input from being verified
+function isMeaningfulFacebookContent(text) {
+    const t = (text || '').trim();
+    // Require sufficient length
+    if (t.length < 60) return false;
+    // Require multiple words
+    const words = t.split(/\s+/).filter(Boolean);
+    if (words.length < 3) return false;
+    // Ensure presence of at least one longer alphabetic word
+    const alphaWords = words.map(w => w.replace(/[^A-Za-z]/g, ''));
+    const longWords = alphaWords.filter(w => w.length >= 4);
+    if (longWords.length === 0) return false;
+    // Reject repeated single-character gibberish
+    const repeatedChar = /^([A-Za-z])\1{5,}$/;
+    if (repeatedChar.test(t.replace(/\s+/g, ''))) return false;
+    return true;
+}
+
+// Word-based validation and preprocessing utilities
+function extractMeaningfulWords(text) {
+    if (!text) return [];
+    const lower = text.toLowerCase().replace(/\s+/g, ' ').trim();
+    const tokens = lower.match(/[a-z][a-z'\-]*/g) || [];
+    const vowels = /[aeiou]/;
+    const repeatedCharPattern = /^([a-z])\1{2,}$/;
+    const longConsonantRun = /[bcdfghjklmnpqrstvwxyz]{5,}/;
+    return tokens.filter(w => {
+        if (w.length < 2) return false;
+        if (repeatedCharPattern.test(w)) return false;
+        if (longConsonantRun.test(w)) return false;
+        if (w.length >= 4 && !vowels.test(w)) return false;
+        return true;
+    });
+}
+
+function countMeaningfulWords(text) {
+    return extractMeaningfulWords(text).length;
+}
+
+function preprocessTextForAnalysis(text) {
+    const words = extractMeaningfulWords(text);
+    return words.join(' ');
+}
+
 // Facebook verification handler
 function handleFacebookVerification() {
     console.log('Facebook verification started');
@@ -216,15 +173,22 @@ function handleFacebookVerification() {
         return;
     }
     
-    // Validate content length if provided
-    if (content && content.length < 60) {
-        showNotification('Facebook content is too short. Please provide at least 60 characters.', 'error');
+    // Validate content quality ONLY when verifying content (no URL provided)
+    if (!url && content && !isMeaningfulFacebookContent(content)) {
+        showNotification('Please enter valid Facebook content (min of 30 meaningful words).', 'error');
         return;
     }
+
+    // Require at least 30 meaningful words ONLY for content-only verification
+    if (!url && content) {
+        const meaningfulCount = countMeaningfulWords(content);
+        if (meaningfulCount < 30) {
+            showNotification('Please enter at least 30 words in Facebook content.', 'error');
+            return;
+        }
+    }
     
-    // Get analysis options
-    const checkLinks = document.getElementById('check-links').checked;
-    const checkSource = document.getElementById('check-source').checked;
+    // Analysis options removed
     
     // Disable button and show loading state
     facebookVerifyBtn.disabled = true;
@@ -238,11 +202,7 @@ function handleFacebookVerification() {
             content: content || null,
             userId: firebase.auth().currentUser.uid,
             userEmail: firebase.auth().currentUser.email,
-            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            options: {
-                checkLinks,
-                checkSource
-            }
+            requestedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
     }
     
@@ -254,12 +214,8 @@ function handleFacebookVerification() {
         },
         body: JSON.stringify({
             title: 'Facebook Content',
-            content: content || `Facebook URL: ${url}`,
-            url: url || null,
-            options: {
-                checkLinks,
-                checkSource
-            }
+            content: content ? preprocessTextForAnalysis(content) : `Facebook URL: ${url}`,
+            url: url || null
         })
     })
     .then(response => {
@@ -271,26 +227,23 @@ function handleFacebookVerification() {
     .then(result => {
         const analysisType = url ? 'facebook-url' : 'facebook-content';
         
-        // Calculate adjusted score based on options
-        let adjustedScore = Math.round(result.credibility.score * 100);
-        if (checkLinks) adjustedScore += 3;
-        if (checkSource) adjustedScore += 3;
-        
-        // Cap the score at 100
-        adjustedScore = Math.min(adjustedScore, 100);
+        // Use credibility score directly
+        const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
         
         showFacebookVerificationResult(analysisType, {
             credibilityScore: adjustedScore,
             sources: (result.credibility && result.credibility.sources) ?? 0,
             factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
-            
-            linkVerification: checkLinks,
-            sourceCheck: checkSource,
             platform: 'Facebook',
             contentType: url ? 'Post/Article URL' : 'Text Content',
             url: url || null,
             credibilityExplanation: result.credibility.explanation,
             credibilityLabel: result.credibility.label,
+            mlDetails: result.ml_details || null,
+            slangDetected: Array.isArray(result.slang_detected) ? result.slang_detected : [],
+            sarcasmPercent: (typeof result.sarcasm_percent === 'number') ? result.sarcasm_percent : null,
+            sarcasmRisk: result.sarcasm_risk || null,
+            tone: result.tone || null,
             fakeClaims: Array.isArray(result.fake_claims) ? result.fake_claims : [],
             realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
@@ -347,6 +300,24 @@ function showFacebookVerificationResult(type, data) {
         </div>
     ` : '';
 
+    const mlSection = '';
+
+    const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
+        <div class="result-summary" style="margin-top:1rem; border-left-color:#1877f2;">
+            <h4 style="margin:0 0 0.5rem 0;">Slang Detection</h4>
+            <div><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</div>
+            ${(typeof data.sarcasmPercent === 'number') ? `<div><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</div>` : ''}
+            ${data.sarcasmRisk ? `<div><strong>Risk:</strong> ${data.sarcasmRisk}</div>` : ''}
+        </div>
+    ` : (typeof data.sarcasmPercent === 'number' ? `
+        <div class="result-summary" style="margin-top:1rem; border-left-color:#1877f2;">
+            <h4 style="margin:0 0 0.5rem 0;">Slang Detection</h4>
+            <div><em>No slang words detected.</em></div>
+            <div><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</div>
+            ${data.sarcasmRisk ? `<div><strong>Risk:</strong> ${data.sarcasmRisk}</div>` : ''}
+        </div>
+    ` : '');
+
     const resultHtml = `
         <div class="verification-result facebook-result">
             <div class="result-header">
@@ -386,25 +357,11 @@ function showFacebookVerificationResult(type, data) {
                 </div>
                 ` : ''}
             </div>
-            <div class="analysis-features">
-                <h4>Analysis Features Used:</h4>
-                <div class="feature-list">
-                    <div class="feature-item ${data.linkVerification ? 'enabled' : 'disabled'}">
-                        <i class="fas fa-link"></i>
-                        <span>Link Verification</span>
-                        ${data.linkVerification ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>'}
-                    </div>
-                    <div class="feature-item ${data.sourceCheck ? 'enabled' : 'disabled'}">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>Source Credibility</span>
-                        ${data.sourceCheck ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>'}
-                    </div>
-                </div>
-            </div>
             <div class="result-summary facebook-summary">
                 <p>${getFacebookDetailedSummary(data)}</p>
             </div>
             ${explanationSection}
+            ${slangSection}
             ${realClaimsSection}
             ${fakeClaimsSection}
         </div>
@@ -429,13 +386,7 @@ function getFacebookScoreSummary(score) {
 
 // Get detailed Facebook analysis summary
 function getFacebookDetailedSummary(data) {
-    const features = [];
-    if (data.linkVerification) features.push('embedded link verification');
-    if (data.sourceCheck) features.push('source credibility assessment');
-    
-    const featuresText = features.length > 0 ? ` including ${features.join(', ')}` : '';
-    
-    return `This Facebook content has been analyzed using our AI-powered verification system${featuresText}. The analysis considered multiple factors including content patterns, source reliability, and cross-referencing with known fact-checking databases. ${data.sources} sources were consulted and ${data.factChecks} fact-checking reports were reviewed.`;
+    return `This Facebook content has been analyzed using our AI-powered verification system. The analysis considered content patterns, source reliability, and cross-referencing with known fact-checking databases. ${data.sources ?? 0} sources were consulted and ${data.factChecks ?? 0} fact-checking reports were reviewed.`;
 }
 
 // Show verification results
@@ -498,6 +449,24 @@ async function showVerificationResult(type, data) {
             <p>${data.credibilityExplanation}</p>
         </div>
     ` : '';
+
+    const mlSection = '';
+
+    const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Slang Detection</h4>
+            <div><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</div>
+            ${(typeof data.sarcasmPercent === 'number') ? `<div><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</div>` : ''}
+            ${data.sarcasmRisk ? `<div><strong>Risk:</strong> ${data.sarcasmRisk}</div>` : ''}
+        </div>
+    ` : (typeof data.sarcasmPercent === 'number' ? `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Slang Detection</h4>
+            <div><em>No slang words detected.</em></div>
+            <div><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</div>
+            ${data.sarcasmRisk ? `<div><strong>Risk:</strong> ${data.sarcasmRisk}</div>` : ''}
+        </div>
+    ` : '');
     
     const resultHtml = `
         <div class="verification-result url-result">
@@ -531,6 +500,7 @@ async function showVerificationResult(type, data) {
                     <span class="result-label">Fact Checks:</span>
                     <span class="result-value">${data.factChecks ?? 0}</span>
                 </div>
+                
                 ${type === 'url' && articleUrl && articleUrl.value ? `
                 <div class="result-item">
                     <span class="result-label">URL:</span>
@@ -557,6 +527,7 @@ async function showVerificationResult(type, data) {
                 <p>${getScoreSummary(data.credibilityScore)}</p>
             </div>
             ${explanationSection}
+            ${slangSection}
             ${realClaimsSection}
             ${fakeClaimsSection}
         </div>
@@ -660,11 +631,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('facebookContent:', facebookContent);
     console.log('facebookCharCount:', facebookCharCount);
     
-    // Text verification
-    if (textVerifyBtn) {
-        textVerifyBtn.addEventListener('click', handleTextVerification);
-    }
-    
     // URL verification
     if (urlVerifyBtn) {
         urlVerifyBtn.addEventListener('click', handleUrlVerification);
@@ -678,14 +644,35 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Facebook verify button not found!');
     }
     
-    // Character counter for textarea
-    if (articleContent) {
-        articleContent.addEventListener('input', updateCharacterCount);
-    }
-    
     // Character counter for Facebook content
     if (facebookContent) {
         facebookContent.addEventListener('input', updateFacebookCharacterCount);
+    }
+
+    // Press Enter to start verification
+    if (articleUrl) {
+        articleUrl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleUrlVerification();
+            }
+        });
+    }
+    if (facebookUrl) {
+        facebookUrl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleFacebookVerification();
+            }
+        });
+    }
+    if (facebookContent) {
+        facebookContent.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleFacebookVerification();
+            }
+        });
     }
     
     // Toggle between URL and Facebook sections
@@ -699,8 +686,8 @@ document.addEventListener('DOMContentLoaded', function() {
             switchVerifySection('facebook');
         });
     }
-    // Default to URL section visible on load
-    switchVerifySection('url');
+    // Default to Facebook section visible on load
+    switchVerifySection('facebook');
     
     // Close modal when clicking outside
     document.addEventListener('click', function(e) {
@@ -734,8 +721,8 @@ function switchVerifySection(section) {
     }
 }
 
-// Default to URL section visible
-switchVerifySection('url');
+// Default to Facebook section visible
+switchVerifySection('facebook');
 
 // Add CSS for notifications and modal
 const additionalStyles = `
@@ -791,9 +778,9 @@ const additionalStyles = `
 .modal-content {
     background: white;
     border-radius: 12px;
-    max-width: 550px;
-    width: 90%;
-    max-height: 80vh;
+    max-width: 980px;
+    width: 95%;
+    max-height: 92vh;
     overflow-y: auto;
     border-left: 4px solid #1877f2;
 }
@@ -899,6 +886,19 @@ const additionalStyles = `
     background: #3b82f6;
     color: #fff;
     border-color: #2563eb;
+}
+/* Verify Url Toggle */
+#show-url-verify.toggle-btn.active {
+    background: #22c55e;
+    color: #fff;
+    border-color: #16a34a;
+
+}
+/* Verify Facebook toggle */
+#show-facebook-verify.toggle-btn.active {
+    background: #1877f2;
+    color: #fff;
+    border-color: #166fe5;
 }
 .btn {
     padding: 0.5rem 1rem;
@@ -1102,6 +1102,11 @@ const additionalStyles = `
     background: #f3f4f6;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
+}
+/* Add green left border and 12px radius to the Verify URL card */
+#url-verify-section .verify-card {
+    border-left: 4px solid #22c55e;
+    border-radius: 20px;
 }
 </style>
 `;

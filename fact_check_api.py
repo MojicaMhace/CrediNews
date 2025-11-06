@@ -1,12 +1,21 @@
 import os
 import json
 import requests
+import csv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import nltk
 from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
 import re
+from typing import Dict, Any, List, Tuple
+
+# ML model integration
+try:
+    from ml_models import load_saved_news_model, predict_news_label
+except Exception:
+    load_saved_news_model = None
+    predict_news_label = None
 
 
 app = Flask(__name__)
@@ -38,13 +47,13 @@ CREDIBILITY_THRESHOLDS = {
 }
 
 def preprocess_text(text):
-    """Clean and extract key sentences from the text."""
+    """Clean and extract key sentences from the text, with safe tokenization fallback."""
     # Remove special characters and extra spaces
     text = re.sub(r"[^\w\s.]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     
-    # Tokenize into sentences
-    sentences = sent_tokenize(text)
+    # Tokenize into sentences safely
+    sentences = _safe_sent_tokenize(text)
     
     # Extract key sentences (first, middle, and last sentences)
     key_sentences = []
@@ -138,6 +147,209 @@ def _html_to_text(html):
     text = re.sub(r"&amp;", "&", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+# --- Slang detection helper ---
+def _load_slang_dictionary() -> List[Dict[str, str]]:
+    """Load Filipino slang dictionary from CSV with columns:
+    word, canonical_form, meaning, usage_example
+    Returns list of dict rows.
+    """
+    csv_path = os.path.join(os.path.dirname(__file__), 'data', 'filipino_slang_words.csv')
+    rows: List[Dict[str, str]] = []
+    if not os.path.exists(csv_path):
+        return rows
+    try:
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Normalize keys/values
+                r = {
+                    'word': (row.get('word') or '').strip().lower(),
+                    'canonical_form': (row.get('canonical_form') or '').strip(),
+                    'meaning': (row.get('meaning') or '').strip(),
+                    'usage_example': (row.get('usage_example') or '').strip()
+                }
+                if r['word']:
+                    rows.append(r)
+    except Exception as e:
+        print(f"Failed to load slang CSV: {e}")
+    return rows
+
+def detect_slang_words(text: str) -> List[str]:
+    """Detect slang words appearing in text using the CSV dictionary."""
+    if not text:
+        return []
+    entries = _load_slang_dictionary()
+    slang_set = {e['word'] for e in entries if e.get('word')}
+    # Fallback small set if CSV missing
+    if not slang_set:
+        slang_set = {'awit', 'yawa', 'lodi', 'werpa', 'petmalu', 'charot'}
+    tokens = [t.lower() for t in re.findall(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-']+", text)]
+    found = sorted(list({t for t in tokens if t in slang_set}))
+    return found
+
+def compute_sarcasm_score(text: str, slang_words: List[str]) -> Tuple[float, str]:
+    """Compute sarcasm score and risk message.
+    Score = (# slang words) / (total words). Threshold 0.02.
+    Returns (score_float_0_1, risk_message_str).
+    """
+    tokens = [t.lower() for t in re.findall(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-']+", text or '')]
+    total = len(tokens)
+    count = len(slang_words or [])
+    score = (count / total) if total > 0 else 0.0
+    if score >= 0.02:
+        risk = 'Potential sarcasm may affect the meaning of the post.'
+    else:
+        risk = 'Low – Not enough slang to indicate sarcasm.'
+    return score, risk
+
+# --- ML evidence & fallback ---
+def analyze_with_ml(text: str) -> Dict[str, Any]:
+    """Run ML model to classify and produce Google-like claim/evidence.
+    Returns dict with: label ('fake'|'real' or None), confidence (0..1 or None),
+    synthetic_factcheck (google-like claims structure), evidence (keywords, sections, features).
+    """
+    result: Dict[str, Any] = {
+        'label': None,
+        'confidence': None,
+        'synthetic_factcheck': None,
+        'evidence': {}
+    }
+    if not text:
+        return result
+    try:
+        model = load_saved_news_model('news_lr_pipeline.joblib') if load_saved_news_model else None
+        if model is None:
+            return result
+        # Predict label
+        try:
+            label = predict_news_label(text, model)
+        except Exception:
+            label = None
+        # Confidence via predict_proba if available
+        conf = None
+        try:
+            if hasattr(model, 'predict_proba'):
+                probs = model.predict_proba([text])[0]
+                # Assume classes order corresponds to model.classes_
+                # Map to 'fake'/'real' if possible
+                classes = getattr(getattr(model, 'steps', [None])[-1][1], 'classes_', None) if hasattr(model, 'steps') else None
+                # If pipeline, try last estimator
+                if classes is None and hasattr(model, 'classes_'):
+                    classes = model.classes_
+                if classes is not None:
+                    # Find probability for predicted label
+                    if label is not None and label in classes:
+                        conf = float(probs[list(classes).index(label)])
+                    else:
+                        conf = float(max(probs))
+                else:
+                    conf = float(max(probs))
+        except Exception:
+            conf = None
+
+        # Build synthetic google-like claim result
+        textual = 'True' if str(label).lower() == 'real' else 'False' if str(label).lower() == 'fake' else 'Unrated'
+        snippet = (text[:200] + '...') if len(text) > 200 else text
+        synthetic = {
+            'claims': [
+                {
+                    'text': snippet,
+                    'claimReview': [
+                        {
+                            'textualRating': textual,
+                            'publisher': {'name': 'ML Model'},
+                            'title': 'ML Classification',
+                            'url': None,
+                            'reviewDate': None
+                        }
+                    ]
+                }
+            ]
+        }
+
+        # Evidence: top words (simple heuristic)
+        words = [w.lower() for w in re.findall(r"[A-Za-zÀ-ÿ]{4,}", text)]
+        stop = set(stopwords.words('english')) if 'english' in stopwords._fileids else set()
+        freq: Dict[str, int] = {}
+        for w in words:
+            if w not in stop:
+                freq[w] = freq.get(w, 0) + 1
+        top_keywords = [w for w, _ in sorted(freq.items(), key=lambda x: x[1], reverse=True)[:8]]
+        slang_found = detect_slang_words(text)
+        sarcasm_score, sarcasm_risk = compute_sarcasm_score(text, slang_found)
+        evidence = {
+            'keywords': top_keywords,
+            'sections': ['headline', 'content'] if len(text) > 120 else ['content'],
+            'matched_features': ['slang_detected'] if slang_found else []
+        }
+
+        result.update({
+            'label': label,
+            'confidence': conf,
+            'synthetic_factcheck': synthetic,
+            'evidence': evidence,
+            'slang_found': slang_found,
+            'sarcasm_score': sarcasm_score,
+            'sarcasm_risk': sarcasm_risk
+        })
+        return result
+    except Exception as e:
+        print(f"ML fallback error: {e}")
+        return result
+
+
+# --- ML Endpoints ---
+@app.route('/api/ml-verify', methods=['POST'])
+def api_ml_verify():
+    """Verify news text (or URL) using the trained ML model.
+    Request JSON: { text?: string, url?: string }
+    Response: { status, label, source, model }
+    """
+    if predict_news_label is None:
+        return jsonify({'status': 'error', 'message': 'ML model functions not available'}), 500
+
+    data = request.get_json(force=True) or {}
+    text = data.get('text')
+    url = data.get('url')
+    source = 'text'
+
+    if not text and url:
+        try:
+            html = fetch_url_content(url)
+            text = _html_to_text(html) if html else None
+            source = 'url'
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': f'Failed to fetch URL: {e}'}), 400
+
+    if not text:
+        return jsonify({'status': 'error', 'message': 'Provide text or url'}), 400
+
+    model = load_saved_news_model('news_lr_pipeline.joblib') if load_saved_news_model else None
+    if model is None:
+        return jsonify({'status': 'error', 'message': 'ML model not found. Run training first.'}), 500
+
+    label = predict_news_label(text, model)
+    return jsonify({
+        'status': 'success',
+        'label': label,
+        'source': source,
+        'model': 'news_lr_pipeline.joblib'
+    })
+
+
+@app.route('/api/ml-metrics', methods=['GET'])
+def api_ml_metrics():
+    """Return stored metrics for the trained ML model."""
+    metrics_path = os.path.join(os.path.dirname(__file__), 'models', 'news_lr_metrics.json')
+    if not os.path.exists(metrics_path):
+        return jsonify({'status': 'error', 'message': 'Metrics file not found'}), 404
+    try:
+        with open(metrics_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify({'status': 'success', 'metrics': data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Failed to read metrics: {e}'}), 500
 
 
 def fetch_url_content(url):
@@ -339,7 +551,7 @@ def fact_check_endpoint():
     # Limit to 5 to keep API efficient
     claims = claims[:5]
     
-    # Check each claim
+    # Check each claim via Google Fact Check
     all_results = []
     for claim in claims:
         result = check_claim_with_google_api(claim)
@@ -412,6 +624,55 @@ def fact_check_endpoint():
                         'true', 'mostly true', 'accurate', 'correct'
                     ]):
                         real_claims.append(info)
+
+    # Determine if Google Fact Check produced any claims
+    has_google_claims = any(
+        r.get('fact_check_result') and r['fact_check_result'].get('claims') for r in all_results
+    )
+
+    ml_details = None
+    # ML fallback when no Google claims
+    if not has_google_claims:
+        aggregate_text = f"{title}\n\n{content}\n\n{url or ''}".strip()
+        ml = analyze_with_ml(aggregate_text)
+        ml_details = {
+            'label': ml.get('label'),
+            'confidence': ml.get('confidence'),
+            'evidence': ml.get('evidence')
+        }
+        synthetic = ml.get('synthetic_factcheck')
+        if synthetic:
+            # Add ML as a source
+            sources_set.add('ML Model')
+            # Treat synthetic as another claim to feed scoring
+            all_results.append({
+                'claim': 'ML Classification',
+                'fact_check_result': synthetic
+            })
+            # Also add to claim_analysis for UI
+            try:
+                claims_list = synthetic.get('claims', [])
+                for c in claims_list:
+                    reviews = c.get('claimReview', [])
+                    for review in reviews:
+                        fact_checks_count += 1
+                        rating_text = (review.get('textualRating') or '').lower()
+                        info = {
+                            'claim': c.get('text') or 'Model-detected evidence',
+                            'rating': review.get('textualRating'),
+                            'reviewer': 'ML Model',
+                            'title': review.get('title'),
+                            'url': None,
+                            'reviewDate': None,
+                            'explanation': f"ML classified as {review.get('textualRating')} with confidence { (ml.get('confidence') or 0.0) * 100:.0f}%"
+                        }
+                        claim_analysis.append(info)
+                        if any(word in rating_text for word in ['false']):
+                            fake_claims.append(info)
+                        if any(word in rating_text for word in ['true']):
+                            real_claims.append(info)
+            except Exception as e:
+                print(f"Failed to append ML synthetic claim: {e}")
     
     # Calculate overall credibility
     if scores:
@@ -447,7 +708,12 @@ def fact_check_endpoint():
         "sources": len(sources_set),
         "factChecks": fact_checks_count
     }
-    
+
+    # Slang detection and sarcasm scoring (on combined text)
+    combined_text = f"{title} {content} {url or ''}"
+    slang_found = detect_slang_words(combined_text)
+    sarcasm_score, sarcasm_risk = compute_sarcasm_score(combined_text, slang_found)
+
     return jsonify({
         'status': 'success',
         'credibility': credibility,
@@ -455,7 +721,13 @@ def fact_check_endpoint():
         'detailed_results': all_results,
         'claim_analysis': claim_analysis,
         'fake_claims': fake_claims,
-        'real_claims': real_claims
+        'real_claims': real_claims,
+        'ml_details': ml_details,
+        'slang_detected': slang_found,
+        'sarcasm_score': sarcasm_score,
+        'sarcasm_percent': round(sarcasm_score * 100, 2),
+        'sarcasm_risk': sarcasm_risk,
+        'tone': ('Risk: Potential sarcasm may affect the meaning of the post.' if sarcasm_score >= 0.02 else 'Risk: Low – Not enough slang to indicate sarcasm.')
     })
 
 if __name__ == '__main__':
