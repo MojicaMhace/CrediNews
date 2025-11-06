@@ -30,7 +30,7 @@
                 <li><a href="verify-news.html" class="nav-link">Verify News</a></li>
                 <li><a href="trends.html" class="nav-link active">Trends</a></li>
                 <li><a href="report.html" class="nav-link">Report</a></li>
-                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="about.html" class="nav-link">About</a></li>
 
                 </ul>
             </div>
@@ -38,9 +38,10 @@
     </nav>
 
            <!-- Latest Verified Facebook News Section -->
+    <main class="main-content">
         <section class="latest-news-section">
             <div class="container">
-                <h2 class="section-title">Latest Verified Facebook News</h2>
+                <h1 class="section-title">Latest Verified Facebook News</h1>
                 <div class="news-grid">
                     <div class="news-item">
                         <div class="news-thumbnail">
@@ -135,5 +136,14 @@
                 </div>
             </div>
         </section>
+    </main>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Firebase Configuration -->
+    <script src="firebase-config.js"></script>
 </body>
 </html>

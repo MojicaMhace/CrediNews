@@ -31,7 +31,7 @@
                 <li><a href="verify-news.html" class="nav-link">Verify News</a></li>
                 <li><a href="trends.html" class="nav-link">Trends</a></li>
                 <li><a href="report.html" class="nav-link active">Report</a></li>
-                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="about.html" class="nav-link">About</a></li>
 
                 </ul>
             </div>
@@ -72,5 +72,116 @@
                 </div>
             </div>
         </section>
+
+        <!-- Charts Section (Hardcoded Template) -->
+        <section class="charts-section">
+            <div class="container">
+                <div class="stats-grid" style="gap: 24px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                    <!-- Fake vs Real Doughnut Chart -->
+                    <div class="stat-box" style="padding: 16px 16px 24px;">
+                        <div class="stat-content" style="width: 100%;">
+                            <div class="stat-label" style="font-weight: 600; margin-bottom: 8px;">Fake vs Real (Analyzed)</div>
+                            <div class="stat-number" style="font-size: 20px; margin-bottom: 12px;">Total: 12,847</div>
+                            <canvas id="breakdownChart" height="220"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Total Analyzed Stacked Bar -->
+                    <div class="stat-box" style="padding: 16px 16px 24px;">
+                        <div class="stat-content" style="width: 100%;">
+                            <div class="stat-label" style="font-weight: 600; margin-bottom: 8px;">Total Analyzed Composition</div>
+                            <div class="stat-number" style="font-size: 20px; margin-bottom: 12px;">12,847 = 9,234 Real + 3,613 Fake</div>
+                            <canvas id="totalStackedChart" height="220"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Firebase Configuration -->
+    <script src="firebase-config.js"></script>
+
+    <!-- Hardcoded Charts (Template) -->
+    <script>
+        // Static template data
+        const TOTAL_ANALYZED = 12847;
+        const REAL_COUNT = 9234;
+        const FAKE_COUNT = 3613;
+        const realPct = Math.round((REAL_COUNT / TOTAL_ANALYZED) * 100);
+        const fakePct = Math.round((FAKE_COUNT / TOTAL_ANALYZED) * 100);
+
+        // Doughnut: Fake vs Real
+        const breakdownCtx = document.getElementById('breakdownChart');
+        if (breakdownCtx) {
+            new Chart(breakdownCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [
+                        `Real (${REAL_COUNT.toLocaleString()} | ${realPct}%)`,
+                        `Fake (${FAKE_COUNT.toLocaleString()} | ${fakePct}%)`
+                    ],
+                    datasets: [{
+                        data: [REAL_COUNT, FAKE_COUNT],
+                        backgroundColor: ['#10B981', '#EF4444'],
+                        hoverBackgroundColor: ['#059669', '#DC2626'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    cutout: '60%'
+                }
+            });
+        }
+
+        // Horizontal stacked bar: total composed of real and fake
+        const stackedCtx = document.getElementById('totalStackedChart');
+        if (stackedCtx) {
+            new Chart(stackedCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Analyzed'],
+                    datasets: [
+                        {
+                            label: `Real (${realPct}%)`,
+                            data: [REAL_COUNT],
+                            backgroundColor: '#10B981'
+                        },
+                        {
+                            label: `Fake (${fakePct}%)`,
+                            data: [FAKE_COUNT],
+                            backgroundColor: '#EF4444'
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    responsive: true,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: {
+                                callback: function(value) { return value.toLocaleString(); }
+                            },
+                            max: TOTAL_ANALYZED
+                        },
+                        y: { stacked: true }
+                    }
+                }
+            });
+        }
+    </script>
+    
+        
 </body>
-</html>
+ </html>
