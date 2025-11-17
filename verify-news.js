@@ -29,11 +29,38 @@ async function handleUrlVerification() {
     urlVerifyBtn.disabled = true;
     urlVerifyBtn.textContent = 'Verifying...';
     
+    let effectiveContent = '';
+    // Try to extract key claim from URL first
+    try {
+        const kcResp = await fetch('http://127.0.0.1:5000/api/extract-key-claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+        if (kcResp.ok) {
+            const kcData = await kcResp.json();
+            const keyClaim = (kcData && typeof kcData.key_claim === 'string') ? kcData.key_claim.trim() : '';
+            if (keyClaim) {
+                effectiveContent = keyClaim;
+            }
+        }
+    } catch (e) {
+        console.error('Key claim extraction failed:', e);
+    }
+
+    // If we couldn't extract any content from the URL, block verification
+    if (!effectiveContent) {
+        showNotification('We couldn\'t retrieve any content from this link. It may be private, removed, or blocking access. Please paste the text or try another link.', 'error');
+        urlVerifyBtn.disabled = false;
+        urlVerifyBtn.textContent = 'Verify URL';
+        return;
+    }
+
     try {
         const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: '', content: `URL: ${url}`, url })
+            body: JSON.stringify({ title: '', content: effectiveContent || '', url })
         });
         if (!fcResp.ok) throw new Error(`API error: ${fcResp.status}`);
         const result = await fcResp.json();
@@ -45,7 +72,8 @@ async function handleUrlVerification() {
             sources: (result.credibility && result.credibility.sources) ?? 0,
             factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
             domain: extractDomain(url),
-            credibilityExplanation: result.credibility && result.credibility.explanation,
+            // Prefer Zyla's explanation/reason when available; fallback to overall explanation
+            credibilityExplanation: (result.zyla && (result.zyla.explanation || result.zyla.analysis)) || (result.credibility && result.credibility.explanation),
             credibilityLabel: result.credibility && result.credibility.label,
             mlDetails: result.ml_details || null,
             slangDetected: Array.isArray(result.slang_detected) ? result.slang_detected : [],
@@ -55,7 +83,8 @@ async function handleUrlVerification() {
             fakeClaims: Array.isArray(result.fake_claims) ? result.fake_claims : [],
             realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
-            claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : []
+            claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : [],
+            hasGoogleClaims: !!result.has_google_claims
         });
     } catch (error) {
         console.error('Verification error:', error);
@@ -84,6 +113,24 @@ function extractDomain(url) {
         return 'Unknown';
     }
 }
+// Build a non-empty, human-readable sentence from a URL
+function buildNonEmptyContentFromUrl(url) {
+    try {
+        const u = new URL(url);
+        const domain = (u.hostname || '').replace(/^www\./, '');
+        const rawSegs = (u.pathname || '').split('/').filter(Boolean);
+        const segs = rawSegs
+            .map(s => decodeURIComponent(s))
+            .filter(s => s.length >= 3 && !/^amp$|^m$|^en$|^index\b/i.test(s));
+        const candidate = (segs[segs.length - 1] || segs[0] || '').replace(/[-_]+/g, ' ').trim();
+        const topic = candidate || domain;
+        const capped = topic.charAt(0).toUpperCase() + topic.slice(1);
+        const trimmed = capped.length > 160 ? capped.slice(0, 160) : capped;
+        return trimmed ? `Context from ${domain}: ${trimmed}.` : `Context from ${domain}.`;
+    } catch (e) {
+        return 'Context from provided link.';
+    }
+}
 
 // Facebook URL validation
 function isFacebookUrl(url) {
@@ -99,9 +146,26 @@ function isFacebookUrl(url) {
     }
 }
 
+// Require a direct Facebook post/permalink URL we can extract from
+function isSupportedFacebookPostUrl(url) {
+    try {
+        const u = new URL(url);
+        const p = u.pathname.toLowerCase();
+        const q = u.search.toLowerCase();
+        return (
+            /\/share\/p\//.test(p) ||
+            /\/posts\//.test(p) ||
+            /\/permalink\//.test(p) ||
+            (/\/photo\.php/.test(p) && /fbid=\d+/.test(q))
+        );
+    } catch (_) {
+        return false;
+    }
+}
+
 // Facebook content quality validation
 // Blocks random letters or low-context input from being verified
-function isMeaningfulFacebookContent(text) {
+function isValidFacebookContent(text) {
     const t = (text || '').trim();
     // Require sufficient length
     if (t.length < 60) return false;
@@ -119,7 +183,7 @@ function isMeaningfulFacebookContent(text) {
 }
 
 // Word-based validation and preprocessing utilities
-function extractMeaningfulWords(text) {
+function extractValidWords(text) {
     if (!text) return [];
     const lower = text.toLowerCase().replace(/\s+/g, ' ').trim();
     const tokens = lower.match(/[a-z][a-z'\-]*/g) || [];
@@ -135,17 +199,17 @@ function extractMeaningfulWords(text) {
     });
 }
 
-function countMeaningfulWords(text) {
-    return extractMeaningfulWords(text).length;
+function countValidWords(text) {
+    return extractValidWords(text).length;
 }
 
 function preprocessTextForAnalysis(text) {
-    const words = extractMeaningfulWords(text);
+    const words = extractValidWords(text);
     return words.join(' ');
 }
 
 // Facebook verification handler
-function handleFacebookVerification() {
+async function handleFacebookVerification() {
     console.log('Facebook verification started');
     console.log('facebookUrl element:', facebookUrl);
     console.log('facebookContent element:', facebookContent);
@@ -172,18 +236,18 @@ function handleFacebookVerification() {
         showNotification('Please enter a valid Facebook URL (facebook.com).', 'error');
         return;
     }
-    
-    // Validate content quality ONLY when verifying content (no URL provided)
-    if (!url && content && !isMeaningfulFacebookContent(content)) {
-        showNotification('Please enter valid Facebook content (min of 30 meaningful words).', 'error');
+    // Enforce supported post/permalink URL formats
+    if (url && !isSupportedFacebookPostUrl(url)) {
+        showNotification('Unsupported Facebook URL. Please paste a direct post/permalink link (e.g., https://facebook.com/share/p/...).', 'error');
         return;
     }
-
-    // Require at least 30 meaningful words ONLY for content-only verification
-    if (!url && content) {
-        const meaningfulCount = countMeaningfulWords(content);
-        if (meaningfulCount < 30) {
-            showNotification('Please enter at least 30 words in Facebook content.', 'error');
+    
+    // Validate content quality whenever content is provided (even when a valid URL exists)
+    if (content) {
+        const validCount = countValidWords(content);
+        const passesQuality = isValidFacebookContent(content);
+        if (!passesQuality || validCount < 14) {
+            showNotification('Content is invalid or too short. Please enter at least 14 valid words.', 'error');
             return;
         }
     }
@@ -206,25 +270,55 @@ function handleFacebookVerification() {
         });
     }
     
-    // Call the fact check API for Facebook content
-    fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            title: 'Facebook Content',
-            content: content ? preprocessTextForAnalysis(content) : `Facebook URL: ${url}`,
-            url: url || null
-        })
-    })
-    .then(response => {
+    // If URL provided but no content, extract key claim from URL (frontend intelligence)
+    let effectiveContent = content ? preprocessTextForAnalysis(content) : '';
+    if (url && !effectiveContent) {
+        try {
+            const resp = await fetch('http://127.0.0.1:5000/api/extract-key-claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                const keyClaim = (data && typeof data.key_claim === 'string') ? data.key_claim.trim() : '';
+                if (keyClaim) {
+                    effectiveContent = keyClaim;
+                }
+            }
+        } catch (e) {
+            console.error('Key claim extraction failed:', e);
+        }
+    }
+    // If we still have no content from the link, block verification
+    if (url && !effectiveContent) {
+        showNotification('We couldn\'t retrieve any content from this Facebook link. The post may be private or removed. Paste the text or use another link.', 'error');
+        facebookVerifyBtn.disabled = false;
+        facebookVerifyBtn.innerHTML = '<i class="fab fa-facebook"></i> Analyze Facebook Content';
+        return;
+    }
+
+    // Build the exact content string we will send to the API
+    const contentForApi = effectiveContent || '';
+
+    // Call the fact check API with the best available content
+    try {
+        const response = await fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: 'Facebook Content',
+                content: contentForApi,
+                url: url || null
+            })
+        });
         if (!response.ok) {
             throw new Error(`API error: ${response.status}`);
         }
-        return response.json();
-    })
-    .then(result => {
+        const result = await response.json();
+
         const analysisType = url ? 'facebook-url' : 'facebook-content';
         
         // Use credibility score directly
@@ -237,8 +331,10 @@ function handleFacebookVerification() {
             platform: 'Facebook',
             contentType: url ? 'Post/Article URL' : 'Text Content',
             url: url || null,
-            credibilityExplanation: result.credibility.explanation,
+            // Prefer Zyla's explanation/reason when available; fallback to overall explanation
+            credibilityExplanation: (result.zyla && (result.zyla.explanation || result.zyla.analysis)) || (result.credibility && result.credibility.explanation),
             credibilityLabel: result.credibility.label,
+            analyzedText: contentForApi,
             mlDetails: result.ml_details || null,
             slangDetected: Array.isArray(result.slang_detected) ? result.slang_detected : [],
             sarcasmPercent: (typeof result.sarcasm_percent === 'number') ? result.sarcasm_percent : null,
@@ -247,56 +343,63 @@ function handleFacebookVerification() {
             fakeClaims: Array.isArray(result.fake_claims) ? result.fake_claims : [],
             realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
-            claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : []
+            claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : [],
+            hasGoogleClaims: !!result.has_google_claims
         });
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Fact check API error:', error);
         showNotification('Error connecting to fact check service. Please try again later.', 'error');
-    })
-    .finally(() => {
+    } finally {
         // Reset button
         facebookVerifyBtn.disabled = false;
         facebookVerifyBtn.innerHTML = '<i class="fab fa-facebook"></i> Analyze Facebook Content';
-    });
+    }
 }
 
 // Show Facebook verification results
 function showFacebookVerificationResult(type, data) {
-    const fakeClaimsSection = (Array.isArray(data.fakeClaims) && data.fakeClaims.length > 0) ? `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Fake Claims Identified</h4>
-            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
-                ${data.fakeClaims.slice(0, 2).map(fc => `
-                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
-                        <div><strong>Claim:</strong> ${fc.claim || 'N/A'}</div>
-                        <div><strong>Explanation:</strong> ${fc.explanation || 'No explanation'}</div>
-                        ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : ''}
-                    </li>
-                `).join('')}
-            </ul>
-        </div>
-    ` : '';
+    const hasGoogle = !!data.hasGoogleClaims;
+    const googleFake = (Array.isArray(data.fakeClaims) ? data.fakeClaims : []).filter(c => (c && c.source) === 'google');
+    const googleReal = (Array.isArray(data.realClaims) ? data.realClaims : []).filter(c => (c && c.source) === 'google');
 
-    const realClaimsSection = (Array.isArray(data.realClaims) && data.realClaims.length > 0) ? `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">True Claims Identified</h4>
-            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
-                ${data.realClaims.slice(0, 2).map(rc => `
-                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
-                        <div><strong>Claim:</strong> ${rc.claim || 'N/A'}</div>
-                        <div><strong>Explanation:</strong> ${rc.explanation || 'No explanation'}</div>
-                        ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : ''}
-                    </li>
-                `).join('')}
-            </ul>
-        </div>
-    ` : '';
+    const fakeClaimsSection = (!hasGoogle || googleFake.length === 0) ? '' : `
+            <div style="margin-top:0.75rem;">
+                <h4 style="margin:0 0 0.5rem 0;">Fake Claims Identified</h4>
+                <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                    ${googleFake.slice(0, 2).map(fc => `
+                        <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                            <div><strong>Claim:</strong> ${safeTextForHtml(fc.claim || 'N/A')}</div>
+                            <div><strong>Reviewer:</strong> ${safeTextForHtml(fc.reviewer || 'Unknown reviewer')}</div>
+                            <div><strong>Title:</strong> ${safeTextForHtml(fc.rating || fc.textualRating || 'Unrated')}</div>
+                            <div><strong>Explanation:</strong> ${safeTextForHtml(fc.explanation || 'No explanation')}</div>
+                            ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+    `;
+
+    const realClaimsSection = (!hasGoogle || googleReal.length === 0) ? '' : `
+            <div style="margin-top:0.75rem;">
+                <h4 style="margin:0 0 0.5rem 0;">True Claims Identified</h4>
+                <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                    ${googleReal.slice(0, 2).map(rc => `
+                        <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                            <div><strong>Claim:</strong> ${safeTextForHtml(rc.claim || 'N/A')}</div>
+                            <div><strong>Reviewer:</strong> ${safeTextForHtml(rc.reviewer || 'Unknown reviewer')}</div>
+                            <div><strong>Title:</strong> ${safeTextForHtml(rc.rating || rc.textualRating || 'Unrated')}</div>
+                            <div><strong>Explanation:</strong> ${safeTextForHtml(rc.explanation || 'No explanation')}</div>
+                            ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+    `;
 
     const explanationSection = data.credibilityExplanation ? `
         <div class="result-summary" style="margin-top:1rem;">
             <h4 style="margin:0 0 0.5rem 0;">Explanation</h4>
-            <p>${data.credibilityExplanation}</p>
+            <p>${safeTextForHtml(data.credibilityExplanation)}</p>
         </div>
     ` : '';
 
@@ -318,6 +421,79 @@ function showFacebookVerificationResult(type, data) {
         </div>
     ` : '');
 
+    // Build a combined fact-check details list as fallback when real/fake lists are empty
+    const combinedClaimsRaw = [
+        ...(Array.isArray(data.claimsChecked) ? data.claimsChecked : []),
+        ...(Array.isArray(data.claimAnalysis) ? data.claimAnalysis : [])
+    ];
+    const seenClaims = new Set();
+    const combinedClaims = combinedClaimsRaw
+        .map(c => ({
+            claim: (c.claim || c.text || c.statement || '').trim(),
+            explanation: c.explanation || '',
+            url: c.url || '',
+            reviewer: c.reviewer || ((c.publisher && c.publisher.name) ? c.publisher.name : ''),
+            rating: c.rating || c.textualRating || '',
+            source: c.source || ''
+        }))
+        .filter(c => c.claim)
+        .filter(c => {
+            const key = `${c.claim.toLowerCase()}|${c.url}`;
+            if (seenClaims.has(key)) return false;
+            seenClaims.add(key);
+            return true;
+        })
+        .slice(0, 4);
+
+    const label = (data.credibilityLabel || '').toUpperCase();
+    const claimsOrderHtml = `${realClaimsSection}${fakeClaimsSection}`;
+    const googleCombined = combinedClaims.filter(c => c.source === 'google' || (c.url && c.reviewer && !/^(ML Model|Zyla Labs)$/i.test(c.reviewer)));
+    // Fallback to ML/Zyla when Google has no claims
+    const fallbackCombined = googleCombined.length > 0 ? [] : combinedClaims.filter(c => (
+        c.source === 'ml' || c.source === 'zyla' || /^(ML Model)$/i.test(c.reviewer) || (c.url && c.reviewer)
+    ));
+    const activeCombined = googleCombined.length > 0 ? googleCombined : fallbackCombined;
+    // Only show Sources when Google claimReview URLs exist
+    const hasGoogleUrl = googleCombined.some(c => !!c.url);
+
+    const reviewedClaimsSection = (activeCombined.length > 0) ? `
+        <div style="margin-top:0.75rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Reviewed Claims</h4>
+            ${googleCombined.length === 0 ? `<div style="margin:0 0 0.5rem 0; color:#6b7280; font-size:0.9rem;">No Google Fact Check reviews found; showing other analysis sources.</div>` : ''}
+            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                ${activeCombined.map(c => `
+                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                        <div><strong>Claim:</strong> ${safeTextForHtml(c.claim || 'N/A')}</div>
+                        <div><strong>Reviewer:</strong> ${safeTextForHtml(c.reviewer || 'Unknown reviewer')}</div>
+                        <div><strong>Title:</strong> ${safeTextForHtml(c.rating || 'Unrated')}</div>
+                        <div><strong>Explanation:</strong> ${safeTextForHtml(c.explanation || 'No explanation')}</div>
+                        ${c.url ? `<div><a href="${c.url}" target="_blank">View fact check</a></div>` : (c.source === 'google' ? `<div><em>No fact-check URL available.</em></div>` : ``)}
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    ` : '';
+
+    const factCheckDetailsSection = `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Fact-Check Claims</h4>
+            ${claimsOrderHtml}
+            ${reviewedClaimsSection}
+            ${(hasGoogleUrl) ? `
+                <div style="margin-top:0.75rem;">
+                    <h4 style="margin:0 0 0.5rem 0;">Sources:</h4>
+                    <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                        ${googleCombined.map(c => c.url ? `
+                            <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                                <div><a href="${c.url}" target="_blank">View fact check</a></div>
+                            </li>
+                        ` : '').join('')}
+                    </ul>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
     const resultHtml = `
         <div class="verification-result facebook-result">
             <div class="result-header">
@@ -328,12 +504,12 @@ function showFacebookVerificationResult(type, data) {
                 <div class="content-type">${data.contentType || 'Post'}</div>
             </div>
             <div class="result-score">
-                <div class="score-circle score-${getScoreClass(data.credibilityScore)}">
+                <div class="score-circle score-${getScoreClassByLabel(data.credibilityLabel)}">
                     <span class="score-number">${data.credibilityScore}</span>
                     <span class="score-label">%</span>
                 </div>
                 <div class="score-description">
-                    <h3>Credibility Score (${data.credibilityLabel || ''})</h3>
+                    <h3>CREDIBILITY SCORE - <span class="credibility-label ${getCredibilityClass(data.credibilityLabel)}">${data.credibilityLabel || ''}</span></h3>
                     <p>${getFacebookScoreSummary(data.credibilityScore)}</p>
                 </div>
             </div>
@@ -357,13 +533,36 @@ function showFacebookVerificationResult(type, data) {
                 </div>
                 ` : ''}
             </div>
-            <div class="result-summary facebook-summary">
-                <p>${getFacebookDetailedSummary(data)}</p>
-            </div>
+            ${data.analyzedText ? `
+            <div class="result-summary analyzed-text ${getHighlightClassByLabel(data.credibilityLabel)}">
+                <h4 style="margin:0 0 0.5rem 0;">Analyzed Text</h4>
+                <p>${safeTextForHtml(data.analyzedText)}</p>
+            </div>` : ''}
             ${explanationSection}
             ${slangSection}
-            ${realClaimsSection}
-            ${fakeClaimsSection}
+            ${factCheckDetailsSection}
+            <div class="feedback-section" 
+                 data-analysis="${type}"
+                 data-platform="facebook"
+                 data-url="${data.url || ''}"
+                 data-content-type="${data.contentType || 'Post'}"
+                 data-score="${data.credibilityScore}"
+                 data-label="${data.credibilityLabel || ''}">
+                <div class="feedback-header">
+                    <i class="far fa-comment-dots"></i>
+                    <span>Share your feedback</span>
+                </div>
+                <div class="feedback-controls">
+                    <button class="feedback-btn" type="button" data-feedback="agree">
+                        <i class="fas fa-thumbs-up"></i>
+                        <span>Agree</span>
+                    </button>
+                    <button class="feedback-btn" type="button" data-feedback="disagree">
+                        <i class="fas fa-thumbs-down"></i>
+                        <span>Disagree</span>
+                    </button>
+                </div>
+            </div>
         </div>
     `;
     
@@ -373,15 +572,13 @@ function showFacebookVerificationResult(type, data) {
 
 // Get Facebook-specific score summary
 function getFacebookScoreSummary(score) {
-    if (score >= 80) {
-        return 'Credible - Content appears reliable and trustworthy';
+    if (score >= 70) {
+        return 'The content aligns with verified information and shows no signs of misinformation.';
     } else if (score >= 50) {
-        return 'Mixed - Some concerns identified, verify with additional sources';
-    } else if (score >= 30) {
-        return 'Likely Fake - Multiple red flags detected, approach with caution';
+        return 'Contains both reliable and questionable information. Consider cross-referencing with additional sources.';
     } else {
-        return 'low credibility - High likelihood of misinformation';
-    }
+        return 'This post may contain false or misleading information. Please verify before sharing.';
+    } 
 }
 
 // Get detailed Facebook analysis summary
@@ -413,35 +610,43 @@ async function showVerificationResult(type, data) {
         console.error('Error storing verification result:', error);
     }
     
-    const fakeClaimsSection = (Array.isArray(data.fakeClaims) && data.fakeClaims.length > 0) ? `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Fake Claims Identified</h4>
-            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
-                ${data.fakeClaims.slice(0, 2).map(fc => `
-                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
-                        <div><strong>Claim:</strong> ${fc.claim || 'N/A'}</div>
-                        <div><strong>Explanation:</strong> ${fc.explanation || 'No explanation'}</div>
-                        ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : ''}
-                    </li>
-                `).join('')}
-            </ul>
-        </div>
-    ` : '';
+    const hasGoogle = !!data.hasGoogleClaims;
+    const googleFake = (Array.isArray(data.fakeClaims) ? data.fakeClaims : []).filter(c => (c && c.source) === 'google');
+    const googleReal = (Array.isArray(data.realClaims) ? data.realClaims : []).filter(c => (c && c.source) === 'google');
 
-    const realClaimsSection = (Array.isArray(data.realClaims) && data.realClaims.length > 0) ? `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">True Claims Identified</h4>
-            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
-                ${data.realClaims.slice(0, 2).map(rc => `
-                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
-                        <div><strong>Claim:</strong> ${rc.claim || 'N/A'}</div>
-                        <div><strong>Explanation:</strong> ${rc.explanation || 'No explanation'}</div>
-                        ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : ''}
-                    </li>
-                `).join('')}
-            </ul>
-        </div>
-    ` : '';
+    const fakeClaimsSection = (!hasGoogle || googleFake.length === 0) ? '' : `
+            <div style="margin-top:0.75rem;">
+                <h4 style="margin:0 0 0.5rem 0;">Fake Claims Identified</h4>
+                <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                    ${googleFake.slice(0, 2).map(fc => `
+                        <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                            <div><strong>Claim:</strong> ${safeTextForHtml(fc.claim || 'N/A')}</div>
+                            <div><strong>Reviewer:</strong> ${safeTextForHtml(fc.reviewer || 'Unknown reviewer')}</div>
+                            <div><strong>Title:</strong> ${safeTextForHtml(fc.rating || fc.textualRating || 'Unrated')}</div>
+                            <div><strong>Explanation:</strong> ${safeTextForHtml(fc.explanation || 'No explanation')}</div>
+                            ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+    `;
+
+    const realClaimsSection = (!hasGoogle || googleReal.length === 0) ? '' : `
+            <div style="margin-top:0.75rem;">
+                <h4 style="margin:0 0 0.5rem 0;">True Claims Identified</h4>
+                <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                    ${googleReal.slice(0, 2).map(rc => `
+                        <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                            <div><strong>Claim:</strong> ${safeTextForHtml(rc.claim || 'N/A')}</div>
+                            <div><strong>Reviewer:</strong> ${safeTextForHtml(rc.reviewer || 'Unknown reviewer')}</div>
+                            <div><strong>Title:</strong> ${safeTextForHtml(rc.rating || rc.textualRating || 'Unrated')}</div>
+                            <div><strong>Explanation:</strong> ${safeTextForHtml(rc.explanation || 'No explanation')}</div>
+                            ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+    `;
 
     const explanationSection = data.credibilityExplanation ? `
         <div class="result-summary" style="margin-top:1rem;">
@@ -468,6 +673,79 @@ async function showVerificationResult(type, data) {
         </div>
     ` : '');
     
+    // Build sources-only fallback if no claims
+    const combinedClaimsRaw = [
+        ...(Array.isArray(data.claimsChecked) ? data.claimsChecked : []),
+        ...(Array.isArray(data.claimAnalysis) ? data.claimAnalysis : [])
+    ];
+    const seenClaims = new Set();
+    const combinedClaims = combinedClaimsRaw
+        .map(c => ({
+            claim: (c.claim || c.text || c.statement || '').trim(),
+            explanation: c.explanation || '',
+            url: c.url || '',
+            reviewer: c.reviewer || ((c.publisher && c.publisher.name) ? c.publisher.name : ''),
+            rating: c.rating || c.textualRating || '',
+            source: c.source || ''
+        }))
+        .filter(c => c.claim)
+        .filter(c => {
+            const key = `${c.claim.toLowerCase()}|${c.url}`;
+            if (seenClaims.has(key)) return false;
+            seenClaims.add(key);
+            return true;
+        })
+        .slice(0, 4);
+
+    const label2 = (data.credibilityLabel || '').toUpperCase();
+    const claimsOrderHtml2 = `${realClaimsSection}${fakeClaimsSection}`;
+    const googleCombined2 = combinedClaims.filter(c => c.source === 'google' || (c.url && c.reviewer && !/^(ML Model|Zyla Labs)$/i.test(c.reviewer)));
+    // Fallback to ML/Zyla when Google has no claims
+    const fallbackCombined2 = googleCombined2.length > 0 ? [] : combinedClaims.filter(c => (
+        c.source === 'ml' || c.source === 'zyla' || /^(ML Model)$/i.test(c.reviewer) || (c.url && c.reviewer)
+    ));
+    const activeCombined2 = googleCombined2.length > 0 ? googleCombined2 : fallbackCombined2;
+    // Only show Sources when Google claimReview URLs exist
+    const hasGoogleUrl2 = googleCombined2.some(c => !!c.url);
+
+    const reviewedClaimsSection2 = (activeCombined2.length > 0) ? `
+        <div style="margin-top:0.75rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Reviewed Claims</h4>
+            ${googleCombined2.length === 0 ? `<div style=\"margin:0 0 0.5rem 0; color:#6b7280; font-size:0.9rem;\">No Google Fact Check reviews found; showing other analysis sources.</div>` : ''}
+            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                ${activeCombined2.map(c => `
+                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                        <div><strong>Claim:</strong> ${safeTextForHtml(c.claim || 'N/A')}</div>
+                        <div><strong>Reviewer:</strong> ${safeTextForHtml(c.reviewer || 'Unknown reviewer')}</div>
+                        <div><strong>Title:</strong> ${safeTextForHtml(c.rating || 'Unrated')}</div>
+                        <div><strong>Explanation:</strong> ${safeTextForHtml(c.explanation || 'No explanation')}</div>
+                        ${c.url ? `<div><a href="${c.url}" target="_blank">View fact check</a></div>` : (c.source === 'google' ? `<div><em>No fact-check URL available.</em></div>` : ``)}
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    ` : '';
+
+    const factCheckDetailsSection = `
+        <div class="result-summary" style="margin-top:1rem;">
+            <h4 style="margin:0 0 0.5rem 0;">Fact-Check Claims</h4>
+            ${claimsOrderHtml2}
+            ${reviewedClaimsSection2}
+            ${(hasGoogleUrl2) ? `
+                <div style="margin-top:0.75rem;">
+                    <h4 style="margin:0 0 0.5rem 0;">Sources:</h4>
+                    <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+                        ${googleCombined2.map(c => c.url ? `
+                            <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                                <div><a href="${c.url}" target="_blank">View fact check</a></div>
+                            </li>
+                        ` : '').join('')}
+                    </ul>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
     const resultHtml = `
         <div class="verification-result url-result">
             <div class="result-header">
@@ -478,12 +756,12 @@ async function showVerificationResult(type, data) {
                 <div class="content-type">${data.domain || 'Article'}</div>
             </div>
             <div class="result-score">
-                <div class="score-circle score-${getScoreClass(data.credibilityScore)}">
+                <div class="score-circle score-${getScoreClassByLabel(data.credibilityLabel)}">
                     <span class="score-number">${data.credibilityScore}</span>
                     <span class="score-label">%</span>
                 </div>
                 <div class="score-description">
-                    <h3>Credibility Score (${data.credibilityLabel || ''})</h3>
+                    <h3>CREDIBILITY SCORE - <span class="credibility-label ${getCredibilityClass(data.credibilityLabel)}">${data.credibilityLabel || ''}</span></h3>
                     <p>${getScoreSummary(data.credibilityScore)}</p>
                 </div>
             </div>
@@ -508,28 +786,37 @@ async function showVerificationResult(type, data) {
                 </div>
                 ` : ''}
             </div>
-            <div class="analysis-features">
-                <h4>Analysis Features Used:</h4>
-                <div class="feature-list">
-                    <div class="feature-item enabled">
-                        <i class="fas fa-link"></i>
-                        <span>Link Verification</span>
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="feature-item enabled">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>Source Credibility</span>
-                        <i class="fas fa-check"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="result-summary">
-                <p>${getScoreSummary(data.credibilityScore)}</p>
-            </div>
+            ${data.analyzedText ? `
+            <div class="result-summary analyzed-text ${getHighlightClassByLabel(data.credibilityLabel)}">
+                <h4 style="margin:0 0 0.5rem 0;">Analyzed Text</h4>
+                <p>${safeTextForHtml(data.analyzedText)}</p>
+            </div>` : ''}
+
             ${explanationSection}
             ${slangSection}
-            ${realClaimsSection}
-            ${fakeClaimsSection}
+            ${factCheckDetailsSection}
+            <div class="feedback-section" 
+                 data-analysis="${type}"
+                 data-platform="web"
+                 data-url="${type === 'url' && articleUrl && articleUrl.value ? articleUrl.value : (data.url || '')}"
+                 data-content-type="${data.domain || 'Article'}"
+                 data-score="${data.credibilityScore}"
+                 data-label="${data.credibilityLabel || ''}">
+                <div class="feedback-header">
+                    <i class="far fa-comment-dots"></i>
+                    <span>Share your feedback</span>
+                </div>
+                <div class="feedback-controls">
+                    <button class="feedback-btn" type="button" data-feedback="agree">
+                        <i class="fas fa-thumbs-up"></i>
+                        <span>Agree</span>
+                    </button>
+                    <button class="feedback-btn" type="button" data-feedback="disagree">
+                        <i class="fas fa-thumbs-down"></i>
+                        <span>Disagree</span>
+                    </button>
+                </div>
+            </div>
         </div>
     `;
     
@@ -539,20 +826,74 @@ async function showVerificationResult(type, data) {
 
 // Get score class for styling
 function getScoreClass(score) {
-    if (score >= 80) return 'high';
+    if (score >= 70) return 'high';
     if (score >= 50) return 'medium';
+    return 'low';
+}
+
+// Get score class based on label (requested behavior)
+function getScoreClassByLabel(label) {
+    const t = String(label || '').trim().toLowerCase();
+    if (!t) return 'low';
+    if (t === 'credible') return 'high';
+    if (t === 'mixed') return 'medium';
+    if (t.includes('low credibility') || t.includes('unverified')) return 'low';
     return 'low';
 }
 
 // Get score summary text
 function getScoreSummary(score) {
-    if (score >= 80) {
-        return 'This content appears to be highly credible based on our analysis.';
-    } else if (score >= 60) {
-        return 'This content shows moderate credibility. Consider cross-referencing with additional sources.';
+    if (score >= 70) {
+        return 'The content aligns with verified information and shows no signs of misinformation.';
+    } else if (score >= 50) {
+        return 'Contains both reliable and questionable information. Consider cross-referencing with additional sources.';
     } else {
-        return 'This content shows low credibility. We recommend verifying with multiple reliable sources.';
+        return 'This post may contain false or misleading information. Please verify before sharing.';
     }
+}
+
+// Map verdict label text to credibility color classes (CREDIBLE/MIXED/LOW CREDIBILITY)
+function getCredibilityClass(label) {
+    const t = String(label || '').trim().toLowerCase();
+    if (!t) return '';
+    if (t === 'low credibility' || t.includes('low credibility')) return 'low-credibility';
+    if (t === 'credible') return 'high-credibility';
+    if (t === 'mixed' || t.includes('unverified')) return 'medium-credibility';
+    return '';
+}
+
+// Highlight class for analyzed text based on label
+function getHighlightClassByLabel(label) {
+    const t = String(label || '').trim().toLowerCase();
+    if (!t) return 'highlight-low';
+    if (t === 'credible') return 'highlight-high';
+    if (t === 'mixed') return 'highlight-medium';
+    if (t.includes('low credibility') || t.includes('unverified')) return 'highlight-low';
+    return 'highlight-low';
+}
+
+// Decode incoming HTML entities (e.g., &quot;, &#x2019;) to plain text
+function decodeHtmlEntities(str) {
+    const t = document.createElement('textarea');
+    t.innerHTML = String(str || '');
+    return t.value;
+}
+
+// Normalize curly “smart” quotes to straight quotes for consistency
+function normalizeSmartQuotes(str) {
+    return String(str)
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"');
+}
+
+// Escape for HTML context without converting quotes, so they display correctly
+function safeTextForHtml(str) {
+    const decoded = decodeHtmlEntities(str);
+    const normalized = normalizeSmartQuotes(decoded);
+    return String(normalized)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 // Show notification
@@ -600,25 +941,64 @@ function showModal(title, content) {
 
 // Close modal
 function closeModal() {
-    const modal = document.getElementById('verificationModal');
-    if (modal) {
-        modal.remove();
+  const modal = document.getElementById('verificationModal');
+  if (modal) {
+    modal.remove();
+    // Trigger feedback popup only on first verification close
+    try {
+      if (window.Feedback && typeof window.Feedback.promptIfFirstTime === 'function') {
+        window.Feedback.promptIfFirstTime();
+      }
+    } catch (e) {
+      console.warn('Feedback prompt failed:', e);
     }
+  }
 }
 
-// Facebook character counter
+// Facebook word counter (max 2000 words)
 function updateFacebookCharacterCount() {
     if (facebookContent && facebookCharCount) {
-        const currentLength = facebookContent.value.length;
-        facebookCharCount.textContent = currentLength;
-        
-        // Change color based on character count
-        if (currentLength > 2800) {
-            facebookCharCount.style.color = '#ef4444';
-        } else if (currentLength > 2500) {
-            facebookCharCount.style.color = '#f59e0b';
+        // Split by whitespace and filter out empty entries
+        let words = facebookContent.value.trim().split(/\s+/).filter(Boolean);
+        let currentWords = words.length;
+
+        // Enforce 2000-word maximum by truncating excess words
+        if (currentWords > 2000) {
+            words = words.slice(0, 2000);
+            facebookContent.value = words.join(' ');
+            currentWords = 2000;
+        }
+
+        // Update counter text with current word count
+        facebookCharCount.textContent = currentWords;
+
+        // Change color based on word count (soft warnings near the limit)
+        if (currentWords > 1900) {
+            facebookCharCount.style.color = '#ef4444'; // danger near limit
+        } else if (currentWords > 1800) {
+            facebookCharCount.style.color = '#f59e0b'; // warning approaching limit
         } else {
-            facebookCharCount.style.color = '#6b7280';
+            facebookCharCount.style.color = '#6b7280'; // neutral
+        }
+
+        // Button gating: enable when either valid URL OR ≥14 valid words
+        // If content is present but <14, keep disabled even if URL exists
+        if (facebookVerifyBtn) {
+            const urlText = facebookUrl ? facebookUrl.value.trim() : '';
+            const validUrl = !!urlText && isValidUrl(urlText) && isFacebookUrl(urlText);
+            const contentText = facebookContent ? facebookContent.value.trim() : '';
+            const validCount = countValidWords(contentText);
+
+            if (contentText) {
+                facebookVerifyBtn.disabled = validCount < 14;
+                facebookVerifyBtn.title = validCount < 14 ? 'Enter at least 14 valid words to analyze.' : '';
+            } else if (validUrl) {
+                facebookVerifyBtn.disabled = false;
+                facebookVerifyBtn.title = '';
+            } else {
+                facebookVerifyBtn.disabled = true;
+                facebookVerifyBtn.title = 'Provide a valid Facebook URL or at least 14 words.';
+            }
         }
     }
 }
@@ -644,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Facebook verify button not found!');
     }
     
-    // Character counter for Facebook content
+    // Word counter for Facebook content
     if (facebookContent) {
         facebookContent.addEventListener('input', updateFacebookCharacterCount);
     }
@@ -702,6 +1082,63 @@ document.addEventListener('DOMContentLoaded', function() {
             closeModal();
         }
     });
+});
+
+// Feedback interactions: like/dislike selection and submit
+document.addEventListener('click', function(e) {
+    // Toggle agree/disagree selection
+    const fbBtn = e.target.closest('.feedback-btn');
+    if (fbBtn) {
+        const section = fbBtn.closest('.feedback-section');
+        if (section) {
+            section.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('selected'));
+            fbBtn.classList.add('selected');
+        }
+    }
+
+    // Submit feedback
+    const submitBtn = e.target.closest('.submit-feedback-btn');
+    if (submitBtn) {
+        const section = submitBtn.closest('.feedback-section');
+        if (!section) return;
+        const selectedBtn = section.querySelector('.feedback-btn.selected');
+        const feedbackChoice = selectedBtn ? selectedBtn.dataset.feedback : null;
+        const commentEl = section.querySelector('.feedback-text');
+        const comment = commentEl ? commentEl.value.trim() : '';
+
+        if (!feedbackChoice && !comment) {
+            showNotification('Please select like/dislike or add a comment.', 'error');
+            return;
+        }
+
+        const payload = {
+            analysis: section.dataset.analysis || null,
+            platform: section.dataset.platform || null,
+            url: section.dataset.url || null,
+            contentType: section.dataset.contentType || null,
+            score: Number(section.dataset.score || 0),
+            label: section.dataset.label || null,
+            feedback: feedbackChoice,
+            comment: comment
+        };
+
+        try {
+            if (window.firebase && firebase.firestore) {
+                firebase.firestore().collection('verification_feedback').add({
+                    ...payload,
+                    userId: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
+                    userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
+                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } else {
+                console.log('Feedback payload:', payload);
+            }
+            showNotification('Thanks for your feedback!', 'success');
+        } catch (err) {
+            console.error('Error submitting feedback:', err);
+            showNotification('Failed to submit feedback. Please try again.', 'error');
+        }
+    }
 });
 
 // Toggle controls
@@ -916,6 +1353,11 @@ const additionalStyles = `
 .btn-primary:hover {
     background: #2563eb;
 }
+/* Disabled button visuals */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 
 
 .result-header {
@@ -952,7 +1394,9 @@ const additionalStyles = `
 }
 
 .result-score {
-    display: flex;
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 1.25rem;
     align-items: center;
     margin-bottom: 2rem;
     padding: 1.5rem;
@@ -962,14 +1406,13 @@ const additionalStyles = `
 }
 
 .score-circle {
-    width: 110px;
-    height: 80px;
+    width: 140px;
+    height: 140px;
     border-radius: 50%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin-right: 1.5rem;
     font-weight: bold;
     border: 4px solid;
 }
@@ -993,12 +1436,12 @@ const additionalStyles = `
 }
 
 .score-number {
-    font-size: 1.5rem;
+    font-size: 2.25rem;
     line-height: 1;
 }
 
 .score-label {
-    font-size: 0.875rem;
+    font-size: 1rem;
     opacity: 0.8;
     line-height: 1;
 }
@@ -1006,14 +1449,53 @@ const additionalStyles = `
 .score-description h3 {
     margin: 0 0 0.5rem 0;
     color: #1f2937;
-    font-size: 1.125rem;
+    font-size: 1.5rem;
 }
 
 .score-description p {
     margin: 0;
     color: #6b7280;
-    font-size: 0.875rem;
-    line-height: 1.5;
+    font-size: 1.125rem;
+    line-height: 1.7;
+}
+
+/* Credibility label color (verdict-based), referencing fact_check_styles.css */
+.score-description .credibility-label {
+    font-weight: 700;
+}
+.score-description .credibility-label.high-credibility {
+    color: #10B981;
+    background: transparent !important;
+}
+.score-description .credibility-label.medium-credibility {
+    color: #F59E0B;
+    background: transparent !important;
+}
+.score-description .credibility-label.low-credibility {
+    color: #EF4444;
+    background: transparent !important;
+}
+
+/* Responsive adjustments for small screens */
+@media (max-width: 640px) {
+    .result-score {
+        grid-template-columns: 120px 1fr;
+        gap: 1rem;
+    }
+    .score-circle {
+        width: 110px;
+        height: 110px;
+    }
+    .score-number {
+        font-size: 1.75rem;
+    }
+    .score-description h3 {
+        font-size: 1.25rem;
+    }
+    .score-description p {
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
 }
 
 .analysis-features {
@@ -1095,6 +1577,26 @@ const additionalStyles = `
     line-height: 1.6;
 }
 
+/* Analyzed text highlighting */
+.analyzed-text {
+    border-left-width: 4px;
+}
+.analyzed-text.highlight-high {
+    border-left-color: #22c55e;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    color: #166534;
+}
+.analyzed-text.highlight-medium {
+    border-left-color: #f59e0b;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
+}
+.analyzed-text.highlight-low {
+    border-left-color: #ef4444;
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #7f1d1d;
+}
+
 .url-value {
     word-break: break-all;
     font-family: monospace;
@@ -1102,6 +1604,87 @@ const additionalStyles = `
     background: #f3f4f6;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
+}
+/* Feedback section styles */
+.feedback-section {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+.feedback-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.75rem;
+}
+.feedback-controls {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.feedback-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #374151;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.feedback-btn i { color: #6b7280; }
+.feedback-btn.selected i { color: inherit; }
+.facebook-result .feedback-btn.selected {
+    border-color: #1877f2;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    color: #1e40af;
+}
+.url-result .feedback-btn.selected {
+    border-color: #22c55e;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    color: #166534;
+}
+.feedback-comment .feedback-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+.feedback-text {
+    width: 100%;
+    resize: vertical;
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    color: #1f2937;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.feedback-text::placeholder {
+    color: #6b7280;
+    opacity: 1;
+    font-family: inherit;
+}
+.feedback-actions {
+    margin-top: 0.75rem;
+    text-align: right;
+}
+.facebook-result .submit-feedback-btn {
+    background: #1877f2;
+    color: #fff;
+}
+.url-result .submit-feedback-btn {
+    background: #22c55e;
+    color: #fff;
+}
+.submit-feedback-btn:hover {
+    opacity: 0.95;
 }
 /* Add green left border and 12px radius to the Verify URL card */
 #url-verify-section .verify-card {
@@ -1112,4 +1695,4 @@ const additionalStyles = `
 `;
 
 // Add styles to head
-document.head.insertAdjacentHTML('beforeend', additionalStyles);
+// Inline styles have been moved to verify-news.css and are no longer injected.
