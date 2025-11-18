@@ -202,12 +202,18 @@ function handleFacebookVerification() {
             content: content || null,
             userId: firebase.auth().currentUser.uid,
             userEmail: firebase.auth().currentUser.email,
-            requestedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'pending'
+        }).then(docRef => {
+            // Immediately attempt to process this pending request if URL is provided
+            if (url) {
+                processPendingFacebookVerifications(docRef.id).catch(err => console.warn('Queue process error:', err));
+            }
+        }).catch(err => console.warn('Queue add error:', err));
     }
     
     // Call the fact check API for Facebook content
-    fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
+    fetch('http://127.0.0.1:5000/api/fact-check', { // Fact check API (separate service)
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -259,6 +265,87 @@ function handleFacebookVerification() {
         facebookVerifyBtn.disabled = false;
         facebookVerifyBtn.innerHTML = '<i class="fab fa-facebook"></i> Analyze Facebook Content';
     });
+}
+
+// Process pending facebook_verification_requests (status = 'pending')
+async function processPendingFacebookVerifications(docIdToPrioritize = null) {
+    if (!firebase || !firebase.firestore) return;
+    const db = firebase.firestore();
+    let query = db.collection('facebook_verification_requests').where('status', '==', 'pending').orderBy('requestedAt', 'asc').limit(5);
+    if (docIdToPrioritize) {
+        try {
+            const doc = await db.collection('facebook_verification_requests').doc(docIdToPrioritize).get();
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.url) {
+                    await _processSingleFacebookRequest(docIdToPrioritize, data);
+                }
+            }
+        } catch (e) { console.warn('Prioritized doc read failed', e); }
+    }
+    const snap = await query.get();
+    for (const doc of snap.docs) {
+        const data = doc.data();
+        if (!data.url) {
+            // Content-only requests cannot run full Graph verification; mark as processed with note
+            await db.collection('facebook_verification_requests').doc(doc.id).update({
+                status: 'processed',
+                processedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                note: 'Content-only request processed via fact-check; Graph verification skipped.'
+            });
+            continue;
+        }
+        await _processSingleFacebookRequest(doc.id, data);
+    }
+}
+
+async function _processSingleFacebookRequest(docId, data) {
+    const db = firebase.firestore();
+    const url = data.url;
+    try {
+        const resp = await fetch('http://127.0.0.1:5001/api/poser/analyze_full', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+        if (!resp.ok) throw new Error(`Facebook analyze error: ${resp.status}`);
+        const result = await resp.json();
+        const serverTs = firebase.firestore.FieldValue.serverTimestamp();
+
+        // Compose full detection record
+        const fullResult = {
+            input_url: url,
+            page: result.page || null,
+            post: result.post || null,
+            profile: result.profile || null,
+            signals: result.signals || null,
+            credi_score: result.credi_score || 0,
+            classification: result.classification || 'Unknown',
+            verdict: result.verdict || '',
+            analyzed_at: serverTs
+        };
+        const summaryResult = {
+            subject: (result.inputs && result.inputs.resolved_id) || url,
+            classification: result.classification || 'Unknown',
+            credi_score: result.credi_score || 0,
+            timestamp: serverTs
+        };
+        const detRef = await db.collection('poser_detections').add(fullResult);
+        const verRef = await db.collection('verification_results').add(summaryResult);
+        await db.collection('facebook_verification_requests').doc(docId).update({
+            status: 'processed',
+            processedAt: serverTs,
+            resultRefs: { detectionId: detRef.id, summaryId: verRef.id },
+            classification: summaryResult.classification,
+            credi_score: summaryResult.credi_score
+        });
+    } catch (e) {
+        console.error('Facebook analyze error:', e);
+        await db.collection('facebook_verification_requests').doc(docId).update({
+            status: 'error',
+            errorMessage: String(e)
+        });
+    }
 }
 
 // Show Facebook verification results

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Poser Detection - CrediNews</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="poser-detection.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body class="verify-news-page">
@@ -70,13 +71,13 @@
                         <textarea id="poser-notes" class="form-textarea" rows="4" placeholder="Any context or observations..."></textarea>
                     </div>
 
-                    <button type="button" class="verify-btn" id="run-poser-btn" style="background:#7e22ce;">
+                    <button type="button" class="verify-btn poser-run-btn" id="run-poser-btn">
                         <i class="fas fa-shield-alt"></i>
                         Run Poser Detection
                     </button>
                 </div>
 
-                <div id="poser-result" class="results-section" style="display:none; margin-top:1rem;">
+                <div id="poser-result" class="results-section">
                     <div class="results-card">
                         <div class="results-header">
                             <h3 class="results-title">Poser Detection Result</h3>
@@ -89,27 +90,13 @@
             </div>
         </div>
     </main>
-
+    <!-- Firebase SDK (compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase Configuration -->
+    <script src="firebase-config.js"></script>
+    <!-- Page Script -->
     <script src="poser-detection.js"></script>
-    <style>
-      .toggle-buttons { display: flex; gap: 0.5rem; margin-bottom: 1rem; justify-content: center; }
-      .toggle-btn { padding: 0.5rem 1rem; border: 1px solid #e5e7eb; background: #f9fafb; color: #374151; border-radius: 6px; cursor: pointer; font-weight: 600; }
-      .toggle-btn.active { background: #3b82f6; color: #fff; border-color: #2563eb; }
-      #show-url-verify.toggle-btn.active { background: #22c55e; color: #fff; border-color: #16a34a; }
-      #show-facebook-verify.toggle-btn.active { background: #1877f2; color: #fff; border-color: #166fe5; }
-      #open-poser-detection.toggle-btn:hover { background: #7e22ce; color: #fff; border-color: #7e22ce; }
-      .verify-card.poser-accent { border-left: 4px solid #7e22ce; }
-      .card-icon.poser-accent { color: #7e22ce; }
-      .toggle-btn { transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
-    </style>
-    <script>
-      // Navigation wiring
-      document.addEventListener('DOMContentLoaded', function() {
-        var fbBtn = document.getElementById('show-facebook-verify');
-        var urlBtn = document.getElementById('show-url-verify');
-        if (fbBtn) fbBtn.addEventListener('click', function() { window.location.href = 'verify-news.html'; });
-        if (urlBtn) urlBtn.addEventListener('click', function() { window.location.href = 'verify-news.html'; });
-      });
-    </script>
 </body>
 </html>

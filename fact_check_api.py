@@ -35,6 +35,69 @@ def index():
 FACT_CHECK_API_KEY = "AIzaSyDOrHTLNuEZEiIA-ba9_LrEz9s2Zw6TDFM"
 FACT_CHECK_API_URL = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
 
+# --- Facebook Graph API configuration ---
+def _load_env_var(key: str, default: str = "") -> str:
+    """Read environment variable, fallback to .env file if not set."""
+    v = os.getenv(key)
+    if v:
+        return v
+    # Fallback: parse local .env
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    if '=' in line:
+                        k, val = line.split('=', 1)
+                        k = k.strip()
+                        val = val.strip().strip('"')
+                        if k == key:
+                            return val
+    except Exception:
+        pass
+    return default
+
+# Note: Poser detection code (Graph API) was moved to poser_detection_api.py
+
+def _graph_get(path: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    return { 'error': 'Poser detection code moved to poser_detection_api.py' }
+
+def _extract_id_from_facebook_url(url_or_id: str) -> str:
+    # Stub: Poser detection code moved to poser_detection_api.py
+    return (url_or_id or '').strip()
+
+def _compute_page_signals(page: Dict[str, Any], recent_posts: List[Dict[str, Any]]) -> Dict[str, Any]:
+    # Stub: Poser detection code moved to poser_detection_api.py
+    return {}
+
+def _compute_poster_signals(profile: Dict[str, Any], recent_posts: List[Dict[str, Any]]) -> Dict[str, Any]:
+    # Stub: Poser detection code moved to poser_detection_api.py
+    return {}
+
+def _compute_content_signals(post: Dict[str, Any]) -> Dict[str, Any]:
+    # Stub: Poser detection code moved to poser_detection_api.py
+    return {}
+
+def _compute_external_checks(page: Dict[str, Any], post: Dict[str, Any]) -> Dict[str, Any]:
+    # Stub: Poser detection code moved to poser_detection_api.py
+    return {}
+
+def _classify_credibility(total_score: int, suspicious_signals: bool) -> str:
+    if total_score >= 81:
+        return 'Trusted Source'
+    if total_score >= 61:
+        return 'Likely Trusted'
+    if total_score >= 41:
+        return 'Neutral / Needs Verification'
+    # <= 40
+    return 'POSER / Low Credibility'
+
+
+
+
 # Uncomment these lines to download NLTK resources first time
 # nltk.download('punkt')
 # nltk.download('stopwords')
@@ -591,7 +654,7 @@ def fact_check_endpoint():
                         'title': None,
                         'url': None,
                         'reviewDate': None,
-                        'explanation': 'No fact-check reviews found for this claim.'
+                        'explanation': 'No poser check reviews found for this claim.'
                     }
                     claim_analysis.append(info)
                     continue
