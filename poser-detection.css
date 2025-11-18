@@ -84,15 +84,21 @@
 .content-type{background:#f3f4f6;color:#374151;padding:0.25rem 0.75rem;border-radius:12px;font-size:0.75rem;font-weight:500}
 .classification-badge{padding:0.35rem 0.7rem;border-radius:999px;font-size:0.8rem;font-weight:700}
 .classification-good{background:#dcfce7;color:#166534;border:1px solid #22c55e}
+.classification-neutral{background:#fef3c7;color:#92400e;border:1px solid #f59e0b}
 .classification-bad{background:#fee2e2;color:#991b1b;border:1px solid #ef4444}
 
+.classification-highlight{font-weight:800;}
+.hl-good{color:#166534;background:#dcfce7;border:1px solid #22c55e;padding:2px 6px;border-radius:6px}
+.hl-neutral{color:#92400e;background:#fef3c7;border:1px solid #f59e0b;padding:2px 6px;border-radius:6px}
+.hl-bad{color:#991b1b;background:#fee2e2;border:1px solid #ef4444;padding:2px 6px;border-radius:6px}
+
 /* Score block */
-.result-score{display:flex;align-items:center;margin-bottom:2rem;padding:1.5rem;background:linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%);border-radius:12px;border:1px solid #e2e8f0}
-.score-circle{width:110px;height:80px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-right:1.5rem;font-weight:bold;border:4px solid}
+.result-score{display:flex;align-items:center;margin-bottom:2rem;padding:2rem;background:linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%);border-radius:14px;border:1px solid #e2e8f0}
+.score-circle{width:120px;height:120px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-right:1.5rem;font-weight:bold;border:6px solid}
 .score-circle.score-high{background:linear-gradient(135deg,#dcfce7 0%,#bbf7d0 100%);border-color:#22c55e;color:#15803d}
 .score-circle.score-medium{background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-color:#f59e0b;color:#d97706}
 .score-circle.score-low{background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);border-color:#ef4444;color:#dc2626}
-.score-number{font-size:1.5rem;line-height:1}
+.score-number{font-size:2rem;line-height:1}
 .score-label{font-size:0.875rem;opacity:0.8;line-height:1}
 .score-description h3{margin:0 0 0.5rem 0;color:#1f2937;font-size:1.125rem}
 .score-description p{margin:0;color:#6b7280;font-size:0.875rem;line-height:1.5}

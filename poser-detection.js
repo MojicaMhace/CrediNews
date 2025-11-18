@@ -130,10 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const recentPostsCount = (data.recent_posts_count || 0);
       const explanation = (() => {
         const cls = (classification || '').toLowerCase();
-        if (cls.includes('poser') || cls.includes('low credibility')) {
+        if (cls.includes('poser')) {
           return 'Caution: Signals suggest this source may be unreliable. Verify with trusted outlets before sharing.';
         }
-        if (cls.includes('neutral')) {
+        if (cls.includes('suspicious')) {
           return 'Mixed signals detected. Please check official sources to confirm.';
         }
         return 'No strong poser signs detected. Continue to verify key details.';
@@ -363,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   runBtn.addEventListener('click', async () => {
     const input = (urlInput.value || '').trim();
-    const notes = (notesInput.value || '').trim();
+    const notes = notesInput ? (notesInput.value || '').trim() : '';
 
     if (!input) {
       showNotification('Please enter a Facebook poster/page URL or ID.', 'error');
@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!analysis) {
         analysis = {
           posterId: extractPosterId(input),
-          classification: 'POSER',
+          classification: 'Poser',
           verdict: 'Content-level verification unavailable. Possible unverified content.',
           signals: { profile_completeness: 'Unknown', posting_behavior: 'Unknown', suspicious_activity: true },
           suspiciousSignals: ['backend_failure'],
@@ -409,7 +409,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const conciseSuspicious = analysis.suspiciousHits ?? (analysis.suspiciousSignals ? analysis.suspiciousSignals.length : 0);
       const pfDay = (analysis.postingFrequency || 0).toFixed(2);
-      const classificationClass = analysis.classification === 'POSER' ? 'classification-bad' : 'classification-good';
+      const rawClass = (analysis.classification || '').toLowerCase();
+      let normalizedClassification = 'Verified';
+      if (rawClass.includes('poser') || rawClass.includes('low credibility')) normalizedClassification = 'Poser';
+      else if (rawClass.includes('suspicious') || rawClass.includes('neutral') || rawClass.includes('needs verification')) normalizedClassification = 'Suspicious';
+      let classificationClass = normalizedClassification === 'Poser' ? 'classification-bad' : (normalizedClassification === 'Suspicious' ? 'classification-neutral' : 'classification-good');
+      const highlightClass = normalizedClassification === 'Poser' ? 'hl-bad' : (normalizedClassification === 'Suspicious' ? 'hl-neutral' : 'hl-good');
 
       const resultHtml = `
       <div class="verification-result poser-result">
@@ -418,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <i class="fas fa-user-secret"></i>
             <span>Poster Analysis</span>
           </div>
-          <div class="classification-badge ${classificationClass}">${analysis.classification}</div>
+          <div class="content-type">Profile</div>
         </div>
         <div class="result-score">
           <div class="score-circle score-${getScoreClass(posterScore)}">
@@ -426,8 +431,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="score-label">%</span>
           </div>
           <div class="score-description">
-            <h3>Poster Score</h3>
-            <p>${analysis.verdict}</p>
+            <h3>POSTER SCORE - <span class="classification-highlight ${highlightClass}">${normalizedClassification.toUpperCase()}</span></h3>
+            <p>${analysis.verdict || (analysis.explanation || '')}</p>
           </div>
         </div>
         <div class="key-metrics">

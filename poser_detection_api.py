@@ -478,23 +478,18 @@ def _compute_external_checks(page: Dict[str, Any], post: Dict[str, Any]) -> Dict
     }
 
 def _classify_credibility(total_score_100: int, suspicious_signals: bool) -> str:
-    if total_score_100 >= 80:
-        return 'Trusted Source'
     if total_score_100 >= 60:
-        return 'Likely Trusted'
+        return 'Verified'
     if total_score_100 >= 40:
-        return 'Neutral / Needs Verification'
-    return 'POSER / Low Credibility'
+        return 'Suspicious'
+    return 'Poser'
 
 def _score_to_verdict(total_score_100: int) -> str:
-    # Single source for verdict text
-    if total_score_100 >= 80:
-        return 'Trusted Source'
     if total_score_100 >= 60:
-        return 'Likely Trusted'
+        return 'Verified'
     if total_score_100 >= 40:
-        return 'Neutral / Needs Verification'
-    return 'POSER / Low Credibility'
+        return 'Suspicious'
+    return 'Poser'
 
 # --- Index / Info Routes ---
 @app.route('/', methods=['GET'])
