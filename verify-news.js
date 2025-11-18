@@ -1066,6 +1066,14 @@ document.addEventListener('DOMContentLoaded', function() {
             switchVerifySection('facebook');
         });
     }
+
+    // Open standalone Poser Detection page
+    const openPoserDetectBtn = document.getElementById('open-poser-detection');
+    if (openPoserDetectBtn) {
+        openPoserDetectBtn.addEventListener('click', function() {
+            window.location.href = 'poser-detection.html';
+        });
+    }
     // Default to Facebook section visible on load
     switchVerifySection('facebook');
     
@@ -1305,11 +1313,12 @@ const additionalStyles = `
     color: #374151;    
 }
 
-.toggle-buttons {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-}
+  .toggle-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      justify-content: center;
+  }
 .toggle-btn {
     padding: 0.5rem 1rem;
     border: 1px solid #e5e7eb;
@@ -1319,11 +1328,16 @@ const additionalStyles = `
     cursor: pointer;
     font-weight: 600;
 }
-.toggle-btn.active {
-    background: #3b82f6;
-    color: #fff;
-    border-color: #2563eb;
-}
+  .toggle-btn.active {
+      background: #3b82f6;
+      color: #fff;
+      border-color: #2563eb;
+  }
+  #open-poser-detection.toggle-btn:hover {
+      background: #7e22ce;
+      color: #fff;
+      border-color: #7e22ce;
+  }
 /* Verify Url Toggle */
 #show-url-verify.toggle-btn.active {
     background: #22c55e;
