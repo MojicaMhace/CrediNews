@@ -27,11 +27,14 @@
   function isMeaningfulFeedbackContent(text){
     if (!text) return false;
     const t = text.trim();
+
     if (t.length < 20) return false;
     const words = t.split(/\s+/).filter(Boolean);
+
     if (words.length < 6) return false; // at least 6 words containing letters
     const repeatedCharPattern = /^([a-z])\1{2,}$/i;
     let letterWords = 0;
+
     for (const w of words){
       if (/\d/.test(w)) return false; // block numbers mixed-in words
       if (repeatedCharPattern.test(w)) return false; // gibberish
@@ -62,11 +65,10 @@
           <div style="text-align:center;">
             <p style="margin:0; font-weight:600;">How would you rate your website experience?</p>
             <div class="rating-row">${buildStars()}</div>
-            <p class="feedback-muted">Tap a star to continue</p>
           </div>
         </div>
         <div class="feedback-actions">
-          <button class="fb-btn" id="fbSkip1">Skip</button>
+          <button class="fb-btn primary" id="fbContinue" disabled>Continue</button>
         </div>
       </div>
     `);
@@ -79,14 +81,15 @@
           <div class="feedback-row">
             <label class="feedback-label" for="fbCategory">Feedback Category</label>
             <select class="feedback-select" id="fbCategory">
-              <option value="Suggestion">Suggestion</option>
-              <option value="Issue">Issue</option>
               <option value="Compliment">Compliment</option>
+              <option value="Suggestion">Suggestion</option>
+              <option value="Issue">Issue</option>             
             </select>
           </div>
           <div class="feedback-row">
             <label class="feedback-label" for="fbMessage">Please share in detail what we can improve your website experience.</label>
-            <textarea id="fbMessage" class="feedback-textarea" placeholder="Enter Here"></textarea>
+            <textarea id="fbMessage" class="feedback-textarea" placeholder="Please enter your feedback here (at least 6 valid words)"></textarea>
+            <div class="feedback-count" id="fbWordCount">Valid words: 0/6</div>
           </div>
         </div>
         <div class="feedback-actions">
@@ -105,6 +108,7 @@
 
     let rating = 0;
     // Star interactions
+    const continueBtn = step1.querySelector('#fbContinue');
     step1.querySelectorAll('.rating-star').forEach(star => {
       star.addEventListener('click', () => {
         rating = Number(star.dataset.value || 0);
@@ -112,17 +116,20 @@
           const value = Number(s.dataset.value);
           s.classList.toggle('active', value <= rating);
         });
-        // dissolve step1 → show step2
-        step1.classList.add('fade-out');
-        setTimeout(() => { step1.classList.add('hidden'); step2.classList.remove('hidden'); }, 220);
+        // Enable continue when a rating is chosen; allow changing freely
+        if (continueBtn) continueBtn.disabled = rating <= 0;
       });
     });
 
-    // Skip first step
-    step1.querySelector('#fbSkip1').addEventListener('click', () => {
-      step1.classList.add('fade-out');
-      setTimeout(() => { step1.classList.add('hidden'); step2.classList.remove('hidden'); }, 220);
-    });
+    // Continue to next form only after a rating is selected
+    if (continueBtn) {
+      continueBtn.addEventListener('click', () => {
+        if (rating > 0) {
+          step1.classList.add('fade-out');
+          setTimeout(() => { step1.classList.add('hidden'); step2.classList.remove('hidden'); }, 220);
+        }
+      });
+    }
 
     // Cancel → close overlay
     step2.querySelector('#fbCancel').addEventListener('click', () => {
@@ -135,34 +142,108 @@
       setTimeout(() => overlay.remove(), 220);
     });
 
+    const submitBtn = step2.querySelector('#fbSubmit');
+    const msgEl = step2.querySelector('#fbMessage');
+    // Initial state: disable until content passes validation
+    if (submitBtn) submitBtn.disabled = true;
+
+    // Stronger validation helpers
+    const gibberishSet = new Set(['asdf','qwerty','qwe','zxc','zxcv','lorem','ipsum','test','xxx','aaaa','bbbb','cccc']);
+    function isValidWord(w){
+      if (!w) return false;
+      const s = w.toLowerCase();
+      if (/[^a-z]/i.test(s)) return false; // letters only
+      if (s.length < 3) return false;
+      if (gibberishSet.has(s)) return false;
+      if (/^([a-z])\1{2,}$/i.test(s)) return false; // same char repeated
+      if (!/[aeiou]/i.test(s)) return false; // must contain a vowel
+      return true;
+    }
+    function countValidWords(text){
+      const words = (text || '').trim().split(/\s+/).filter(Boolean);
+      let valid = 0;
+      const seen = new Map(); // word -> count
+      for (const raw of words){
+        const w = raw.replace(/[^a-z]/gi,'');
+        if (!isValidWord(w)) continue;
+        const key = w.toLowerCase();
+        const cnt = (seen.get(key) || 0) + 1;
+        seen.set(key, cnt);
+        // Penalize heavy repetition: count only first 2 occurrences
+        if (cnt <= 2) valid++;
+      }
+      return valid;
+    }
+
+    function updateSubmitDisabled(){
+      const val = (msgEl || {}).value || '';
+      const validWordCount = countValidWords(val);
+      const valid = validWordCount >= 6 && isMeaningfulFeedbackContent(val);
+      const wcEl = document.getElementById('fbWordCount');
+      if (wcEl) {
+        wcEl.textContent = `Valid words: ${validWordCount}/6`;
+        wcEl.style.color = valid ? '#10B981' : '#9CA3AF';
+      }
+      if (submitBtn) submitBtn.disabled = !valid;
+    }
+
+    if (msgEl) {
+      msgEl.addEventListener('input', updateSubmitDisabled);
+      // Run once in case of prefill
+      updateSubmitDisabled();
+    }
+
     // Submit
-    step2.querySelector('#fbSubmit').addEventListener('click', async () => {
+    submitBtn.addEventListener('click', async () => {
       const msg = (document.getElementById('fbMessage') || {}).value || '';
       if (!isMeaningfulFeedbackContent(msg)){
         showToast('Please enter a meaningful message (no random letters/numbers).');
         return;
       }
       const category = (document.getElementById('fbCategory') || {}).value || 'Suggestion';
+
+      // Attach user identity (uid and email) when available
+      let userId = null;
+      let userEmail = null;
+      try {
+        if (window.firebase && firebase.auth && firebase.auth().currentUser) {
+          userId = firebase.auth().currentUser.uid || null;
+          userEmail = firebase.auth().currentUser.email || null;
+        }
+      } catch(_) { /* ignore */ }
+
       const payload = {
         rating: rating || null,
         category,
         message: msg.trim(),
         created_at: new Date().toISOString(),
+        userId,
+        userEmail,
       };
       try {
-        if (window.firebase && firebase.firestore){
-          await firebase.firestore().collection('user_feedback').add(payload);
+        if (!(window.firebase && firebase.firestore && firebase.auth)) {
+          showToast('Feedback service unavailable. Please try again later.');
+          return;
         }
-      } catch (e){ console.warn('Feedback save failed (non-blocking):', e.message); }
-      showToast('Your Feedback has been submitted.');
-      // Mark submitted so we don't re-prompt next session
-      try {
-        sessionStorage.setItem(S_SUBMITTED_THIS_SESSION, '1');
-        localStorage.setItem(KEY_SUBMITTED_EVER, '1');
-        localStorage.removeItem(KEY_PENDING_NEXT);
-      } catch(_){}
-      overlay.classList.add('fade-out');
-      setTimeout(() => overlay.remove(), 260);
+        const user = firebase.auth().currentUser;
+        if (!user || user.emailVerified !== true) {
+          showToast('Please sign in and verify your email to submit feedback.');
+          return;
+        }
+        await firebase.firestore().collection('user_feedback').add(payload);
+        showToast('Your Feedback has been submitted.');
+        // Mark submitted only on success
+        try {
+          sessionStorage.setItem(S_SUBMITTED_THIS_SESSION, '1');
+          localStorage.setItem(KEY_SUBMITTED_EVER, '1');
+          localStorage.removeItem(KEY_PENDING_NEXT);
+        } catch(_){}
+        overlay.classList.add('fade-out');
+        setTimeout(() => overlay.remove(), 260);
+      } catch (e){
+        console.warn('Feedback save failed:', e && e.message ? e.message : e);
+        showToast('Failed to submit feedback. Check your account verification and try again.');
+      }
     });
   }
 

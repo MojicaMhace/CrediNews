@@ -81,6 +81,14 @@
 
 .feedback-muted { color: var(--fb-muted); font-size: 13px; text-align: center; }
 
+/* Word count indicator */
+.feedback-count {
+  font-size: 12px;
+  color: var(--fb-muted);
+  text-align: right;
+  margin-top: 6px;
+}
+
 /* Step 2 */
 .feedback-row { display: grid; gap: 10px; margin: 12px 0; }
 .feedback-label { font-size: 13px; color: var(--fb-muted); }
@@ -97,12 +105,26 @@ textarea.feedback-textarea { min-height: 120px; resize: vertical; }
 select.feedback-select:focus,
 textarea.feedback-textarea:focus { outline: 2px solid var(--fb-accent); }
 
+/* Match placeholder font to verify FB news inputs */
+textarea.feedback-textarea {
+  color: #F9FAFB !important;
+  opacity: 1 !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Ensure all placeholders in feedback modal use the same font and color */
+.feedback-container ::placeholder {
+  color: #6b7280 !important;
+  opacity: 1 !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 /* Toast */
 .feedback-toast {
   position: fixed;
-  bottom: 22px;
+  top: 22px;
   right: 22px;
-  background: #0e1726;
+  background: #10B981;
   color: var(--fb-text);
   border: 1px solid var(--fb-border);
   border-radius: 12px;
