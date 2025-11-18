@@ -3836,11 +3836,13 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 
 /* Verify News Page (verify-news.html) */
 .verify-news-page .verify-news-container {
-  max-width: 850px;
+  /* Expand the verify area to reduce dead space */
+  max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  gap: 36px;
-  padding: 24px;
+  gap: 24px;
+  /* Leave small space on each side similar to the second image */
+  padding: 12px;
 }
 
 .verify-news-page .verification-grid {
@@ -3853,12 +3855,65 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 .verify-news-page .verify-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
   border-radius: 20px;
-  padding: 48px;
+  /* Slightly tighter padding to match wider layout */
+  padding: 40px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12), 0 8px 32px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(10px);
   position: relative;
   overflow: hidden;
+}
+
+/* Stretch the toggle buttons across the verify card width */
+.verify-news-page .toggle-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 16px 0;
+}
+
+.verify-news-page .toggle-btn {
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+  color: #fff;
+}
+
+/* Gradient colors per toggle */
+.verify-news-page #show-facebook-verify.toggle-btn {
+  /* Improved multi-stop blue gradient for Facebook */
+  background: linear-gradient(135deg, #1d4ed8 0%, #1877f2 45%, #3b82f6 100%) !important;
+  border-color: #166fe5;
+}
+.verify-news-page #show-facebook-verify.toggle-btn:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #166fe5 45%, #60a5fa 100%) !important;
+}
+.verify-news-page #show-facebook-verify.toggle-btn.active {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1458d8 50%, #3a8ef4 100%) !important;
+}
+
+.verify-news-page #show-url-verify.toggle-btn {
+  /* Improved multi-stop green gradient for Article */
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 45%, #34d399 100%) !important;
+  border-color: #16a34a;
+}
+.verify-news-page #show-url-verify.toggle-btn:hover {
+  background: linear-gradient(135deg, #15803d 0%, #1fb16a 45%, #6ee7b7 100%) !important;
+}
+.verify-news-page #show-url-verify.toggle-btn.active {
+  background: linear-gradient(135deg, #166534 0%, #15803d 50%, #22c55e 100%) !important;
+}
+
+.verify-news-page .toggle-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .verify-news-page .verification-card {
