@@ -15,9 +15,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const runBtn = document.getElementById('run-poser-btn');
   const urlInput = document.getElementById('poser-url');
+  const urlError = document.getElementById('poser-url-error');
   const notesInput = document.getElementById('poser-notes');
   const resultSection = document.getElementById('poser-result');
   const resultDetails = document.getElementById('poser-analysis-details');
+
+  function setFieldError(message){
+    if(urlError){ urlError.textContent = message; }
+    const fg = urlInput ? urlInput.closest('.form-group') : null;
+    if(fg) fg.classList.add('has-error');
+    if(urlInput) urlInput.classList.add('error');
+  }
+  function clearFieldError(){
+    if(urlError){ urlError.textContent = ''; }
+    const fg = urlInput ? urlInput.closest('.form-group') : null;
+    if(fg) fg.classList.remove('has-error');
+    if(urlInput) urlInput.classList.remove('error');
+  }
+  if(urlInput){ urlInput.addEventListener('input', clearFieldError); }
 
   // Helpers copied to match Verify Facebook News UI
   function getScoreClass(score) {
@@ -199,8 +214,80 @@ document.addEventListener('DOMContentLoaded', () => {
              /\/reel\//.test(p) ||
              /\/story\.php/.test(p) ||
              /\/permalink\//.test(p) ||
+             /\/share\//.test(p) ||
+             /\/sharer\.php/.test(p) ||
+             /\/search\//.test(p) ||
              /(\?|&)story_fbid=/.test(q) ||
              /(\?|&)fbid=/.test(q);
+    } catch(_) {
+      return false;
+    }
+  }
+
+  function isAllowedPageOrProfileUrl(url) {
+    try {
+      const u = new URL(url);
+      const host = (u.hostname || '').toLowerCase();
+      if (!(host.endsWith('facebook.com') || host.endsWith('fb.com'))) return false;
+      const path = (u.pathname || '').toLowerCase();
+      const parts = path.split('/').filter(Boolean);
+      const first = parts[0] || '';
+      const reserved = new Set([
+        'posts','photos','videos','reel','story.php','permalink','share','sharer.php','search',
+        'groups','events','marketplace','watch','gaming','help','settings','privacy','policy','login'
+      ]);
+      if (reserved.has(first)) return false;
+      if (path === '/' || parts.length === 0) return false; // homepage is not a poster link
+      if (first === 'profile.php') return !!u.searchParams.get('id');
+      if (first === 'pages' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
+      if (first === 'people' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
+      return /^[a-z0-9_.-]+$/.test(parts[0]);
+    } catch(_) {
+      return false;
+    }
+  }
+
+  function isAllowedPageOrProfileUrl(url) {
+    try {
+      const u = new URL(url);
+      const host = (u.hostname || '').toLowerCase();
+      if (!(host.endsWith('facebook.com') || host.endsWith('fb.com'))) return false;
+      const path = (u.pathname || '').toLowerCase();
+      const parts = path.split('/').filter(Boolean);
+      const first = parts[0] || '';
+      const reserved = new Set([
+        'posts','photos','videos','reel','story.php','permalink','share','sharer.php','search',
+        'groups','events','marketplace','watch','gaming','help','settings','privacy','policy','login'
+      ]);
+      if (reserved.has(first)) return false;
+      if (path === '/' || parts.length === 0) return false; 
+      if (first === 'profile.php') return !!u.searchParams.get('id');
+      if (first === 'pages' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
+      if (first === 'people' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
+      return /^[a-z0-9_.-]+$/.test(parts[0]);
+    } catch(_) {
+      return false;
+    }
+  }
+
+  function isAllowedPageOrProfileUrl(url) {
+    try {
+      const u = new URL(url);
+      const host = (u.hostname || '').toLowerCase();
+      if (!(host.endsWith('facebook.com') || host.endsWith('fb.com'))) return false;
+      const path = (u.pathname || '').toLowerCase();
+      const parts = path.split('/').filter(Boolean);
+      const first = parts[0] || '';
+      const reserved = new Set([
+        'posts','photos','videos','reel','permalink','share','sharer.php','search',
+        'groups','events','marketplace','watch','gaming','help','settings','privacy','policy','login'
+      ]);
+      if (reserved.has(first)) return false;
+      if (path === '/' || parts.length === 0) return false; // homepage is not a poster link
+      if (first === 'profile.php') return !!u.searchParams.get('id');
+      if (first === 'pages' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
+      if (first === 'people' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
+      return /^[a-z0-9_.-]+$/.test(parts[0]);
     } catch(_) {
       return false;
     }
@@ -365,18 +452,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = (urlInput.value || '').trim();
     const notes = notesInput ? (notesInput.value || '').trim() : '';
 
+    clearFieldError();
     if (!input) {
-      showNotification('Please enter a Facebook poster/page URL or ID.', 'error');
-      urlInput.focus();
+      setFieldError('Please enter a Facebook page/profile URL or ID.');
+      if(urlInput) urlInput.focus();
       return;
     }
     if (!isFacebookUrl(input)) {
-      showNotification('Please enter a valid Facebook URL or ID.', 'error');
+      setFieldError('Please enter a valid Facebook URL or ID.');
       return;
     }
     if (isPostUrl(input)) {
-      showNotification('Please enter a Facebook page/profile URL (not a post).', 'error');
+      setFieldError('Please enter a Facebook page/profile URL (not a post/share/search).');
       return;
+    }
+    try {
+      const asUrl = new URL(input);
+      if (!isAllowedPageOrProfileUrl(input)) {
+        setFieldError('The link must be a Facebook Page or User profile URL only.');
+        return;
+      }
+    } catch(_) {
+      // Raw IDs are allowed
+    }
+    try {
+      const asUrl = new URL(input);
+      if (!isAllowedPageOrProfileUrl(input)) {
+        showNotification('The link must be a Facebook Page or User profile URL only.', 'error');
+        return;
+      }
+    } catch(_) {
+      // Raw IDs are allowed
+    }
+    try {
+      const asUrl = new URL(input);
+      if (!isAllowedPageOrProfileUrl(input)) {
+        showNotification('The link must be a Facebook Page or User profile URL only.', 'error');
+        return;
+      }
+    } catch(_) {
+      // Raw IDs are allowed
     }
 
     setButtonLoading(runBtn, true, 'ANALYZING POSER DETECTION...');

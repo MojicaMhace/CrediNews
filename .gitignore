@@ -2,8 +2,6 @@ __pycache__/
 *.pyc
 
 models/
-.joblib
-.json
-filipino_phrases.bin
-
-"filipino_phrases.bin" 
+*.joblib
+*.json
+*.bin

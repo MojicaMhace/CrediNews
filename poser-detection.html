@@ -42,7 +42,6 @@
                 <div class="title-underline"></div>
             </div>
 
-            <!-- Toggle Bar -->
             <div class="toggle-buttons">
                 <button id="show-facebook-verify" class="toggle-btn">Verify Facebook News</button>
                 <button id="show-url-verify" class="toggle-btn">Verify News Article</button>
@@ -60,6 +59,7 @@
                     <div class="form-group">
                         <label for="poser-url" class="form-label">Facebook Page/Post URL</label>
                         <input type="url" id="poser-url" class="form-input" placeholder="https://www.facebook.com/..." />
+                        <div id="poser-url-error" class="input-error" aria-live="polite"></div>
                         <div class="input-help">
                             <i class="fas fa-info-circle"></i>
                             We analyze profile signals, posting patterns, and content markers.
