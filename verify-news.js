@@ -48,13 +48,7 @@ async function handleUrlVerification() {
         console.error('Key claim extraction failed:', e);
     }
 
-    // If we couldn't extract any content from the URL, block verification
-    if (!effectiveContent) {
-        showNotification('We couldn\'t retrieve any content from this link. It may be private, removed, or blocking access. Please paste the text or try another link.', 'error');
-        urlVerifyBtn.disabled = false;
-        urlVerifyBtn.textContent = 'Verify URL';
-        return;
-    }
+    // Proceed even if no extracted content; backend will use URL-based fallbacks
 
     try {
         const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
@@ -154,6 +148,8 @@ function isSupportedFacebookPostUrl(url) {
         const q = u.search.toLowerCase();
         return (
             /\/share\/p\//.test(p) ||
+            /\/share\/r\//.test(p) ||
+            /\/reel\//.test(p) ||
             /\/posts\//.test(p) ||
             /\/permalink\//.test(p) ||
             (/\/photo\.php/.test(p) && /fbid=\d+/.test(q))
@@ -271,7 +267,7 @@ async function handleFacebookVerification() {
     }
     
     // If URL provided but no content, extract key claim from URL (frontend intelligence)
-    let effectiveContent = content ? preprocessTextForAnalysis(content) : '';
+    let effectiveContent = content ? content.trim() : '';
     if (url && !effectiveContent) {
         try {
             const resp = await fetch('http://127.0.0.1:5000/api/extract-key-claim', {
@@ -290,13 +286,7 @@ async function handleFacebookVerification() {
             console.error('Key claim extraction failed:', e);
         }
     }
-    // If we still have no content from the link, block verification
-    if (url && !effectiveContent) {
-        showNotification('We couldn\'t retrieve any content from this Facebook link. The post may be private or removed. Paste the text or use another link.', 'error');
-        facebookVerifyBtn.disabled = false;
-        facebookVerifyBtn.innerHTML = '<i class="fab fa-facebook"></i> Analyze Facebook Content';
-        return;
-    }
+    // Proceed even if content is empty; backend will attempt URL-based extraction
 
     // Build the exact content string we will send to the API
     const contentForApi = effectiveContent || '';
@@ -446,7 +436,6 @@ function showFacebookVerificationResult(type, data) {
         .slice(0, 4);
 
     const label = (data.credibilityLabel || '').toUpperCase();
-    const claimsOrderHtml = `${realClaimsSection}${fakeClaimsSection}`;
     const googleCombined = combinedClaims.filter(c => c.source === 'google' || (c.url && c.reviewer && !/^(ML Model|Zyla Labs)$/i.test(c.reviewer)));
     // Fallback to ML/Zyla when Google has no claims
     const fallbackCombined = googleCombined.length > 0 ? [] : combinedClaims.filter(c => (
@@ -455,6 +444,7 @@ function showFacebookVerificationResult(type, data) {
     const activeCombined = googleCombined.length > 0 ? googleCombined : fallbackCombined;
     // Only show Sources when Google claimReview URLs exist
     const hasGoogleUrl = googleCombined.some(c => !!c.url);
+    const claimsOrderHtml = hasGoogleUrl ? '' : `${realClaimsSection}${fakeClaimsSection}`;
 
     const reviewedClaimsSection = (activeCombined.length > 0) ? `
         <div style="margin-top:0.75rem;">
@@ -479,7 +469,7 @@ function showFacebookVerificationResult(type, data) {
             <h4 style="margin:0 0 0.5rem 0;">Fact-Check Claims</h4>
             ${claimsOrderHtml}
             ${reviewedClaimsSection}
-            ${(hasGoogleUrl) ? `
+            ${(!hasGoogleUrl) ? `
                 <div style="margin-top:0.75rem;">
                     <h4 style="margin:0 0 0.5rem 0;">Sources:</h4>
                     <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
@@ -541,17 +531,13 @@ function showFacebookVerificationResult(type, data) {
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
-            <div class="feedback-section" 
+            <div class="feedback-section compact" 
                  data-analysis="${type}"
                  data-platform="facebook"
                  data-url="${data.url || ''}"
                  data-content-type="${data.contentType || 'Post'}"
                  data-score="${data.credibilityScore}"
                  data-label="${data.credibilityLabel || ''}">
-                <div class="feedback-header">
-                    <i class="far fa-comment-dots"></i>
-                    <span>Share your feedback</span>
-                </div>
                 <div class="feedback-controls">
                     <button class="feedback-btn" type="button" data-feedback="agree">
                         <i class="fas fa-thumbs-up"></i>
@@ -698,7 +684,6 @@ async function showVerificationResult(type, data) {
         .slice(0, 4);
 
     const label2 = (data.credibilityLabel || '').toUpperCase();
-    const claimsOrderHtml2 = `${realClaimsSection}${fakeClaimsSection}`;
     const googleCombined2 = combinedClaims.filter(c => c.source === 'google' || (c.url && c.reviewer && !/^(ML Model|Zyla Labs)$/i.test(c.reviewer)));
     // Fallback to ML/Zyla when Google has no claims
     const fallbackCombined2 = googleCombined2.length > 0 ? [] : combinedClaims.filter(c => (
@@ -707,6 +692,7 @@ async function showVerificationResult(type, data) {
     const activeCombined2 = googleCombined2.length > 0 ? googleCombined2 : fallbackCombined2;
     // Only show Sources when Google claimReview URLs exist
     const hasGoogleUrl2 = googleCombined2.some(c => !!c.url);
+    const claimsOrderHtml2 = hasGoogleUrl2 ? '' : `${realClaimsSection}${fakeClaimsSection}`;
 
     const reviewedClaimsSection2 = (activeCombined2.length > 0) ? `
         <div style="margin-top:0.75rem;">
@@ -731,7 +717,7 @@ async function showVerificationResult(type, data) {
             <h4 style="margin:0 0 0.5rem 0;">Fact-Check Claims</h4>
             ${claimsOrderHtml2}
             ${reviewedClaimsSection2}
-            ${(hasGoogleUrl2) ? `
+            ${(!hasGoogleUrl2) ? `
                 <div style="margin-top:0.75rem;">
                     <h4 style="margin:0 0 0.5rem 0;">Sources:</h4>
                     <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
@@ -795,17 +781,13 @@ async function showVerificationResult(type, data) {
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
-            <div class="feedback-section" 
+            <div class="feedback-section compact" 
                  data-analysis="${type}"
                  data-platform="web"
                  data-url="${type === 'url' && articleUrl && articleUrl.value ? articleUrl.value : (data.url || '')}"
                  data-content-type="${data.domain || 'Article'}"
                  data-score="${data.credibilityScore}"
                  data-label="${data.credibilityLabel || ''}">
-                <div class="feedback-header">
-                    <i class="far fa-comment-dots"></i>
-                    <span>Share your feedback</span>
-                </div>
                 <div class="feedback-controls">
                     <button class="feedback-btn" type="button" data-feedback="agree">
                         <i class="fas fa-thumbs-up"></i>
@@ -1626,6 +1608,12 @@ const additionalStyles = `
     background: #f9fafb;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
+}
+.feedback-section.compact {
+    margin-top: 0.5rem;
+    padding: 0;
+    background: transparent;
+    border: 0;
 }
 .feedback-header {
     display: flex;
