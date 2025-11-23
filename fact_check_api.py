@@ -38,14 +38,23 @@ FACT_CHECK_API_KEY = "AIzaSyDOrHTLNuEZEiIA-ba9_LrEz9s2Zw6TDFM"
 FACT_CHECK_API_URL = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
 
 # Zyla Labs Fact Checking API
-ZYLA_API_URL = "https://zylalabs.com/api/2753/fact+checking+api/2860/check+facts"
+# Allow overriding via environment; default to the known endpoint
+ZYLA_API_URL = os.environ.get(
+    "ZYLA_API_URL",
+    "https://zylalabs.com/api/2753/fact+checking+api/2860/check+facts"
+)
 # Prefer env var; fall back to provided key
 ZYLA_API_KEY = os.environ.get(
     "ZYLA_API_KEY",
     "11018|hgGq1lMPYDpnVFB7YHAPcVpxgtjvWP9zlSFUJ5YS"
 )
 # Feature flag to enable/disable Zyla without code changes
-ZYLA_ENABLED = os.environ.get("ENABLE_ZYLA", "0").strip().lower() in ("1", "true", "yes", "on")
+# Feature flag to enable/disable Zyla without code changes
+_env_enable = os.environ.get("ENABLE_ZYLA")
+if _env_enable is None or not str(_env_enable).strip():
+    ZYLA_ENABLED = True
+else:
+    ZYLA_ENABLED = str(_env_enable).strip().lower() in ("1", "true", "yes", "on")
 # Simple in-memory cache to reduce Zyla usage
 _ZYLA_CACHE: Dict[str, Dict[str, Any]] = {}
 _ZYLA_CACHE_TTL_SEC = 24 * 3600
@@ -76,32 +85,99 @@ def _clamp01(x: float) -> float:
 # Credible domain boost configuration
 # Domains listed here slightly increase borderline scores when no negative evidence exists.
 # Keep boosts small to avoid overwhelming explicit fact-check verdicts.
+
 CREDIBLE_DOMAIN_BOOSTS: Dict[str, float] = {
+    # --- PHILIPPINES: Major Nationals (High Reputation) ---
     'rappler.com': 0.25,
     'inquirer.net': 0.25,
     'news.abs-cbn.com': 0.25,
     'gmanetwork.com': 0.25,
     'philstar.com': 0.25,
-    'mb.com.ph': 0.25,
-    'cnnphilippines.com': 0.25,
+    'mb.com.ph': 0.25,  # Manila Bulletin
+    'bworldonline.com': 0.25, # BusinessWorld (High credibility in finance)
+    'verafiles.org': 0.25, # IFCN Signatory / Fact Checker
+    
+    # --- PHILIPPINES: Broadcasters & Aggregators ---
+    'cnnphilippines.com': 0.25, # (Note: Archived content, outlet defunct as of 2024)
     'onenews.ph': 0.20,
     'news.tv5.com.ph': 0.20,
     'interaksyon.philstar.com': 0.20,
+    
+    # --- PHILIPPINES: Regional & Other Nationals ---
     'sunstar.com.ph': 0.20,
+    'manilatimes.net': 0.20,
+    'mindanews.com': 0.20, # Highly credible Mindanao sources
+    'tribu.net.ph': 0.20,  # Daily Tribune
+    'bulatlat.com': 0.20,  # Alternative journalism
+
+    # --- INTERNATIONAL: Wire Services (The "Source of Truth") ---
+    'reuters.com': 0.25,
+    'apnews.com': 0.25, # Associated Press
+    'afp.com': 0.25,    # Agence France-Presse
+    'bloomberg.com': 0.25,
+
+    # --- INTERNATIONAL: Prestige Global Media (Tier 1) ---
+    'bbc.com': 0.25,
+    'bbc.co.uk': 0.25,
+    'cnn.com': 0.25,
+    'nytimes.com': 0.25,
+    'washingtonpost.com': 0.25,
+    'wsj.com': 0.25,
+    'aljazeera.com': 0.25,
+    'dw.com': 0.25,      # Deutsche Welle
+    'france24.com': 0.25,
+    'npr.org': 0.25,     # National Public Radio (US)
+    
+    # --- INTERNATIONAL: Recognized Global Media (Tier 2) ---
+    'theguardian.com': 0.20,
+    'cnbc.com': 0.20,
+    'time.com': 0.20,
+    'usatoday.com': 0.20,
+    'scmp.com': 0.20,    # South China Morning Post
+    'nikkei.com': 0.20,  # Nikkei Asia
+    'channelnewsasia.com': 0.20, # CNA (Singapore)
+    'straitstimes.com': 0.20,
 }
 
 # Optional URL patterns (e.g., official social pages) with associated boosts
+# Regex explains: Matches explicit verified handles to avoid fan pages
 CREDIBLE_URL_PATTERNS: List[Tuple[str, float]] = [
+    # --- PHILIPPINES: Facebook Handles ---
     (r"facebook\.com/(rapplerdotcom|rappler)", 0.25),
     (r"facebook\.com/inquirerdotnet", 0.25),
     (r"facebook\.com/abscbnNEWS", 0.25),
     (r"facebook\.com/gmanews", 0.25),
     (r"facebook\.com/PhilippineStar", 0.25),
     (r"facebook\.com/manilabulletin", 0.25),
+    (r"facebook\.com/BusinessWorldOnline", 0.25),
+    (r"facebook\.com/verafiles", 0.25), # Fact Checker
     (r"facebook\.com/CNNPhilippines", 0.25),
+    
+    # Tier 2 / Regional PH
     (r"facebook\.com/ONENewsPH", 0.20),
+    (r"facebook\.com/News5Everywhere", 0.20), # TV5 Official
     (r"facebook\.com/interaksyon", 0.20),
     (r"facebook\.com/sunstarphilippines", 0.20),
+    (r"facebook\.com/themanilatimesonline", 0.20),
+    (r"facebook\.com/mindanews", 0.20),
+
+    # --- INTERNATIONAL: Wire Services & Global Giants ---
+    (r"facebook\.com/Reuters", 0.25),
+    (r"facebook\.com/APNews", 0.25),
+    (r"facebook\.com/AFPnewsenglish", 0.25),
+    (r"facebook\.com/bbcnews", 0.25),
+    (r"facebook\.com/cnn", 0.25),
+    (r"facebook\.com/nytimes", 0.25),
+    (r"facebook\.com/washingtonpost", 0.25),
+    (r"facebook\.com/bloombergbusiness", 0.25),
+    (r"facebook\.com/aljazeera", 0.25),
+    (r"facebook\.com/dw.deutschewelle", 0.25),
+    
+    # Tier 2 International
+    (r"facebook\.com/theguardian", 0.20),
+    (r"facebook\.com/cnbc", 0.20),
+    (r"facebook\.com/time", 0.20),
+    (r"facebook\.com/channelnewsasia", 0.20),
 ]
 
 def _extract_domain(url: str) -> str:
@@ -185,19 +261,30 @@ def query_zyla_fact_check(user_content: str) -> Dict[str, Any]:
     if cached is not None:
         return cached
     try:
-        headers = {"Authorization": f"Bearer {ZYLA_API_KEY}"}
-        params = {"user_content": uc}
+        headers = {
+            "Authorization": f"Bearer {ZYLA_API_KEY}",
+            "User-Agent": "CrediNews-FactCheck/1.0"
+        }
+        params = {
+            "user_content": uc
+        }
+        print(f"[Zyla] Calling endpoint={ZYLA_API_URL} len={len(uc)}")
         resp = requests.get(ZYLA_API_URL, headers=headers, params=params, timeout=12)
+        print(f"[Zyla] Status={resp.status_code}")
         if resp.status_code == 200:
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception as je:
+                print(f"[Zyla] JSON parse failed: {je}; body={resp.text[:200]}")
+                return {}
             _zyla_cache_set(cache_key, data)
             return data
         else:
             # Do not cache errors; return empty
-            print(f"Zyla API error {resp.status_code}: {resp.text[:200]}")
+            print(f"[Zyla] API error {resp.status_code}: {resp.text[:200]}")
             return {}
     except Exception as e:
-        print(f"Zyla API request failed: {e}")
+        print(f"[Zyla] request failed: {e}")
         return {}
 
 def parse_zyla_response(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -212,11 +299,11 @@ def parse_zyla_response(data: Dict[str, Any]) -> Dict[str, Any]:
         }
     # Common fields
     verdict_raw = (data.get('verdict') or data.get('result') or data.get('status') or '').strip().lower()
-    # Normalize common verdict synonyms to one of: true, false, misleading
+    # Normalize common verdict synonyms to one of: true, false, partially_true
     verdict_map = {
         'verified': 'true', 'correct': 'true', 'accurate': 'true', 'true': 'true',
         'false': 'false', 'incorrect': 'false', 'not verified': 'false', 'unverified': 'false',
-        'misleading': 'misleading', 'mixed': 'misleading', 'partially true': 'misleading', 'partly true': 'misleading',
+        'misleading': 'partially_true', 'mixed': 'partially_true', 'partially true': 'partially_true', 'partly true': 'partially_true',
     }
     verdict = verdict_map.get(verdict_raw, verdict_raw)
     confidence = data.get('confidence')
@@ -349,15 +436,15 @@ def _is_meaningful_statement(s: str) -> bool:
     t = s.strip()
     # Relax length threshold to allow concise slug-based fallbacks
     # This increases Zyla coverage when content is short but meaningful.
-    if len(t) < 25:
+    if len(t) < 15:
         return False
     if t.lower().startswith(('url:', 'facebook url:')):
         return False
     if 'http://' in t.lower() or 'https://' in t.lower():
         return False
-    # At least 6 words containing letters
+    # At least 4 words containing letters
     words = [w for w in re.split(r"\s+", t) if re.search(r"[a-zA-Z]", w)]
-    if len(words) < 6:
+    if len(words) < 4:
         return False
     return True
 
@@ -378,7 +465,7 @@ def build_zyla_safe_input(text: str) -> str:
     selected = []
     for s in sentences:
         s2 = s.strip()
-        if 30 <= len(s2) <= 300:
+        if 20 <= len(s2) <= 300:
             selected.append(s2)
         if len(selected) >= 3:
             break
@@ -937,7 +1024,9 @@ def fact_check_endpoint():
     zyla_statement = (primary_statement or title or content or '').strip()
     zyla_safe_input = build_zyla_safe_input(zyla_statement)
     zyla = {}
-    if ZYLA_ENABLED and _is_meaningful_statement(zyla_safe_input):
+    zyla_call_attempted = False
+    if ZYLA_ENABLED:
+        zyla_call_attempted = True
         zyla_raw = query_zyla_fact_check(zyla_safe_input)
         zyla = parse_zyla_response(zyla_raw)
 
@@ -952,9 +1041,9 @@ def fact_check_endpoint():
     real_claims = []
 
     # Integrate Zyla into claims sections if it returned a verdict
-    if zyla.get('verdict') in {'true', 'false', 'misleading'}:
+    if zyla.get('verdict') in {'true', 'false', 'partially_true'}:
         # Build a pseudo-claim analysis entry from Zyla
-        rating_text = zyla['verdict'].title()
+        rating_text = 'Partially True' if zyla['verdict'] == 'partially_true' else zyla['verdict'].title()
         info = {
             'claim': zyla.get('claim') or zyla_safe_input or primary_statement,
             'rating': rating_text,
@@ -980,15 +1069,21 @@ def fact_check_endpoint():
             conf = zyla.get('confidence')
             val = 1.0 - float(conf) if isinstance(conf, (int, float)) else 0.1
             scores.append(_clamp01(val))
-        else:  # misleading
-            fake_claims.append(info)
-            scores.append(0.4)
+        else:  # partially_true
+            # Treat partially true as mixed credibility; include in real claims
+            real_claims.append(info)
+            conf = zyla.get('confidence')
+            val = float(conf) if isinstance(conf, (int, float)) else 0.6
+            val = min(val, 0.65)
+            scores.append(_clamp01(val))
         if zyla.get('explanation'):
             explanations.append(str(zyla['explanation']))
 
     # Always query Google Fact Check for claims to retrieve claimReview support
     run_google = True
     if run_google:
+        google_attempted_count = 0
+        google_claims_found_count = 0
         # Only query Google with meaningful claims; skip noisy Facebook fallbacks
         is_facebook = bool(url and 'facebook.com' in (url or '').lower())
         # Filter claims to those that look meaningful for fact-checking
@@ -1006,6 +1101,7 @@ def fact_check_endpoint():
             if _is_meaningful_statement(primary_statement) and primary_statement not in meaningful_claims:
                 meaningful_claims.insert(0, primary_statement)
 
+            google_attempted_count = len(meaningful_claims)
             for claim in meaningful_claims:
                 result = check_claim_with_google_api(claim)
                 all_results.append({
@@ -1016,6 +1112,10 @@ def fact_check_endpoint():
             for result in all_results:
                 fc_result = result["fact_check_result"]
                 if fc_result and "claims" in fc_result:
+                    try:
+                        google_claims_found_count += len(fc_result.get("claims", []))
+                    except Exception:
+                        pass
                     # Score/explanation
                     claim_result = calculate_credibility_score(fc_result)
                     scores.append(_clamp01(claim_result["score"]))
@@ -1166,11 +1266,11 @@ def fact_check_endpoint():
     slang_found = detect_slang_words(text_for_slang)
     sarcasm_score, sarcasm_risk = compute_sarcasm_score(text_for_slang, slang_found)
 
-    # Apply sarcasm deductions to final score (map to 0–7 points)
+    # Apply sarcasm deduction only when slang words are detected
     # Low sarcasm (<2% slang): subtract up to ~2 points; potential: subtract ~5 points
-    deduction_points = 2 if 'Low' in sarcasm_risk else 5
-    # Convert points (out of 100) to score fraction and clamp
-    overall_score = max(0.0, min(1.0, overall_score - (deduction_points / 100.0)))
+    if slang_found:
+        deduction_points = 5 if sarcasm_score >= 0.02 else 2
+        overall_score = max(0.0, min(1.0, overall_score - (deduction_points / 100.0)))
 
     # Determine overall label AFTER deductions so label matches displayed score
     if _has_fact_data:
@@ -1206,6 +1306,20 @@ def fact_check_endpoint():
         'real_claims': real_claims,
         'has_google_claims': bool(has_google_claims),
         'zyla': zyla,
+        'zyla_enabled': bool(ZYLA_ENABLED),
+        'zyla_attempted': bool(zyla_call_attempted),
+        'zyla_input_preview': zyla_safe_input[:160],
+        'zyla_debug': {
+            'endpoint': ZYLA_API_URL,
+            'enabled': bool(ZYLA_ENABLED),
+            'attempted': bool(zyla_call_attempted),
+            'input_len': len(zyla_safe_input or '')
+        },
+        'debug': {
+            'google_attempted_count': int(locals().get('google_attempted_count', 0)),
+            'google_claims_found_count': int(locals().get('google_claims_found_count', 0)),
+            'scores_count': len(scores)
+        },
         'ml_details': ml_details,
         'slang_detected': slang_found,
         'sarcasm_score': sarcasm_score,
