@@ -108,11 +108,18 @@
 .score-circle.score-high { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-color: #22c55e; color: #15803d; }
 .score-circle.score-medium { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-color: #f59e0b; color: #d97706; }
 .score-circle.score-low { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-color: #ef4444; color: #dc2626; }
+.score-circle.score-low .score-number { color: #dc2626; }
+.score-circle.score-medium .score-number { color: #d97706; }
+.score-circle.score-high .score-number { color: #15803d; }
+/* Neutral (Unverified) styling */
+.score-circle.score-neutral { background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border-color: #9ca3af; color: #4b5563; }
+.score-circle.score-neutral .score-number { color: #4b5563; }
 .score-number { font-size: 2.25rem; line-height: 1; }
 .score-label { font-size: 1rem; opacity: 0.8; line-height: 1; }
 .score-description h3 { margin: 0 0 0.5rem 0; color: #1f2937; font-size: 1.5rem; }
 .score-description p { margin: 0; color: #6b7280; font-size: 1.125rem; line-height: 1.7; }
 .score-description .credibility-label { font-weight: 700; }
+.score-description .credibility-label.neutral-credibility { color: #6b7280; background: transparent !important; }
 .score-description .credibility-label.high-credibility { color: #10B981; background: transparent !important; }
 .score-description .credibility-label.medium-credibility { color: #F59E0B; background: transparent !important; }
 .score-description .credibility-label.low-credibility { color: #EF4444; background: transparent !important; }
@@ -143,6 +150,7 @@
 .analyzed-text.highlight-high { border-left-color: #22c55e; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); color: #166534; }
 .analyzed-text.highlight-medium { border-left-color: #f59e0b; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; }
 .analyzed-text.highlight-low { border-left-color: #ef4444; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); color: #7f1d1d; }
+.analyzed-text.highlight-neutral { border-left-color: #9ca3af; background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); color: #374151; }
 
 .url-value { word-break: break-all; font-family: monospace; font-size: 0.75rem; background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px; }
 
@@ -163,3 +171,4 @@
 .submit-feedback-btn:hover { opacity: 0.95; }
 
 #url-verify-section .verify-card { border-left: 4px solid #22c55e; border-radius: 20px; }
+.notification-neutral { background: #6b7280; }

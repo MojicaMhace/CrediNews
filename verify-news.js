@@ -51,10 +51,11 @@ async function handleUrlVerification() {
     // Proceed even if no extracted content; backend will use URL-based fallbacks
 
     try {
+        const contentForApi = effectiveContent || (url ? buildNonEmptyContentFromUrl(url) : '') || '';
         const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: '', content: effectiveContent || '', url })
+            body: JSON.stringify({ title: '', content: contentForApi, url })
         });
         if (!fcResp.ok) throw new Error(`API error: ${fcResp.status}`);
         const result = await fcResp.json();
@@ -164,7 +165,7 @@ function isSupportedFacebookPostUrl(url) {
 function isValidFacebookContent(text) {
     const t = (text || '').trim();
     // Require sufficient length
-    if (t.length < 60) return false;
+    if (t.length < 20) return false;
     // Require multiple words
     const words = t.split(/\s+/).filter(Boolean);
     if (words.length < 3) return false;
@@ -242,8 +243,8 @@ async function handleFacebookVerification() {
     if (content) {
         const validCount = countValidWords(content);
         const passesQuality = isValidFacebookContent(content);
-        if (!passesQuality || validCount < 14) {
-            showNotification('Content is invalid or too short. Please enter at least 14 valid words.', 'error');
+        if (!passesQuality || validCount < 5) {
+            showNotification('Content is invalid or too short. Please enter at least 5 valid words.', 'error');
             return;
         }
     }
@@ -254,16 +255,21 @@ async function handleFacebookVerification() {
     facebookVerifyBtn.disabled = true;
     facebookVerifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing Facebook Content...';
     
-    // Call the fact check API for Facebook content
-    if (firebase.auth().currentUser) {
-        // Store verification request in Firebase
-        firebase.firestore().collection('facebook_verification_requests').add({
-            url: url || null,
-            content: content || null,
-            userId: firebase.auth().currentUser.uid,
-            userEmail: firebase.auth().currentUser.email,
-            requestedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+    if (window.firebase && firebase.firestore) {
+        try {
+            await firebase.firestore().collection('facebook_verification_requests').add({
+                url: url || null,
+                content: content || null,
+                userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
+                userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
+                requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (e) {
+            console.error('Error writing facebook_verification request:', e);
+            showNotification('Failed to log verification request. Check Firestore rules.', 'error');
+        }
+    } else {
+        console.log('FB verification request payload:', { url: url || null, content: content || null });
     }
     
     // If URL provided but no content, extract key claim from URL (frontend intelligence)
@@ -289,7 +295,7 @@ async function handleFacebookVerification() {
     // Proceed even if content is empty; backend will attempt URL-based extraction
 
     // Build the exact content string we will send to the API
-    const contentForApi = effectiveContent || '';
+    const contentForApi = effectiveContent || (url ? buildNonEmptyContentFromUrl(url) : '') || '';
 
     // Call the fact check API with the best available content
     try {
@@ -314,6 +320,42 @@ async function handleFacebookVerification() {
         // Use credibility score directly
         const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
         
+        let resultId = null;
+        if (window.firebase && firebase.firestore) {
+            try {
+                const resultDocRef = await firebase.firestore().collection('facebook_verification_results').add({
+                    platform: 'Facebook',
+                    analysis: analysisType,
+                    url: url || null,
+                    contentType: url ? 'Post/Article URL' : 'Text Content',
+                    credibilityScore: adjustedScore,
+                    label: result.credibility && result.credibility.label,
+                    sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
+                    factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
+                    analyzedText: contentForApi,
+                    userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
+                    userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
+                    analyzed_at: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                resultId = resultDocRef.id;
+            } catch (e) {
+                console.error('Error writing facebook_verification_results:', e);
+                showNotification('Failed to store analysis result. Check Firestore rules.', 'error');
+            }
+        } else {
+            console.log('FB verification result payload:', {
+                platform: 'Facebook',
+                analysis: analysisType,
+                url: url || null,
+                contentType: url ? 'Post/Article URL' : 'Text Content',
+                credibilityScore: adjustedScore,
+                label: result.credibility && result.credibility.label,
+                sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
+                factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
+                analyzedText: contentForApi
+            });
+        }
+
         showFacebookVerificationResult(analysisType, {
             credibilityScore: adjustedScore,
             sources: (result.credibility && result.credibility.sources) ?? 0,
@@ -334,7 +376,8 @@ async function handleFacebookVerification() {
             realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
             claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : [],
-            hasGoogleClaims: !!result.has_google_claims
+            hasGoogleClaims: !!result.has_google_claims,
+            resultId: resultId
         });
     } catch (error) {
         console.error('Fact check API error:', error);
@@ -537,7 +580,8 @@ function showFacebookVerificationResult(type, data) {
                  data-url="${data.url || ''}"
                  data-content-type="${data.contentType || 'Post'}"
                  data-score="${data.credibilityScore}"
-                 data-label="${data.credibilityLabel || ''}">
+                 data-label="${data.credibilityLabel || ''}"
+                 data-result-id="${data.resultId || ''}">
                 <div class="feedback-controls">
                     <button class="feedback-btn" type="button" data-feedback="agree">
                         <i class="fas fa-thumbs-up"></i>
@@ -558,10 +602,12 @@ function showFacebookVerificationResult(type, data) {
 
 // Get Facebook-specific score summary
 function getFacebookScoreSummary(score) {
-    if (score >= 70) {
+    if (score >= 75) {
         return 'The content aligns with verified information and shows no signs of misinformation.';
-    } else if (score >= 50) {
-        return 'Contains both reliable and questionable information. Consider cross-referencing with additional sources.';
+    } else if (score >= 55) {
+        return 'Contains both reliable and questionable information. Consider cross-referencing.';
+    } else if (score >= 46) {
+        return 'We could not find sufficient evidence to verify this content. Proceed with caution.';
     } else {
         return 'This post may contain false or misleading information. Please verify before sharing.';
     } 
@@ -590,8 +636,12 @@ async function showVerificationResult(type, data) {
             summary: getScoreSummary(data.credibilityScore)
         };
         
-        await firebase.firestore().collection('verification_results').add(verificationData);
-        console.log('Verification result stored in Firebase');
+        if (window.firebase && firebase.firestore) {
+            await firebase.firestore().collection('verification_results').add(verificationData);
+            console.log('Verification result stored in Firebase');
+        } else {
+            console.log('Verification result payload:', verificationData);
+        }
     } catch (error) {
         console.error('Error storing verification result:', error);
     }
@@ -816,19 +866,22 @@ function getScoreClass(score) {
 // Get score class based on label (requested behavior)
 function getScoreClassByLabel(label) {
     const t = String(label || '').trim().toLowerCase();
-    if (!t) return 'low';
+    if (!t) return 'neutral';
     if (t === 'credible') return 'high';
     if (t === 'mixed') return 'medium';
-    if (t.includes('low credibility') || t.includes('unverified')) return 'low';
-    return 'low';
+    if (t.includes('unverified')) return 'neutral';
+    if (t.includes('low credibility')) return 'low';
+    return 'neutral';
 }
 
 // Get score summary text
 function getScoreSummary(score) {
-    if (score >= 70) {
+    if (score >= 75) {
         return 'The content aligns with verified information and shows no signs of misinformation.';
-    } else if (score >= 50) {
-        return 'Contains both reliable and questionable information. Consider cross-referencing with additional sources.';
+    } else if (score >= 55) {
+        return 'Contains both reliable and questionable information. Consider cross-referencing.';
+    } else if (score >= 46) {
+        return 'We could not find sufficient evidence to verify this content. Proceed with caution.';
     } else {
         return 'This post may contain false or misleading information. Please verify before sharing.';
     }
@@ -837,21 +890,23 @@ function getScoreSummary(score) {
 // Map verdict label text to credibility color classes (CREDIBLE/MIXED/LOW CREDIBILITY)
 function getCredibilityClass(label) {
     const t = String(label || '').trim().toLowerCase();
-    if (!t) return '';
+    if (!t) return 'neutral-credibility';
     if (t === 'low credibility' || t.includes('low credibility')) return 'low-credibility';
     if (t === 'credible') return 'high-credibility';
-    if (t === 'mixed' || t.includes('unverified')) return 'medium-credibility';
-    return '';
+    if (t === 'mixed') return 'medium-credibility';
+    if (t.includes('unverified')) return 'neutral-credibility';
+    return 'neutral-credibility';
 }
 
 // Highlight class for analyzed text based on label
 function getHighlightClassByLabel(label) {
     const t = String(label || '').trim().toLowerCase();
-    if (!t) return 'highlight-low';
+    if (!t) return 'highlight-neutral';
     if (t === 'credible') return 'highlight-high';
     if (t === 'mixed') return 'highlight-medium';
-    if (t.includes('low credibility') || t.includes('unverified')) return 'highlight-low';
-    return 'highlight-low';
+    if (t.includes('unverified')) return 'highlight-neutral';
+    if (t.includes('low credibility')) return 'highlight-low';
+    return 'highlight-neutral';
 }
 
 // Decode incoming HTML entities (e.g., &quot;, &#x2019;) to plain text
@@ -972,8 +1027,8 @@ function updateFacebookCharacterCount() {
             const validCount = countValidWords(contentText);
 
             if (contentText) {
-                facebookVerifyBtn.disabled = validCount < 14;
-                facebookVerifyBtn.title = validCount < 14 ? 'Enter at least 14 valid words to analyze.' : '';
+                facebookVerifyBtn.disabled = validCount < 5;
+                facebookVerifyBtn.title = validCount < 5 ? 'Enter at least 5 valid words to analyze.' : '';
             } else if (validUrl) {
                 facebookVerifyBtn.disabled = false;
                 facebookVerifyBtn.title = '';
@@ -1075,59 +1130,61 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Feedback interactions: like/dislike selection and submit
-document.addEventListener('click', function(e) {
-    // Toggle agree/disagree selection
+document.addEventListener('click', async function(e) {
     const fbBtn = e.target.closest('.feedback-btn');
-    if (fbBtn) {
-        const section = fbBtn.closest('.feedback-section');
-        if (section) {
-            section.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('selected'));
-            fbBtn.classList.add('selected');
-        }
+    if (!fbBtn) return;
+
+    const section = fbBtn.closest('.feedback-section');
+    if (!section) return;
+
+    section.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('selected'));
+    fbBtn.classList.add('selected');
+
+    const feedbackChoice = fbBtn.dataset.feedback;
+    const resultId = section.dataset.resultId || '';
+
+    if (!feedbackChoice) {
+        showNotification('Please select agree or disagree.', 'error');
+        return;
     }
 
-    // Submit feedback
-    const submitBtn = e.target.closest('.submit-feedback-btn');
-    if (submitBtn) {
-        const section = submitBtn.closest('.feedback-section');
-        if (!section) return;
-        const selectedBtn = section.querySelector('.feedback-btn.selected');
-        const feedbackChoice = selectedBtn ? selectedBtn.dataset.feedback : null;
-        const commentEl = section.querySelector('.feedback-text');
-        const comment = commentEl ? commentEl.value.trim() : '';
+    if (!window.firebase || !firebase.firestore) {
+        showNotification('Feedback unavailable: Firestore not initialized.', 'error');
+        return;
+    }
 
-        if (!feedbackChoice && !comment) {
-            showNotification('Please select like/dislike or add a comment.', 'error');
-            return;
-        }
+    const user = firebase.auth().currentUser;
+    if (!user || !user.uid) {
+        showNotification('Sign in to vote.', 'error');
+        return;
+    }
 
-        const payload = {
-            analysis: section.dataset.analysis || null,
-            platform: section.dataset.platform || null,
-            url: section.dataset.url || null,
-            contentType: section.dataset.contentType || null,
-            score: Number(section.dataset.score || 0),
-            label: section.dataset.label || null,
-            feedback: feedbackChoice,
-            comment: comment
-        };
+    if (!resultId) {
+        showNotification('Unable to record vote: missing result ID.', 'error');
+        return;
+    }
 
-        try {
-            if (window.firebase && firebase.firestore) {
-                firebase.firestore().collection('verification_feedback').add({
-                    ...payload,
-                    userId: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
-                    userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
-                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            } else {
-                console.log('Feedback payload:', payload);
-            }
-            showNotification('Thanks for your feedback!', 'success');
-        } catch (err) {
-            console.error('Error submitting feedback:', err);
-            showNotification('Failed to submit feedback. Please try again.', 'error');
-        }
+    try {
+        const docRef = firebase.firestore().collection('facebook_verification_results').doc(resultId);
+        await firebase.firestore().runTransaction(async (tx) => {
+            const snap = await tx.get(docRef);
+            const data = snap.exists ? snap.data() : {};
+            const feedback = data.feedback || { agreeCount: 0, disagreeCount: 0 };
+            const voters = data.voters || {};
+            const prev = voters[user.uid];
+            const next = feedbackChoice;
+            if (prev === next) return;
+            if (prev === 'agree') feedback.agreeCount = Math.max(0, Number(feedback.agreeCount || 0) - 1);
+            if (prev === 'disagree') feedback.disagreeCount = Math.max(0, Number(feedback.disagreeCount || 0) - 1);
+            if (next === 'agree') feedback.agreeCount = Number(feedback.agreeCount || 0) + 1;
+            if (next === 'disagree') feedback.disagreeCount = Number(feedback.disagreeCount || 0) + 1;
+            voters[user.uid] = next;
+            tx.set(docRef, { feedback, voters }, { merge: true });
+        });
+        showNotification('Your vote has been recorded.', 'success');
+    } catch (err) {
+        console.error('Error recording vote:', err);
+        showNotification('Failed to record vote. Please try again.', 'error');
     }
 });
 
@@ -1151,550 +1208,3 @@ function switchVerifySection(section) {
 // Default to Facebook section visible
 switchVerifySection('facebook');
 
-// Add CSS for notifications and modal
-const additionalStyles = `
-<style>
-.notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 1rem 1.5rem;
-    border-radius: 8px;
-    color: white;
-    font-weight: 500;
-    z-index: 10000;
-    animation: slideIn 0.3s ease;
-}
-
-.notification-error {
-    background: #ef4444;
-}
-
-.notification-success {
-    background: #22c55e;
-}
-
-.notification-info {
-    background: #3b82f6;
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-}
-
-.modal-content {
-    background: white;
-    border-radius: 12px;
-    max-width: 980px;
-    width: 95%;
-    max-height: 92vh;
-    overflow-y: auto;
-    border-left: 4px solid #1877f2;
-}
-
-.modal-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.modal-header h2 {
-    margin: 0;
-    color: #1f2937;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: #6b7280;
-}
-
-.modal-body {
-    padding: 1.5rem;
-}
-
-.modal-footer {
-    display: flex;
-    margin: 0 auto;
-    padding: 1.5rem;
-    border-top: 1px solid #e5e7eb;
-    text-align: center;
-}
-
-.verification-result {
-    text-align: left;
-    color: #1f2937;
-}
-
-.result-grid {
-    display: grid;
-    gap: 1rem;
-    margin: 1rem 0;
-}
-
-
-.result-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f3f4f6;
-}
-
-.result-label {
-    font-weight: 600;
-    color: #374151;
-}
-
-.result-value {
-    font-weight: 500;
-    color: #1f2937;
-}
-
-.score-high {
-    color: #22c55e;
-}
-
-.score-medium {
-    color: #f59e0b;
-}
-
-.score-low {
-    color: #ef4444;
-}
-
-.result-summary {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: #f9fafb;
-    border-radius: 8px;
-    border-left: 4px solid #3b82f6;
-    color: #374151;    
-}
-
-  .toggle-buttons {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-      justify-content: center;
-  }
-.toggle-btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid #e5e7eb;
-    background: #f9fafb;
-    color: #374151;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
-}
-  .toggle-btn.active {
-      background: #3b82f6;
-      color: #fff;
-      border-color: #2563eb;
-  }
-  #open-poser-detection.toggle-btn:hover {
-      background: #7e22ce;
-      color: #fff;
-      border-color: #7e22ce;
-  }
-/* Verify Url Toggle */
-#show-url-verify.toggle-btn.active {
-    background: #22c55e;
-    color: #fff;
-    border-color: #16a34a;
-
-}
-/* Verify Facebook toggle */
-#show-facebook-verify.toggle-btn.active {
-    background: #1877f2;
-    color: #fff;
-    border-color: #166fe5;
-}
-.btn {
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-}
-
-.btn-primary {
-    background: #3b82f6;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #2563eb;
-}
-/* Disabled button visuals */
-.btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-
-.result-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.platform-badge {
-    display: flex;
-    align-items: center;
-    background: linear-gradient(135deg, #1877f2 0%, #166fe5 100%);
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-    font-weight: 600;
-    font-size: 0.875rem;
-}
-
-.platform-badge i {
-    margin-right: 0.5rem;
-}
-
-.content-type {
-    background: #f3f4f6;
-    color: #374151;
-    padding: 0.25rem 0.75rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.result-score {
-    display: grid;
-    grid-template-columns: 160px 1fr;
-    gap: 1.25rem;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-
-.score-circle {
-    width: 140px;
-    height: 140px;
-    border-radius: 50%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    border: 4px solid;
-}
-
-.score-circle.score-high {
-    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-    border-color: #22c55e;
-    color: #15803d;
-}
-
-.score-circle.score-medium {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    border-color: #f59e0b;
-    color: #d97706;
-}
-
-.score-circle.score-low {
-    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-    border-color: #ef4444;
-    color: #dc2626;
-}
-
-.score-number {
-    font-size: 2.25rem;
-    line-height: 1;
-}
-
-.score-label {
-    font-size: 1rem;
-    opacity: 0.8;
-    line-height: 1;
-}
-
-.score-description h3 {
-    margin: 0 0 0.5rem 0;
-    color: #1f2937;
-    font-size: 1.5rem;
-}
-
-.score-description p {
-    margin: 0;
-    color: #6b7280;
-    font-size: 1.125rem;
-    line-height: 1.7;
-}
-
-/* Credibility label color (verdict-based), referencing fact_check_styles.css */
-.score-description .credibility-label {
-    font-weight: 700;
-}
-.score-description .credibility-label.high-credibility {
-    color: #10B981;
-    background: transparent !important;
-}
-.score-description .credibility-label.medium-credibility {
-    color: #F59E0B;
-    background: transparent !important;
-}
-.score-description .credibility-label.low-credibility {
-    color: #EF4444;
-    background: transparent !important;
-}
-
-/* Responsive adjustments for small screens */
-@media (max-width: 640px) {
-    .result-score {
-        grid-template-columns: 120px 1fr;
-        gap: 1rem;
-    }
-    .score-circle {
-        width: 110px;
-        height: 110px;
-    }
-    .score-number {
-        font-size: 1.75rem;
-    }
-    .score-description h3 {
-        font-size: 1.25rem;
-    }
-    .score-description p {
-        font-size: 0.95rem;
-        line-height: 1.6;
-    }
-}
-
-.analysis-features {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    background: #f9fafb;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-}
-
-.analysis-features h4 {
-    margin: 0 0 1rem 0;
-    color: #1f2937;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.feature-list {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-    color: #1f2937;
-}
-
-.feature-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem;
-    background: white;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    font-size: 0.875rem;
-    color: #1f2937;
-}
-
-.feature-item.enabled {
-    border-color: #22c55e;
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-}
-
-.feature-item.disabled {
-    border-color: #e5e7eb;
-    background: #f9fafb;
-    opacity: 0.6;
-}
-
-.feature-item i:first-child {
-    margin-right: 0.5rem;
-    color: #6b7280;
-}
-
-.feature-item.enabled i:first-child {
-    color: #22c55e;
-}
-
-.feature-item i:last-child {
-    color: #22c55e;
-}
-
-.feature-item.disabled i:last-child {
-    color: #ef4444;
-}
-
-.facebook-summary {
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-    border: 1px solid #3b82f6;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-top: 1.5rem;
-}
-
-.facebook-summary p {
-    margin: 0;
-    color: #1e40af;
-    font-size: 0.875rem;
-    line-height: 1.6;
-}
-
-/* Analyzed text highlighting */
-.analyzed-text {
-    border-left-width: 4px;
-}
-.analyzed-text.highlight-high {
-    border-left-color: #22c55e;
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    color: #166534;
-}
-.analyzed-text.highlight-medium {
-    border-left-color: #f59e0b;
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    color: #92400e;
-}
-.analyzed-text.highlight-low {
-    border-left-color: #ef4444;
-    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-    color: #7f1d1d;
-}
-
-.url-value {
-    word-break: break-all;
-    font-family: monospace;
-    font-size: 0.75rem;
-    background: #f3f4f6;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-}
-/* Feedback section styles */
-.feedback-section {
-    margin-top: 1.5rem;
-    padding: 1rem;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-}
-.feedback-section.compact {
-    margin-top: 0.5rem;
-    padding: 0;
-    background: transparent;
-    border: 0;
-}
-.feedback-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 0.75rem;
-}
-.feedback-controls {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-}
-.feedback-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    color: #374151;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
-}
-.feedback-btn i { color: #6b7280; }
-.feedback-btn.selected i { color: inherit; }
-.facebook-result .feedback-btn.selected {
-    border-color: #1877f2;
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-    color: #1e40af;
-}
-.url-result .feedback-btn.selected {
-    border-color: #22c55e;
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    color: #166534;
-}
-.feedback-comment .feedback-label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-size: 0.85rem;
-    color: #6b7280;
-}
-.feedback-text {
-    width: 100%;
-    resize: vertical;
-    padding: 0.5rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    color: #1f2937;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-}
-.feedback-text::placeholder {
-    color: #6b7280;
-    opacity: 1;
-    font-family: inherit;
-}
-.feedback-actions {
-    margin-top: 0.75rem;
-    text-align: right;
-}
-.facebook-result .submit-feedback-btn {
-    background: #1877f2;
-    color: #fff;
-}
-.url-result .submit-feedback-btn {
-    background: #22c55e;
-    color: #fff;
-}
-.submit-feedback-btn:hover {
-    opacity: 0.95;
-}
-/* Add green left border and 12px radius to the Verify URL card */
-#url-verify-section .verify-card {
-    border-left: 4px solid #22c55e;
-    border-radius: 20px;
-}
-</style>
-`;
-
-// Add styles to head
-// Inline styles have been moved to verify-news.css and are no longer injected.
