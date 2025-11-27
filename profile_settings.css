@@ -1,0 +1,27 @@
+:root { --bg:#111827; --panel:#0f172a; --border:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --green:#10b981; --red:#ef4444; }
+html,body { height:100%; background:var(--bg); color:var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+.settings-page { display:flex; min-height:100vh; }
+.settings-sidebar { width:260px; background:var(--panel); border-right:1px solid var(--border); padding:20px; }
+.settings-sidebar h2 { font-size:18px; font-weight:800; margin:0 0 12px; }
+.settings-sidebar nav { display:flex; flex-direction:column; gap:8px; }
+.tab-btn { padding:10px 12px; border-radius:8px; background:transparent; color:var(--text); border:1px solid var(--border); text-align:left; cursor:pointer; }
+.tab-btn:hover { border-color:var(--green); }
+.tab-btn.danger { color:#fecaca; border-color:#7f1d1d; }
+.settings-content { flex:1; padding:24px; }
+.tab { display:none; }
+.tab.active { display:block; }
+h3 { font-size:16px; font-weight:800; margin:0 0 14px; }
+.form-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-group.full { grid-column: 1 / -1; }
+label { font-weight:700; color:var(--muted); }
+input, textarea, select { background:#0b1322; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px; outline:none; }
+input:focus, textarea:focus, select:focus { border-color:var(--green); box-shadow:0 0 0 2px rgba(16,185,129,0.15); }
+.actions { display:flex; gap:10px; margin-top:12px; }
+.btn { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px; border:1px solid var(--border); background:#1e3a8a; color:#fff; cursor:pointer; }
+.btn.primary { background:#1e3a8a; }
+.btn.ghost { background:transparent; color:var(--text); }
+.btn.danger { background:var(--red); border-color:#b91c1c; }
+.btn.danger-outline { background:transparent; color:#fecaca; border-color:#ef4444; }
+.danger-card { border:1px solid var(--red); border-radius:12px; padding:16px; background:#0b1322; }
+.toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0b1322; color:#fff; border:1px solid var(--border); border-radius:10px; padding:10px 14px; display:none; }

@@ -146,8 +146,11 @@
             auth.applyActionCode(oobCode)
               .then(() => {
                 const successEl = document.getElementById('verificationSuccessMessage');
-                if (successEl) successEl.style.display = 'block';
-                // Clear query params after applying code
+                if (successEl) {
+                  successEl.style.display = 'block';
+                  sessionStorage.setItem('verification_just_completed','1');
+                  setTimeout(() => { successEl.style.display = 'none'; }, 5000);
+                }
                 window.history.replaceState({}, document.title, window.location.pathname);
               })
               .catch((error) => {

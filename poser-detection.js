@@ -1,75 +1,162 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Navigation buttons in the toggle bar
+  // --- Navigation Logic ---
   const goFacebookBtn = document.getElementById('show-facebook-verify');
   const goUrlBtn = document.getElementById('show-url-verify');
-  if (goFacebookBtn) {
-    goFacebookBtn.addEventListener('click', () => {
-      window.location.href = 'verify-news.html?section=facebook';
-    });
-  }
-  if (goUrlBtn) {
-    goUrlBtn.addEventListener('click', () => {
-      window.location.href = 'verify-news.html?section=url';
-    });
-  }
+  if (goFacebookBtn) goFacebookBtn.addEventListener('click', () => window.location.href = 'verify-news.html?section=facebook');
+  if (goUrlBtn) goUrlBtn.addEventListener('click', () => window.location.href = 'verify-news.html?section=url');
 
+  // --- Elements ---
   const runBtn = document.getElementById('run-poser-btn');
   const urlInput = document.getElementById('poser-url');
   const urlError = document.getElementById('poser-url-error');
-  const notesInput = document.getElementById('poser-notes');
-  const resultSection = document.getElementById('poser-result');
-  const resultDetails = document.getElementById('poser-analysis-details');
+  const notesInput = document.getElementById('poser-notes'); 
 
+  // --- Validation Helpers ---
   function setFieldError(message){
     if(urlError){ urlError.textContent = message; }
     const fg = urlInput ? urlInput.closest('.form-group') : null;
     if(fg) fg.classList.add('has-error');
     if(urlInput) urlInput.classList.add('error');
   }
+  
   function clearFieldError(){
     if(urlError){ urlError.textContent = ''; }
     const fg = urlInput ? urlInput.closest('.form-group') : null;
     if(fg) fg.classList.remove('has-error');
     if(urlInput) urlInput.classList.remove('error');
   }
-  if(urlInput){ urlInput.addEventListener('input', clearFieldError); }
 
-  // Helpers copied to match Verify Facebook News UI
   function getScoreClass(score) {
     if (score >= 80) return 'high';
     if (score >= 50) return 'medium';
     return 'low';
   }
 
-  function showModal(title, content) {
-    const modalHtml = `
-        <div class="modal-overlay" id="verificationModal">
-            <div class="modal-content" style="border-left-color:#7e22ce;">
-                <div class="modal-header">
-                    <h2>${title}</h2>
-                    <button class="modal-close" onclick="(function(){const m=document.getElementById('verificationModal'); if(m) m.remove();})()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    ${content}
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-primary" onclick="(function(){const m=document.getElementById('verificationModal'); if(m) m.remove();})()">Close</button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const m = document.getElementById('verificationModal');
-    if (m) m.style.display = 'flex';
+  // --- URL Helpers ---
+  function isFacebookUrl(urlOrId) {
+    try {
+      const u = new URL(urlOrId);
+      return /facebook\.com$/.test(u.hostname) || u.hostname.includes('fb.com');
+    } catch (_) {
+      return /^\d{5,}$/.test(urlOrId); // Allow raw numeric IDs
+    }
   }
 
-  function showLoadingModal(title = 'Analyzing...') {
-    const loader = `
-      <div class="loading-wrap">
-        <div class="loading-spinner"></div>
-        <p class="loading-text">Analyzing poster...</p>
+  function isPostUrl(url) {
+    try {
+      const u = new URL(url);
+      const p = (u.pathname || '').toLowerCase();
+      const q = (u.search || '').toLowerCase();
+      
+      // 1. Check for Post/Photo/Video patterns
+      if (/\/posts\//.test(p) || /\/photos\//.test(p) || /\/videos\//.test(p) || /\/reel\//.test(p) || 
+          /\/story\.php/.test(p) || /\/permalink\//.test(p) || /\/sharer\.php/.test(p) ||
+          /(\?|&)story_fbid=/.test(q) || /(\?|&)fbid=/.test(q)) {
+          return true;
+      }
+
+      // 2. Check for Non-Profile Pages (Groups, Marketplace, Watch, Gaming, etc.)
+      const parts = p.split('/').filter(Boolean);
+      const first = parts[0] || '';
+      const reserved = ['groups', 'events', 'marketplace', 'watch', 'gaming', 'help', 'settings', 'privacy', 'login', 'search'];
+      
+      if (reserved.includes(first)) {
+          return true; 
+      }
+
+      return false;
+    } catch(_) { 
+      return false; 
+    }
+  }
+
+  function isAllowedPageOrProfileUrl(url) {
+    // Simple strict check combining the above
+    if (!isFacebookUrl(url)) return false;
+    if (isPostUrl(url)) return false;
+    return true;
+  }
+
+  function extractPosterId(input) {
+    try {
+      const u = new URL(input);
+      const idParam = u.searchParams.get('id');
+      if (u.pathname.includes('/profile.php') && idParam) return idParam;
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length >= 1) {
+        const last = parts[parts.length - 1];
+        const numeric = parts.find(p => /^\d{5,}$/.test(p));
+        return numeric || last;
+      }
+      return u.hostname;
+    } catch (_) { return input.trim(); }
+  }
+
+  // --- REAL-TIME VALIDATION ---
+  function validateInputState() {
+    const val = (urlInput.value || '').trim();
+    
+    if (!val) {
+        runBtn.disabled = false;
+        runBtn.title = "";
+        clearFieldError();
+        return;
+    }
+
+    // 2. Valid Facebook URL Check
+    if (!isFacebookUrl(val)) {
+        runBtn.disabled = true;
+        runBtn.title = "Please enter a valid Facebook URL.";
+        return;
+    }
+
+    // 3. Page/Profile Check (Not a Post)
+    if (isPostUrl(val)) {
+        runBtn.disabled = true;
+        runBtn.title = "Please enter a Page or Profile URL, not a specific post.";
+        setFieldError("Please provide a Page or Profile URL, not a post.");
+        return;
+    }
+
+    // 4. If all good
+    runBtn.disabled = false;
+    runBtn.title = "";
+    clearFieldError();
+  }
+
+  if(urlInput){ 
+      // Run validation on every keystroke
+      urlInput.addEventListener('input', validateInputState);
+      // Run once on load to set initial state
+      validateInputState();
+  }
+
+
+  // --- Modal Logic ---
+  function showModal(title, content) {
+    const existingModal = document.getElementById('verificationModal');
+    if (existingModal) existingModal.remove();
+
+    const modalHtml = `
+      <div class="modal-overlay poser-modal" id="verificationModal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>${title}</h2>
+            <button class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">${content}</div>
+          <div class="modal-footer">
+            <button class="verify-btn poser-run-btn" onclick="closeModal()">Close</button>
+          </div>
+        </div>
       </div>`;
-    showModal(title, loader);
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const overlay = document.getElementById('verificationModal');
+    if (overlay) {
+      const btn = overlay.querySelector('.modal-close');
+      if (btn) btn.addEventListener('click', closeModal);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    }
   }
 
   function updateModal(title, content) {
@@ -80,6 +167,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (h) h.textContent = title;
     if (b) b.innerHTML = content;
   }
+
+  function closeModal(){
+    const modal = document.getElementById('verificationModal');
+    if (modal) modal.remove();
+  }
+  window.closeModal = closeModal;
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
   function setButtonLoading(btn, loading, labelWhile = 'Analyzing...') {
     if (!btn) return;
@@ -95,27 +189,84 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function applyResultStatusToButton(btn, classification) {
-    if (!btn) return;
-    const c = (classification || '').toLowerCase();
-    btn.classList.remove('status-good','status-neutral','status-bad');
-    let label = 'Result';
-    if (c.includes('poser') || c.includes('low credibility')) {
-      btn.classList.add('status-bad');
-      label = 'POSER';
-    } else if (c.includes('neutral')) {
-      btn.classList.add('status-neutral');
-      label = 'Needs Verification';
-    } else {
-      btn.classList.add('status-good');
-      label = 'Genuine Poster';
+  // --- LOADING LOGIC (Cycling Text) ---
+  const LOADING_MESSAGES = [
+    "Verifying page authenticity...",
+    "Reality checking this page...", 
+    "Sniffing out the bots...", 
+    "Validating activity levels...", 
+    "Scanning for poser indicators...", 
+    "Checking for follower count...", 
+    "Detecting anomaly patterns...", 
+    "Analyzing credibility signals..."
+  ];
+
+  function showPoserLoading() {
+    const existing = document.getElementById('poserLoading');
+    if (existing) existing.remove();
+    
+    // Initial message
+    const initialMsg = LOADING_MESSAGES[0];
+
+    const html = `
+      <div id="poserLoading" class="poser-loading-overlay">
+        <div class="loading-panel">
+          <div class="ring">
+            <div class="ring-core"></div>
+          </div>
+          <h3 class="loading-title">Poser Detection</h3>
+          <p class="loading-subtitle" id="loadingSubtitle">${initialMsg}</p>
+          <div class="loading-bar"><div class="loading-fill"></div></div>
+        </div>
+      </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    const overlayEl = document.getElementById('poserLoading');
+
+    // 1. Progress Bar Animation Interval
+    const barInterval = setInterval(() => {
+      const fill = document.querySelector('#poserLoading .loading-fill');
+      if (!fill) return;
+      const w = parseFloat(fill.style.getPropertyValue('--w') || '10');
+      const next = w >= 95 ? 10 : w + 15;
+      fill.style.setProperty('--w', String(next));
+      fill.style.width = next + '%';
+    }, 600);
+
+    // 2. Text Cycling Interval
+    let msgIndex = 0;
+    const textInterval = setInterval(() => {
+        const subtitle = document.getElementById('loadingSubtitle');
+        if (subtitle) {
+            msgIndex = (msgIndex + 1) % LOADING_MESSAGES.length;
+            subtitle.textContent = LOADING_MESSAGES[msgIndex];
+        }
+    }, 1500); // Change text every 1.5 seconds
+
+    // Store IDs so we can clear them later
+    if (overlayEl) {
+        overlayEl.dataset.barInterval = String(barInterval);
+        overlayEl.dataset.textInterval = String(textInterval);
     }
-    btn.innerHTML = `<span class="btn-text">${label}</span>`;
+    
+    document.documentElement.style.overflow = 'hidden';
   }
 
-  // Inject minimal modal/score styles to mirror verify-news
+  function hidePoserLoading() {
+    const el = document.getElementById('poserLoading');
+    if (el) { 
+        // Clear Bar Interval
+        const barId = Number(el.dataset.barInterval || 0);
+        if (barId) clearInterval(barId);
+        
+        // Clear Text Interval
+        const textId = Number(el.dataset.textInterval || 0);
+        if (textId) clearInterval(textId);
 
-
+        el.remove(); 
+    }
+    document.documentElement.style.overflow = '';
+  }
 
   function showNotification(message, type = 'info') {
     const n = document.createElement('div');
@@ -125,9 +276,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => n.remove(), 2500);
   }
 
+  // --- API Call ---
   async function analyzePosterViaGraph(idOrUrl) {
     try {
-      let endpoint = 'http://127.0.0.1:5001/api/poser/analyze_poster';
+      let endpoint = 'http://127.0.0.1:5001/api/poser/analyze_full'; 
       let payload = { id_or_url: idOrUrl };
 
       const resp = await fetch(endpoint, {
@@ -135,438 +287,253 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      
+      if (resp.status === 502) throw new Error('API returned 502 error.'); 
       if (!resp.ok) throw new Error(`Facebook analyze error: ${resp.status}`);
+      
       const data = await resp.json();
+      if (data.status === 'error') throw new Error('API processing failed.');
 
-      const posterId = (data.poster_id || (data.inputs && data.inputs.resolved_id) || extractPosterId(idOrUrl));
-      const ps = (data.poster_signals || (data.signals && data.signals.poster_level) || {});
-      const classification = data.classification || 'Unknown';
-      const verdict = data.verdict || '';
-      const recentPostsCount = (data.recent_posts_count || 0);
-      const explanation = (() => {
-        const cls = (classification || '').toLowerCase();
-        if (cls.includes('poser')) {
-          return 'Caution: Signals suggest this source may be unreliable. Verify with trusted outlets before sharing.';
-        }
-        if (cls.includes('suspicious')) {
-          return 'Mixed signals detected. Please check official sources to confirm.';
-        }
-        return 'No strong poser signs detected. Continue to verify key details.';
-      })();
-      const postingFrequency = ps.signals ? (ps.signals.posting_frequency_last_30 || 0) : 0;
-      const suspiciousHits = ps.signals ? (ps.signals.suspicious_hits || 0) : 0;
-      const signals = {
-            profile_completeness: (ps.signals && ps.signals.has_bio ? 'Complete' : 'Partial'),
-            posting_behavior:
-                'Frequency: ' +
-                (ps.signals
-                    ? (ps.signals.posting_frequency_last_30 || 0).toFixed(2) + '/day'
-                    : 'n/a'),
-
-          // FIX: consider BOTH backend suspicious_behavior AND suspicious_hits
-          suspicious_activity:
-                (ps.suspicious_behavior || 0) < 0 ||
-                (ps.signals?.suspicious_hits || 0) > 0
-      };
-
-      return {
-        posterId,
-        classification,
-        verdict,
-        signals,
-        recentPostsCount,
-        postingFrequency,
-        suspiciousHits,
-        scoreBreakdown: {
-          profile_completeness: ps.profile_completeness || 0,
-          normal_behavior: ps.normal_behavior || 0,
-          suspicious_behavior: ps.suspicious_behavior || 0
-        },
-        suspiciousSignals: (ps.signals && ps.signals.suspicious_hits ? ['suspicious_hits:' + ps.signals.suspicious_hits] : []),
-        explanation
-      };
+      return data;
     } catch (e) {
-      console.warn('Graph analysis failed, falling back to heuristic:', e);
-      try { showNotification('Cannot connect to Poser API. Using local heuristic.', 'error'); } catch(_) {}
+      console.error(e);
       return null;
     }
   }
 
-  function isFacebookUrl(urlOrId) {
-    // Accept either a complete URL or an ID-like string
-    try {
-      const u = new URL(urlOrId);
-      return /facebook\.com$/.test(u.hostname) || u.hostname.includes('fb.com');
-    } catch (_) {
-      // Not a URL; treat as ID input if reasonably alphanumeric
-      return /^[A-Za-z0-9_.-]+$/.test(urlOrId);
-    }
-  }
-
-  function isPostUrl(url) {
-    try {
-      const u = new URL(url);
-      const p = (u.pathname || '').toLowerCase();
-      const q = (u.search || '').toLowerCase();
-      return /\/posts\//.test(p) ||
-             /\/photos\//.test(p) ||
-             /\/videos\//.test(p) ||
-             /\/reel\//.test(p) ||
-             /\/story\.php/.test(p) ||
-             /\/permalink\//.test(p) ||
-             /\/share\//.test(p) ||
-             /\/sharer\.php/.test(p) ||
-             /\/search\//.test(p) ||
-             /(\?|&)story_fbid=/.test(q) ||
-             /(\?|&)fbid=/.test(q);
-    } catch(_) {
-      return false;
-    }
-  }
-
-  function isAllowedPageOrProfileUrl(url) {
-    try {
-      const u = new URL(url);
-      const host = (u.hostname || '').toLowerCase();
-      if (!(host.endsWith('facebook.com') || host.endsWith('fb.com'))) return false;
-      const path = (u.pathname || '').toLowerCase();
-      const parts = path.split('/').filter(Boolean);
-      const first = parts[0] || '';
-      const reserved = new Set([
-        'posts','photos','videos','reel','story.php','permalink','share','sharer.php','search',
-        'groups','events','marketplace','watch','gaming','help','settings','privacy','policy','login'
-      ]);
-      if (reserved.has(first)) return false;
-      if (path === '/' || parts.length === 0) return false; // homepage is not a poster link
-      if (first === 'profile.php') return !!u.searchParams.get('id');
-      if (first === 'pages' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
-      if (first === 'people' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
-      return /^[a-z0-9_.-]+$/.test(parts[0]);
-    } catch(_) {
-      return false;
-    }
-  }
-
-  function isAllowedPageOrProfileUrl(url) {
-    try {
-      const u = new URL(url);
-      const host = (u.hostname || '').toLowerCase();
-      if (!(host.endsWith('facebook.com') || host.endsWith('fb.com'))) return false;
-      const path = (u.pathname || '').toLowerCase();
-      const parts = path.split('/').filter(Boolean);
-      const first = parts[0] || '';
-      const reserved = new Set([
-        'posts','photos','videos','reel','story.php','permalink','share','sharer.php','search',
-        'groups','events','marketplace','watch','gaming','help','settings','privacy','policy','login'
-      ]);
-      if (reserved.has(first)) return false;
-      if (path === '/' || parts.length === 0) return false; 
-      if (first === 'profile.php') return !!u.searchParams.get('id');
-      if (first === 'pages' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
-      if (first === 'people' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
-      return /^[a-z0-9_.-]+$/.test(parts[0]);
-    } catch(_) {
-      return false;
-    }
-  }
-
-  function isAllowedPageOrProfileUrl(url) {
-    try {
-      const u = new URL(url);
-      const host = (u.hostname || '').toLowerCase();
-      if (!(host.endsWith('facebook.com') || host.endsWith('fb.com'))) return false;
-      const path = (u.pathname || '').toLowerCase();
-      const parts = path.split('/').filter(Boolean);
-      const first = parts[0] || '';
-      const reserved = new Set([
-        'posts','photos','videos','reel','permalink','share','sharer.php','search',
-        'groups','events','marketplace','watch','gaming','help','settings','privacy','policy','login'
-      ]);
-      if (reserved.has(first)) return false;
-      if (path === '/' || parts.length === 0) return false; // homepage is not a poster link
-      if (first === 'profile.php') return !!u.searchParams.get('id');
-      if (first === 'pages' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
-      if (first === 'people' && parts.length >= 3) return /^\d{5,}$/.test(parts[2]);
-      return /^[a-z0-9_.-]+$/.test(parts[0]);
-    } catch(_) {
-      return false;
-    }
-  }
-
-  function extractPosterId(input) {
-    try {
-      const u = new URL(input);
-      // Heuristics: profile.php?id=123, or first path segment
-      const idParam = u.searchParams.get('id');
-      if (u.pathname.includes('/profile.php') && idParam) return idParam;
-      const parts = u.pathname.split('/').filter(Boolean);
-      // e.g., /SomePageName or /pages/Page-Name/123456789
-      if (parts.length >= 1) {
-        const last = parts[parts.length - 1];
-        // Prefer numeric id if present
-        const numeric = parts.find(p => /^\d{5,}$/.test(p));
-        return numeric || last;
-      }
-      return u.hostname;
-    } catch (_) {
-      // Treat as raw ID
-      return input.trim();
-    }
-  }
-
-  function analyzePosterSignals(input, notes) {
-    const lowerNotes = (notes || '').toLowerCase();
-    const posterId = extractPosterId(input);
-
-    // Profile completeness: simple heuristic based on URL shape and notes
-    let profileCompletenessScore = 6; // baseline
-    let profileCompletenessLabel = 'Partially Complete';
-    try {
-      const u = new URL(input);
-      const path = u.pathname.toLowerCase();
-      if (path.includes('/profile.php')) {
-        profileCompletenessScore = 4;
-        profileCompletenessLabel = 'Incomplete';
-      } else if (path.split('/').filter(Boolean).length >= 2) {
-        profileCompletenessScore = 8;
-        profileCompletenessLabel = 'Mostly Complete';
-      }
-    } catch (_) {
-      // If ID-like and reasonably long, assume moderate completeness
-      if (posterId.length >= 6) {
-        profileCompletenessScore = 7;
-        profileCompletenessLabel = 'Mostly Complete';
-      }
-    }
-    if (/(no\s+profile\s+pic|no\s+about|no\s+bio)/.test(lowerNotes)) {
-      profileCompletenessScore = Math.max(3, profileCompletenessScore - 3);
-      profileCompletenessLabel = 'Incomplete';
-    }
-
-    // Normal behavior: presence of typical content endpoints suggests normal usage
-    let normalBehaviorScore = 6;
-    let normalBehaviorLabel = 'Typical';
-    try {
-      const u = new URL(input);
-      const p = u.pathname.toLowerCase();
-      if (/(posts|videos|photos)/.test(p)) {
-        normalBehaviorScore = 8;
-        normalBehaviorLabel = 'Active & Typical';
-      } else if (/groups\//.test(p)) {
-        normalBehaviorScore = 5;
-        normalBehaviorLabel = 'Group-Focused';
-      }
-    } catch (_) { /* keep defaults */ }
-    if (/(regular|consistent|normal)/.test(lowerNotes)) {
-      normalBehaviorScore = Math.min(9, normalBehaviorScore + 1);
-    }
-
-    // Suspicious behavior signals (count multiple)
-    const suspiciousKeywords = [
-      'copy', 'copy-paste', 'copypaste', 'repetitive', 'spam', 'share-only', 'clickbait', 'engagement-bait'
-    ];
-    let suspiciousSignals = [];
-    suspiciousKeywords.forEach(k => { if (lowerNotes.includes(k)) suspiciousSignals.push(k); });
-    try {
-      const u = new URL(input);
-      const p = u.pathname.toLowerCase();
-      if (/groups\//.test(p)) suspiciousSignals.push('groups-spam');
-      if (/share\//.test(p)) suspiciousSignals.push('share-only');
-    } catch (_) { /* ignore */ }
-    const suspiciousActivity = suspiciousSignals.length >= 1; // flag on any suspicious signal
-    const suspiciousBehaviorScore = suspiciousActivity ? -10 : 0;
-
-    // Classification rule
-    const classification = suspiciousActivity ? 'POSER' : 'Genuine Poster';
-    const verdict = suspiciousActivity
-      ? 'This poster shows multiple poser-like behaviors.'
-      : 'No strong poser signals detected based on provided input.';
-
-    // Compose signals object (labels)
-    const signals = {
-      profile_completeness: profileCompletenessLabel,
-      posting_behavior: suspiciousActivity ? 'Repetitive/Spam' : normalBehaviorLabel,
-      suspicious_activity: suspiciousActivity
-    };
-
-    // Scores (0–10 and negative for suspicious)
-    const scoreBreakdown = {
-      profile_completeness: profileCompletenessScore,
-      normal_behavior: normalBehaviorScore,
-      suspicious_behavior: suspiciousBehaviorScore
-    };
-
-    // Human-readable explanation
-    const explanation = [
-      `Profile completeness: ${profileCompletenessLabel} (${profileCompletenessScore}/10)`,
-      `Normal behavior: ${normalBehaviorLabel} (${normalBehaviorScore}/10)`,
-      suspiciousActivity ? 'Suspicious behavior: multiple flags detected (-10)' : 'Suspicious behavior: none detected (0)'
-    ].join(' | ');
-
-    return {
-      posterId,
-      classification,
-      verdict,
-      signals,
-      scoreBreakdown,
-      suspiciousSignals,
-      postingFrequency: 0,
-      suspiciousHits: suspiciousSignals.length,
-      explanation
-    };
-  }
-
-  async function persistResults(detection, urlOrId) {
+  // --- Database Persistence ---
+  async function persistResults(analysis, urlOrId) {
     const hasFirebase = typeof firebase !== 'undefined' && firebase.firestore;
-    if (!hasFirebase) {
-      showNotification('Firebase not available. Skipping save.', 'info');
-      return { saved: false };
-    }
+    if (!hasFirebase) return;
+    
     const db = firebase.firestore();
     const serverTs = firebase.firestore.FieldValue.serverTimestamp();
+    const user = (firebase.auth && firebase.auth().currentUser) ? firebase.auth().currentUser : null;
 
     const fullResult = {
-      poster_id: detection.posterId,
-      classification: detection.classification,
-      signals: detection.signals,
-      verdict: detection.verdict,
-      analyzed_at: serverTs,
       input: urlOrId,
-      score_breakdown: detection.scoreBreakdown,
-      suspicious_signals: detection.suspiciousSignals
+      poster_id: analysis.inputs?.resolved_id || extractPosterId(urlOrId),
+      verdict: analysis.verdict,
+      score: analysis.credi_score,
+      metadata: analysis.metadata,
+      createdAt: serverTs,
+      userId: user ? user.uid : 'anonymous'
     };
 
-    const summaryResult = {
-      poster_id: detection.posterId,
-      classification: detection.classification,
-      verified_by: 'system',
-      timestamp: serverTs
-    };
-
-    const detRef = await db.collection('poser_detections').add(fullResult);
-    const verRef = await db.collection('verification_results').add(summaryResult);
-    return { saved: true, detId: detRef.id, verId: verRef.id };
+    await db.collection('poser_detections').add(fullResult);
+    showNotification('Analysis saved.', 'success');
   }
 
+  // --- Main Event Listener ---
   runBtn.addEventListener('click', async () => {
     const input = (urlInput.value || '').trim();
-    const notes = notesInput ? (notesInput.value || '').trim() : '';
-
-    clearFieldError();
+    
+    // Final Safety Check
     if (!input) {
-      setFieldError('Please enter a Facebook page/profile URL or ID.');
-      if(urlInput) urlInput.focus();
-      return;
+        setFieldError('Please enter a URL.');
+        const content = `
+          <div style="background:linear-gradient(135deg,#7e22ce 0%,#9333ea 60%,#a855f7 100%);color:#fff;padding:1rem;border-radius:12px;display:flex;align-items:center;gap:12px;">
+            <i class="fas fa-ban" style="font-size:2rem;color:#ef4444;"></i>
+            <div>
+              <div style="font-weight:700;">No URL Provided</div>
+              <div style="opacity:.95;">Please paste a Facebook Page or Profile URL to run Poser Detection.</div>
+            </div>
+          </div>`;
+        showModal('Invalid URL', content);
+        return;
     }
+
     if (!isFacebookUrl(input)) {
-      setFieldError('Please enter a valid Facebook URL or ID.');
-      return;
-    }
-    if (isPostUrl(input)) {
-      setFieldError('Please enter a Facebook page/profile URL (not a post/share/search).');
-      return;
-    }
-    try {
-      const asUrl = new URL(input);
-      if (!isAllowedPageOrProfileUrl(input)) {
-        setFieldError('The link must be a Facebook Page or User profile URL only.');
+        setFieldError('Only Facebook URLs are supported.');
+        const content = `
+          <div style="background:linear-gradient(135deg,#7e22ce 0%,#9333ea 60%,#a855f7 100%);color:#fff;padding:1rem;border-radius:12px;display:flex;align-items:center;gap:12px;">
+            <i class="fas fa-ban" style="font-size:2rem;color:#ef4444;"></i>
+            <div>
+              <div style="font-weight:700;">Unsupported URL</div>
+              <div style="opacity:.95;">Poser Detection accepts Facebook Page or Profile URLs only.</div>
+            </div>
+          </div>`;
+        showModal('Invalid URL', content);
         return;
-      }
-    } catch(_) {
-      // Raw IDs are allowed
-    }
-    try {
-      const asUrl = new URL(input);
-      if (!isAllowedPageOrProfileUrl(input)) {
-        showNotification('The link must be a Facebook Page or User profile URL only.', 'error');
-        return;
-      }
-    } catch(_) {
-      // Raw IDs are allowed
-    }
-    try {
-      const asUrl = new URL(input);
-      if (!isAllowedPageOrProfileUrl(input)) {
-        showNotification('The link must be a Facebook Page or User profile URL only.', 'error');
-        return;
-      }
-    } catch(_) {
-      // Raw IDs are allowed
     }
 
-    setButtonLoading(runBtn, true, 'ANALYZING POSER DETECTION...');
+    if (!isAllowedPageOrProfileUrl(input)) {
+        setFieldError('Please enter a Page or Profile URL, not a post/group/link.');
+        const content = `
+          <div style="background:linear-gradient(135deg,#7e22ce 0%,#9333ea 60%,#a855f7 100%);color:#fff;padding:1rem;border-radius:12px;display:flex;align-items:center;gap:12px;">
+            <i class="fas fa-ban" style="font-size:2rem;color:#ef4444;"></i>
+            <div>
+              <div style="font-weight:700;">Not a Page/Profile URL</div>
+              <div style="opacity:.95;">Posts, groups, marketplace, or share links are not supported.</div>
+              <ul style="margin:.5rem 0 0 1rem;font-size:.9rem;line-height:1.5;">
+                <li>Allowed: <span style="font-family:monospace;">/profile.php?id=...</span>, vanity pages like <span style="font-family:monospace;">/OneNewsPH</span></li>
+                <li>Blocked: <span style="font-family:monospace;">/posts/...</span>, <span style="font-family:monospace;">/groups/...</span>, <span style="font-family:monospace;">/story.php?fbid=...</span></li>
+              </ul>
+            </div>
+          </div>`;
+        showModal('Invalid URL', content);
+        return;
+    }
+
+    setButtonLoading(runBtn, true, 'ANALYZING...');
+    showPoserLoading();
+    
     try {
-      let analysis = await analyzePosterViaGraph(input);
-      if (!analysis) {
-        analysis = {
-          posterId: extractPosterId(input),
-          classification: 'Poser',
-          verdict: 'Content-level verification unavailable. Possible unverified content.',
-          signals: { profile_completeness: 'Unknown', posting_behavior: 'Unknown', suspicious_activity: true },
-          suspiciousSignals: ['backend_failure'],
-          suspiciousHits: 1,
-          postingFrequency: 0,
-          scoreBreakdown: { profile_completeness: 0, normal_behavior: 0, suspicious_behavior: -10 },
-          explanation: 'Content appears unverified. Please confirm with trusted sources.'
+      let apiData = await analyzePosterViaGraph(input);
+      
+      if (!apiData) {
+        apiData = {
+             inputs: { resolved_id: extractPosterId(input) },
+             classification: 'Unknown',
+             verdict: 'Backend API Connection Failed',
+             credi_score: 0,
+             metadata: {},
+             trust: { layers: {}, raw_score: 0 },
+             note: 'API Error'
         };
+        showNotification('API Error. Showing empty result.', 'error');
       }
+      
+      try { await persistResults(apiData, input); } catch (e) { console.error(e); }
 
-      try { await persistResults(analysis, input); } catch (e) {
-        console.error('Save error:', e);
-        showNotification('Could not save results. Displaying local analysis.', 'error');
-      }
+      // --- 1. PREPARE DATA VARIABLES ---
+      const score = apiData.credi_score || 0;
+      const meta = apiData.metadata || {};
+      const analysis = apiData; 
+      
+      const posterScore = score;
+      const classification = analysis.classification;
+      
+      const originalScoreClass = getScoreClass(posterScore);
+      const headlineClass = originalScoreClass === 'high' ? 'hl-good' : (originalScoreClass === 'medium' ? 'hl-neutral' : 'hl-bad');
+      
+      let displayClassification = 'High Credibility - Most likely VERIFIED/TRUSTABLE';
+      if (classification.toLowerCase().includes('low')) displayClassification = 'Low Credibility - Most Likely POSER';
+      else if (classification.toLowerCase().includes('suspicious')) displayClassification = 'Moderate Credibility - Most Likely SUSPICIOUS';
+      
+      const audience = Math.max(Number(meta.followers_count || 0), Number(meta.fan_count || 0));
+      const hasBadge = !!(
+        meta.is_verified ||
+        (meta.verification_status || '').toLowerCase().includes('verified') ||
+        (posterSigs.verified === true) ||
+        (meta.badge || '').toLowerCase().includes('blue')
+      );
+      
+      // AGE CHECK LOGIC (UPDATED)
+      const createdYear = meta.created_time ? new Date(meta.created_time).getFullYear() : null;
+      const accountAgeYears = Number(pageLevel.account_age_years || meta.account_age_years || (createdYear ? (new Date().getFullYear() - createdYear) : 0));
+      const isOld = accountAgeYears >= 1;
+      const isYoung = accountAgeYears > 0 && accountAgeYears < 1;
+      
+      const missingProfile = !(meta.bio || meta.about || meta.description || meta.website || meta.link);
+      const signals = analysis.signals || {};
+      const pageLevel = signals.page_level || {};
+      const posterLevel = signals.poster_level || {};
+      const posterSigs = posterLevel.signals || {};
+      const suspiciousCount = typeof posterSigs.suspicious_hits === 'number' ? posterSigs.suspicious_hits : (posterLevel.suspicious_behavior && posterLevel.suspicious_behavior < 0 ? 1 : 0);
+      const activePosting = (posterSigs.posting_frequency_last_30 || pageLevel.posting_frequency_last_30 || analysis.postingFrequency || 0) > 0;
+      const smallAudience = audience > 0 && audience < 300;
+      
+      // --- LOGIC UPDATED ---
+      
+      let trustSignals = [
+        audience && audience > 0 ? `Large Audience: ${audience} followers indicates established reach.` : '',
+        isOld ? 'Established History: Account is older than 1 year.' : '',
+        hasBadge ? 'Verified Identity: Holds an official Blue Badge.' : '',
+        activePosting ? 'Active Posting: Consistent posting activity detected.' : ''
+      ].filter(Boolean);
 
-      const pc = analysis.scoreBreakdown.profile_completeness || 0;
-      const nb = analysis.scoreBreakdown.normal_behavior || 0;
-      const sb = analysis.scoreBreakdown.suspicious_behavior || 0;
-      const safeSb = Math.max(0, 10 + sb);
-      const posterScore = Math.round(((pc + nb + safeSb) / 30) * 100);
+      const profileScore = Number((analysis.scoreBreakdown && analysis.scoreBreakdown.profile_completeness) || 0);
+      const inactive = !activePosting;
+      let riskFactors = [
+        suspiciousCount > 0 ? `Suspicious Activity: ${suspiciousCount} spam-like behaviors detected.` : '',
+        (missingProfile || profileScore < 5) ? 'Incomplete Profile: Missing basic details like Bio or Website.' : '',
+        smallAudience ? 'Limited Audience: Fewer than 300 followers; low reach.' : '',
+        isYoung ? 'New Account: Less than 1 year old.' : '',
+        inactive ? 'Inactive: No recent posting activity.' : '',
+        (!hasBadge && audience > 10000 && isYoung) ? 'Unverified and confirmed new for large audience.' : ''
+      ].filter(Boolean);
 
-      const conciseSuspicious = analysis.suspiciousHits ?? (analysis.suspiciousSignals ? analysis.suspiciousSignals.length : 0);
-      const pfDay = (analysis.postingFrequency || 0).toFixed(2);
-      const rawClass = (analysis.classification || '').toLowerCase();
-      let normalizedClassification = 'Verified';
-      if (rawClass.includes('poser') || rawClass.includes('low credibility')) normalizedClassification = 'Poser';
-      else if (rawClass.includes('suspicious') || rawClass.includes('neutral') || rawClass.includes('needs verification')) normalizedClassification = 'Suspicious';
-      let classificationClass = normalizedClassification === 'Poser' ? 'classification-bad' : (normalizedClassification === 'Suspicious' ? 'classification-neutral' : 'classification-good');
-      const highlightClass = normalizedClassification === 'Poser' ? 'hl-bad' : (normalizedClassification === 'Suspicious' ? 'hl-neutral' : 'hl-good');
+      // --- Tags for "Why This Score" ---
+      const boostTags = [];
+      if (audience && audience > 0) boostTags.push(`Large audience (${audience} followers)`);
+      if (hasBadge) boostTags.push('Verified badge');
+      if (isOld) boostTags.push('Account age over 1 year');
+      if (activePosting) boostTags.push('Active posting');
+      
+      const riskTags = [];
+      if (suspiciousCount > 0) riskTags.push(`${suspiciousCount} suspicious signals`);
+      if (missingProfile || profileScore < 5) riskTags.push('Incomplete profile');
+      if (smallAudience) riskTags.push('Limited audience');
+      if (isYoung) riskTags.push('New account');
+      if (inactive) riskTags.push('Inactive posting');
+      if (!hasBadge && audience > 10000 && isYoung) riskTags.push('New account, high followers');
 
+      const boostSummary = boostTags.join(', ') || 'None';
+      const riskSummary = riskTags.join(', ') || 'None';
+
+      const trustList = trustSignals.length ? trustSignals.map(t => `<li><strong>${t.split(':')[0]}:</strong> ${t.split(':').slice(1).join(':').trim()}</li>`).join('') : '<li>No strong trust signals detected.</li>';
+      const riskList = riskFactors.length ? riskFactors.map(t => `<li><strong>${t.split(':')[0]}:</strong> ${t.split(':').slice(1).join(':').trim()}</li>`).join('') : '<li>No immediate risk factors detected.</li>';
+
+      const pct = Math.max(0, Math.min(100, Math.round(posterScore)));
+      
       const resultHtml = `
-      <div class="verification-result poser-result">
-        <div class="result-header">
-          <div class="platform-badge">
-            <i class="fas fa-user-secret"></i>
-            <span>Poster Analysis</span>
-          </div>
-          <div class="content-type">Profile</div>
+      <div class="poser-result-card">
+        <div class="poser-result-header">
+          <h2 class="poser-result-title">Poser Detection Result</h2>
         </div>
-        <div class="result-score">
-          <div class="score-circle score-${getScoreClass(posterScore)}">
-            <span class="score-number">${posterScore}</span>
-            <span class="score-label">%</span>
+
+        <div class="summary-band">
+          <div class="score-donut ${originalScoreClass}" style="--pct:${pct}">
+            <div class="inner">
+              <div class="num">${pct}</div>
+              <div class="pct">%</div>
+            </div>
           </div>
-          <div class="score-description">
-            <h3>POSTER SCORE - <span class="classification-highlight ${highlightClass}">${normalizedClassification.toUpperCase()}</span></h3>
-            <p>${analysis.verdict || (analysis.explanation || '')}</p>
+          <div class="summary-text">
+            <h3 class="${headlineClass}">${displayClassification}</h3>
+            <p>${analysis.verdict || 'Trustworthy - Credible'}</p>
           </div>
         </div>
-        <div class="key-metrics">
-          <div class="metric"><span class="metric-label">Poster ID</span><span class="metric-value mono">${analysis.posterId}</span></div>
-          <div class="metric"><span class="metric-label">Profile</span><span class="metric-value">${pc}/10</span></div>
-          <div class="metric"><span class="metric-label">Normal</span><span class="metric-value">${nb}/10</span></div>
-          <div class="metric"><span class="metric-label">Posts/day</span><span class="metric-value">${pfDay}</span></div>
-          <div class="metric"><span class="metric-label">Suspicious flags</span><span class="metric-value">${conciseSuspicious}</span></div>
+
+        <div class="panels-row">
+          <div class="panel trust">
+            <div class="panel-title"><span class="label">TRUST SIGNALS</span></div>
+            <ul>${trustList}</ul>
+          </div>
+          <div class="panel risk">
+            <div class="panel-title"><span class="label">RISK FACTORS</span></div>
+            <ul>${riskList}</ul>
+          </div>
         </div>
-        <div class="result-summary">
-          <p>${analysis.explanation}</p>
+
+        <div class="why-card">
+          <h5>WHY THIS SCORE</h5>
+          <p><span class="chip boost">Boosts</span> ${boostSummary}</p>
+          <p><span class="chip risk">Risks</span> ${riskSummary}</p>
+          <p>We combine these signals to estimate credibility. More boosts and fewer risks increase the percentage.</p>
+        </div>
+
+        <div class="meta-row">
+          <span class="meta-label">Analyzed ID:</span>
+          <span class="mono">${analysis.inputs?.resolved_id || analysis.posterId || 'Unknown'}</span>
+          <span class="dot">•</span>
+          <span class="meta-label">Source:</span>
+          <span class="meta-value">${analysis.metadata?.sourceNote || analysis.sourceNote || 'Hybrid Scan'}</span>
         </div>
       </div>`;
 
-    // Show modal matching Verify Facebook News style
-    updateModal('Poser Detection Complete', resultHtml);
+      hidePoserLoading();
+      showModal('', resultHtml);
+
+    } catch (err) {
+      console.error(err);
+      showNotification('An error occurred.', 'error');
+      hidePoserLoading();
     } finally {
       setButtonLoading(runBtn, false);
-      runBtn.classList.remove('status-good','status-neutral','status-bad');
+      // Re-run validation to reset state if needed
+      validateInputState();
     }
   });
 });

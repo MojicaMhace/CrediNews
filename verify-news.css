@@ -76,7 +76,7 @@
 }
 
 .toggle-buttons { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-.toggle-btn { padding: 0.5rem 1rem; border: 1px solid #e5e7eb; background: #f9fafb; color: #374151; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.toggle-btn { padding: 0.5rem 1rem; border: 1px solid #e5e7eb; background: #f9fafb; color: #374151; border-radius: 16px; cursor: pointer; font-weight: 600; }
 .toggle-btn.active { background: #3b82f6; color: #fff; border-color: #2563eb; }
 #show-url-verify.toggle-btn.active { background: #22c55e; color: #fff; border-color: #16a34a; }
 #show-facebook-verify.toggle-btn.active { background: #1877f2; color: #fff; border-color: #166fe5; }

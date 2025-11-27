@@ -234,6 +234,9 @@
     const COOLDOWN_MS = 60 * 1000; // after success
     const BLOCK_COOLDOWN_MS = 5 * 60 * 1000; // on too-many-requests
     const cooldownKey = 'register_cooldown_until';
+    const BLOCK_KEY = 'register_block_until';
+    const ATTEMPT_KEY = 'register_attempts';
+    let submitting = false;
     let countdownTimer = null;
     function startCountdown(untilTs) {
         const submitBtn = document.querySelector('#registerForm button[type="submit"]');
@@ -258,7 +261,11 @@
         countdownTimer = setInterval(update, 1000);
     }
     const existingUntil = parseInt(localStorage.getItem(cooldownKey) || '0', 10);
-    if (existingUntil > Date.now()) {
+    const existingBlock = parseInt(localStorage.getItem(BLOCK_KEY) || '0', 10);
+    if (existingBlock > Date.now()) {
+        showInlineMessage('We have blocked requests from this device due to unusual activity. Please wait and try again later.', 'error');
+        startCountdown(existingBlock);
+    } else if (existingUntil > Date.now()) {
         startCountdown(existingUntil);
     }
 
@@ -269,7 +276,15 @@
         const email = document.getElementById("email").value.trim();
         const password = document.getElementById("password").value;
         const confirmPassword = document.getElementById("confirmPassword").value;
+        let createdUser = null;
+        const db = firebase.firestore();
 
+        const blockUntil = parseInt(localStorage.getItem(BLOCK_KEY) || '0', 10);
+        if (blockUntil > Date.now()) {
+            showInlineMessage('We have blocked requests from this device due to unusual activity. Please wait and try again later.', 'error');
+            return;
+        }
+        if (submitting) return; submitting = true;
         if (!isValidFullName(fullName)) {
             showInlineMessage("Please enter a valid full name using letters only (spaces, hyphens, apostrophes allowed).", 'error');
             return;
@@ -288,8 +303,9 @@
         auth.createUserWithEmailAndPassword(email, password)
             .then((userCredential) => {
                 const user = userCredential.user;
+                createdUser = user;
 
-                // ✅ Update display name first
+                // Update display name first
                 return user.updateProfile({
                         displayName: fullName
                     }).then(() => {
@@ -311,11 +327,30 @@
 
                     });
             })
-            .then(() => {
+            .then(async () => {
+                try {
+                    if (createdUser) {
+                        await db.collection('users').doc(createdUser.uid).set({
+                            fullname: fullName,
+                            email: email,
+                            createdAt: new Date().toISOString(),
+                            provider: 'password',
+                            role: 'user',
+                            emailVerified: false
+                        }, { merge: true });
+                        await db.collection('email_verifications').doc(createdUser.uid).set({
+                            user_id: createdUser.uid,
+                            verification_token: null,
+                            date_sent: new Date().toISOString(),
+                            date_verified: null
+                        }, { merge: true });
+                    }
+                } catch (err) {}
                 showInlineMessage(`Account created! A verification email was sent to ${email}. Please verify your email before logging in.`, 'success');
                 const until = Date.now() + COOLDOWN_MS;
                 localStorage.setItem(cooldownKey, String(until));
                 startCountdown(until);
+                submitting = false;
             })
             .catch((error) => {
                 console.error('Registration error:', error);
@@ -333,11 +368,13 @@
                     case 'auth/too-many-requests':
                         msg = 'We have blocked requests from this device due to unusual activity. Please wait and try again later.';
                         const blockUntil = Date.now() + BLOCK_COOLDOWN_MS;
-                        localStorage.setItem(cooldownKey, String(blockUntil));
+                        localStorage.setItem(BLOCK_KEY, String(blockUntil));
+                        showInlineMessage(msg, 'error');
                         startCountdown(blockUntil);
                         break;
                 }
                 showInlineMessage(`${msg} (${error.code || 'unknown'})`, 'error');
+                submitting = false;
             });
     });
 </script>
