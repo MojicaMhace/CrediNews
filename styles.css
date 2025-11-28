@@ -3867,7 +3867,7 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 /* Stretch the toggle buttons across the verify card width */
 .verify-news-page .toggle-buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   width: 100%;
   margin: 0 0 16px 0;
@@ -3909,6 +3909,17 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
 }
 .verify-news-page #show-url-verify.toggle-btn.active {
   background: linear-gradient(135deg, #166534 0%, #15803d 50%, #22c55e 100%) !important;
+}
+
+.verify-news-page #open-poser-detection.toggle-btn {
+  background: linear-gradient(135deg, #6b21a8 0%, #7e22ce 45%, #a855f7 100%) !important;
+  border-color: #7e22ce;
+}
+.verify-news-page #open-poser-detection.toggle-btn:hover {
+  background: linear-gradient(135deg, #5b21b6 0%, #7a2bd8 45%, #9333ea 100%) !important;
+}
+.verify-news-page #open-poser-detection.toggle-btn.active {
+  background: linear-gradient(135deg, #4c1d95 0%, #6b21a8 50%, #7e22ce 100%) !important;
 }
 
 .verify-news-page .toggle-btn:hover {
