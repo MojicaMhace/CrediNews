@@ -9,3 +9,5 @@ venv/
 models/
 *.bin
 *.joblib
+*.json
+*.bin

@@ -216,7 +216,7 @@
         rating: rating || null,
         category,
         message: msg.trim(),
-        created_at: new Date().toISOString(),
+        submitted_at: new Date().toISOString(),
         userId,
         userEmail,
       };

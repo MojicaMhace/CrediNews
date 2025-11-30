@@ -6,6 +6,7 @@
 
     <title>Reports - CrediNews</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="report.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -42,57 +43,67 @@
         <section class="statistics-section">
             <div class="container">
                 <div class="stats-grid">
-                    <div class="stat-box">
+                    <div class="stat-box stat-card stat-card--credible">
                         <div class="stat-icon">
                             <i class="fas fa-chart-line"></i>
                         </div>
                         <div class="stat-content">
-                             <div class="stat-number">12,847</div>
+                             <div id="total-analyzed" class="stat-number">--</div>
                              <div class="stat-label">Facebook News Analyzed</div>
                          </div>
                      </div>
-                     <div class="stat-box">
+                     <div class="stat-box stat-card stat-card--credible">
                          <div class="stat-icon">
                              <i class="fas fa-check-circle"></i>
                          </div>
                          <div class="stat-content">
-                             <div class="stat-number">9,234</div>
-                             <div class="stat-label">Verified Facebook News</div>
+                             <div id="credible-count" class="stat-number">--</div>
+                             <div class="stat-label">Credible (Verified)</div>
                         </div>
                     </div>
-                    <div class="stat-box">
+                    <div class="stat-box stat-card stat-card--low">
                         <div class="stat-icon">
                             <i class="fas fa-exclamation-triangle"></i>
                         </div>
                         <div class="stat-content">
-                            <div class="stat-number">3,613</div>
-                            <div class="stat-label">Fake News Detected</div>
+                            <div id="low-count" class="stat-number">--</div>
+                            <div class="stat-label">Low Credibility (Fake)</div>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Charts Section (Hardcoded Template) -->
+        <!-- Charts Section -->
         <section class="charts-section">
             <div class="container">
-                <div class="stats-grid" style="gap: 24px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-                    <!-- Fake vs Real Doughnut Chart -->
-                    <div class="stat-box" style="padding: 16px 16px 24px;">
-                        <div class="stat-content" style="width: 100%;">
-                            <div class="stat-label" style="font-weight: 600; margin-bottom: 8px;">Fake vs Real (Analyzed)</div>
-                            <div class="stat-number" style="font-size: 20px; margin-bottom: 12px;">Total: 12,847</div>
-                            <canvas id="breakdownChart" height="220"></canvas>
+                <div class="charts-grid">
+                    <!-- Labels Breakdown Doughnut -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Credibility Labels Breakdown</div>
+                                <div class="chart-subtitle">CREDIBLE, LOW, MIXED, UNVERIFIED</div>
+                            </div>
                         </div>
+                        <canvas id="breakdownChart"></canvas>
                     </div>
 
-                    <!-- Total Analyzed Stacked Bar -->
-                    <div class="stat-box" style="padding: 16px 16px 24px;">
-                        <div class="stat-content" style="width: 100%;">
-                            <div class="stat-label" style="font-weight: 600; margin-bottom: 8px;">Total Analyzed Composition</div>
-                            <div class="stat-number" style="font-size: 20px; margin-bottom: 12px;">12,847 = 9,234 Real + 3,613 Fake</div>
-                            <canvas id="totalStackedChart" height="220"></canvas>
+                    <!-- Volume Line Chart with Filters -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Volume of News Analyzed</div>
+                                <div class="chart-subtitle">Switch between Day / Week / Month / Year</div>
+                            </div>
+                            <div class="filter-buttons" id="timeFilters">
+                                <button id="filter-day" type="button">Day</button>
+                                <button id="filter-week" type="button">Week</button>
+                                <button id="filter-month" type="button" class="active">Month</button>
+                                <button id="filter-year" type="button">Year</button>
+                            </div>
                         </div>
+                        <canvas id="volumeChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -105,82 +116,7 @@
     
     <!-- Firebase Configuration -->
     <script src="firebase-config.js"></script>
-
-    <!-- Hardcoded Charts (Template) -->
-    <script>
-        // Static template data
-        const TOTAL_ANALYZED = 12847;
-        const REAL_COUNT = 9234;
-        const FAKE_COUNT = 3613;
-        const realPct = Math.round((REAL_COUNT / TOTAL_ANALYZED) * 100);
-        const fakePct = Math.round((FAKE_COUNT / TOTAL_ANALYZED) * 100);
-
-        // Doughnut: Fake vs Real
-        const breakdownCtx = document.getElementById('breakdownChart');
-        if (breakdownCtx) {
-            new Chart(breakdownCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: [
-                        `Real (${REAL_COUNT.toLocaleString()} | ${realPct}%)`,
-                        `Fake (${FAKE_COUNT.toLocaleString()} | ${fakePct}%)`
-                    ],
-                    datasets: [{
-                        data: [REAL_COUNT, FAKE_COUNT],
-                        backgroundColor: ['#10B981', '#EF4444'],
-                        hoverBackgroundColor: ['#059669', '#DC2626'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    },
-                    cutout: '60%'
-                }
-            });
-        }
-
-        // Horizontal stacked bar: total composed of real and fake
-        const stackedCtx = document.getElementById('totalStackedChart');
-        if (stackedCtx) {
-            new Chart(stackedCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Analyzed'],
-                    datasets: [
-                        {
-                            label: `Real (${realPct}%)`,
-                            data: [REAL_COUNT],
-                            backgroundColor: '#10B981'
-                        },
-                        {
-                            label: `Fake (${fakePct}%)`,
-                            data: [FAKE_COUNT],
-                            backgroundColor: '#EF4444'
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    },
-                    responsive: true,
-                    scales: {
-                        x: {
-                            stacked: true,
-                            ticks: {
-                                callback: function(value) { return value.toLocaleString(); }
-                            },
-                            max: TOTAL_ANALYZED
-                        },
-                        y: { stacked: true }
-                    }
-                }
-            });
-        }
-    </script>
+    <script src="reports.js"></script>
     
         
 </body>
