@@ -107,10 +107,10 @@ function updateAuthButton() {
                     </div>
                 </div>
                 <div class="dropdown-menu">
-                    <button class="dropdown-item"><i class="fas fa-user-cog"></i> Profile Settings</button>
-                    <button class="dropdown-item"><i class="fas fa-shield-alt"></i> My Verifications</button>
-                    <button class="dropdown-item"><i class="fas fa-chart-line"></i> Poser Detection History</button>
-                    <button class="dropdown-item"><i class="fas fa-bell"></i> Notifications</button>
+                    <button class="dropdown-item" id="ddProfile"><i class="fas fa-user-cog"></i> Profile Settings</button>
+                    <button class="dropdown-item" id="ddVerifications"><i class="fas fa-shield-alt"></i> My Verifications</button>
+                    <button class="dropdown-item" id="ddPoserHistory"><i class="fas fa-chart-line"></i> Poser Detection History</button>
+                    <button class="dropdown-item" id="ddNotifications"><i class="fas fa-bell"></i> Notifications</button>
                     <div class="dropdown-divider"></div>
                     <div class="dropdown-item logout-item" id="logoutMenuItem"><i class="fas fa-sign-out-alt"></i> Logout</div>
                 </div>
@@ -227,6 +227,15 @@ function updateAuthButton() {
         };
         const logoutItem = ensureDropdown.querySelector('#logoutMenuItem');
         if (logoutItem) logoutItem.onclick = (e) => { e.preventDefault(); doLogout(); };
+
+        const ddProfile = ensureDropdown.querySelector('#ddProfile');
+        if (ddProfile) ddProfile.onclick = (e) => { e.preventDefault(); window.location.href = 'profile_settings.html'; };
+        const ddNotifications = ensureDropdown.querySelector('#ddNotifications');
+        if (ddNotifications) ddNotifications.onclick = (e) => { e.preventDefault(); window.location.href = 'notifications.html'; };
+        const ddVerifications = ensureDropdown.querySelector('#ddVerifications');
+        if (ddVerifications) ddVerifications.onclick = (e) => { e.preventDefault(); window.location.href = 'report.html'; };
+        const ddPoserHistory = ensureDropdown.querySelector('#ddPoserHistory');
+        if (ddPoserHistory) ddPoserHistory.onclick = (e) => { e.preventDefault(); window.location.href = 'poser-detection.html'; };
 
         // Remove any visible Logout fallback if present
         const logoutFallback = document.getElementById('logoutFallback');
@@ -601,25 +610,35 @@ function ensureAuthLinksWork() {
     clearAuthStorage();
 
     if (hasFirebase && currentUser) {
-      console.log('🔐 User is authenticated, signing out before navigating to', url);
+      console.log('User is authenticated, signing out before navigating to', url);
+      try {
+        const sid = sessionStorage.getItem('current_session_id');
+        if (sid && firebase.firestore) {
+          firebase.firestore().collection('login_sessions').doc(sid).set({
+            logout_time: new Date().toISOString(),
+            session_status: 'completed'
+          }, { merge: true });
+          sessionStorage.removeItem('current_session_id');
+        }
+      } catch (_e) {}
       firebase.auth().signOut()
         .then(() => {
-          console.log('✅ Firebase signOut complete');
+          console.log('✅ Firebase Sign Out complete');
           clearAuthStorage();
           // Add URL parameter to signal auth clearing to prevent redirect race condition
           const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
-          console.log('🚀 Navigating to:', targetUrl);
+          console.log('Navigating to:', targetUrl);
           navigateTo(targetUrl);
         })
         .catch((err) => {
           console.error('❌ Firebase signOut error, proceeding anyway:', err);
           clearAuthStorage();
           const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
-          console.log('🚀 Navigating to (after error):', targetUrl);
+          console.log(' Navigating to (after error):', targetUrl);
           navigateTo(targetUrl);
         });
     } else {
-      console.log('🚀 No authentication needed, navigating directly to:', url);
+      console.log('No authentication needed, navigating directly to:', url);
       // Add URL parameter to signal auth clearing even for non-authenticated users
       const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
       navigateTo(targetUrl);
@@ -643,7 +662,7 @@ function ensureAuthLinksWork() {
 
   // Delegated capture-phase handler scoped to auth buttons container
   const delegatedHandler = (e) => {
-    console.log('🖱️ Delegated click handler triggered on:', e.target);
+    console.log('Delegated click handler triggered on:', e.target);
     const target = e.target.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
     if (!target) {
       console.log('❌ No matching target found for delegation');
@@ -651,14 +670,14 @@ function ensureAuthLinksWork() {
     }
     // Ignore clicks on logout fallback if any; ensure it does not use login-btn class
     if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) {
-      console.log('🚫 Ignoring click on logout fallback');
+      console.log('Ignoring click on logout fallback');
       return;
     }
     console.log('✅ Valid auth button clicked:', target.className);
     e.preventDefault();
     e.stopPropagation();
     const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
-    console.log('🎯 Target URL determined:', url);
+    console.log('Target URL determined:', url);
     signOutIfNeededThenNavigate(url);
   };
   document.addEventListener('click', delegatedHandler, { capture: true });
@@ -676,9 +695,7 @@ function ensureAuthLinksWork() {
   }, { capture: true });
 }
 
-// Initialize navbar auth UI early
 document.addEventListener('DOMContentLoaded', () => {
-    // Support query param logout trigger for emergency sign-out
     try {
         const params = new URLSearchParams(window.location.search);
         if (params.get('logout') === '1') {
@@ -700,15 +717,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.removeItem('authData');
                 window.location.href = 'login.html';
             }
-            return; // stop further init on this page load
+            return; 
         }
-    } catch (e) { /* ignore */ }
+    } catch (e) { }
 
-    // Default to showing auth buttons while state loads
     showLoginSignupButtons();
-    // Make sure Login/Sign Up anchors always navigate
     ensureAuthLinksWork();
-    // Then bind to real auth state
     try {
         updateAuthButton();
     } catch (e) {

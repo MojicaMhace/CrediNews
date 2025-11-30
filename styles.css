@@ -3873,6 +3873,18 @@ nav.navbar .nav-controls .auth-buttons .signup-btn {
   margin: 0 0 16px 0;
 }
 
+@media (max-width: 820px) {
+  .verify-news-page .toggle-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .verify-news-page .toggle-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
 .verify-news-page .toggle-btn {
   width: 100%;
   padding: 14px 18px;

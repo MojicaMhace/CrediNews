@@ -154,8 +154,8 @@ class AuthManager {
             return;
         }
 
-        if (!this.validatePasswordComplexity(password)) {
-            this.showError('Password must be at least 6 characters and include one uppercase letter and one special character.');
+        if (!password) {
+            this.showError('Please enter your password.');
             return;
         }
 
@@ -216,8 +216,18 @@ class AuthManager {
                 sessionStorage.setItem('authData', JSON.stringify(authData));
             }
 
+            try {
+                const db = firebase.firestore();
+                const sessionRef = await db.collection('login_sessions').add({
+                    user_id: user.uid,
+                    login_time: new Date().toISOString(),
+                    logout_time: null,
+                    session_status: 'active'
+                });
+                sessionStorage.setItem('current_session_id', sessionRef.id);
+            } catch (_e) {}
+
             this.showSuccess('Login successful! Redirecting to homepage...');
-            // Redirect after success
             setTimeout(() => {
                 window.location.href = 'index.html';
             }, 1500);
@@ -250,7 +260,7 @@ class AuthManager {
         }
     }
 
-    // Registration flow: nasa register.html ang full validation at OTP; placeholder lang dito
+    // Registration flow: nasa register.html ang full validation at OTP placeholder lang dito
     async handleRegister(e) {
         e.preventDefault();
         console.log('Registration handled by register.html. OTP flow removed.');
@@ -914,22 +924,31 @@ class OTPManager {
 // Global OTP Manager instance
 window.otpManager = new OTPManager();
 
-async function checkEmailVerificationStatus() {    try {
-        const user = firebase.auth().currentUser;
-        if (user) {
-            // Reload user data to get latest verification status
-            await user.reload();
-            
-            if (user.emailVerified) {
-                const verificationSuccessMessage = document.getElementById('verificationSuccessMessage');
-                if (verificationSuccessMessage) {
-                    verificationSuccessMessage.style.display = 'block';
-                    console.log('✅ Email verification confirmed for user:', user.email);
-                }
+async function checkEmailVerificationStatus() {
+    try {
+        const justVerified = sessionStorage.getItem('verification_just_completed');
+        if (justVerified === '1') {
+            const verificationSuccessMessage = document.getElementById('verificationSuccessMessage');
+            if (verificationSuccessMessage) {
+                verificationSuccessMessage.style.display = 'block';
+                setTimeout(() => { verificationSuccessMessage.style.display = 'none'; }, 5000);
             }
+            const user = firebase.auth().currentUser;
+            if (user) {
+                try {
+                    const db = firebase.firestore();
+                    await db.collection('users').doc(user.uid).set({ emailVerified: true }, { merge: true });
+                    await db.collection('email_verifications').doc(user.uid).set({
+                        user_id: user.uid,
+                        verification_token: null,
+                        date_verified: new Date().toISOString()
+                    }, { merge: true });
+                } catch (_e) {}
+            }
+            sessionStorage.removeItem('verification_just_completed');
         }
     } catch (error) {
-        console.log('ℹ️ No current user or verification check failed:', error.message);
+        console.log('ℹ️ Verification status check failed:', error.message);
     }
 }
 
@@ -989,12 +1008,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Check for verification success parameter
         if (urlParams.get('verified') === 'true') {
-            const verificationSuccessMessage = document.getElementById('verificationSuccessMessage');
-            if (verificationSuccessMessage) {
-                verificationSuccessMessage.style.display = 'block';
-                // Clear the URL parameter
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
+            sessionStorage.setItem('verification_just_completed','1');
+            checkEmailVerificationStatus();
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
         
         // Check if user just verified their email
@@ -1006,25 +1022,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set up auth state listener for email verification
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
-            // Reload user to get latest verification status
             await user.reload();
-            
-            if (user.emailVerified) {
-                const verificationSuccessMessage = document.getElementById('verificationSuccessMessage');
-                if (verificationSuccessMessage && verificationSuccessMessage.style.display === 'none') {
-                    verificationSuccessMessage.style.display = 'block';
-                    console.log('✅ Email verification detected for:', user.email);
-                    
-                    // Hide any error messages
-                    const errorMessages = document.querySelectorAll('.notification.error');
-                    errorMessages.forEach(msg => msg.remove());
-                    
-                    // Remove resend button if it exists
-                    const resendBtn = document.querySelector('.auth-btn.secondary');
-                    if (resendBtn && resendBtn.textContent.includes('Resend')) {
-                        resendBtn.remove();
-                    }
-                }
+            const justVerified = sessionStorage.getItem('verification_just_completed');
+            if (user.emailVerified && justVerified === '1') {
+                checkEmailVerificationStatus();
             }
         }
     });
