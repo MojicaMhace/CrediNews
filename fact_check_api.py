@@ -1593,5 +1593,25 @@ def fact_check_endpoint():
         'tone': ('Risk: Potential sarcasm may affect the meaning of the post.' if sarcasm_score >= 0.02 else 'Risk: Low – Not enough slang to indicate sarcasm.')
     })
 
+@app.route('/api/extract-image', methods=['POST'])
+def extract_image_endpoint():
+    try:
+        data = request.json or {}
+        url = data.get('url')
+        if not url:
+            return jsonify({'status': 'error', 'message': 'Missing url'}), 400
+        try:
+            if 'facebook.com/share/' in url:
+                resolved = extract_real_fb_url(url)
+                if resolved:
+                    url = resolved
+        except Exception:
+            pass
+        html_doc = fetch_url_content(url)
+        image_url = _extract_og_image(html_doc)
+        return jsonify({'status': 'success', 'image_url': image_url})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
