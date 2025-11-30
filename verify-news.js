@@ -10,6 +10,117 @@ const facebookUrl = document.getElementById('facebook-url');
 const facebookContent = document.getElementById('facebook-content');
 const facebookCharCount = document.getElementById('facebook-char-count');
 
+function isValidImageUrl(u) {
+    try {
+        if (!u || typeof u !== 'string') return false;
+        const parsed = new URL(u);
+        return /^https?:/.test(parsed.protocol) && !!parsed.hostname;
+    } catch (_) {
+        return false;
+    }
+}
+
+function normalizeUrlForCache(u) {
+    try {
+        if (!u) return '';
+        const orig = new URL(u);
+        const host = orig.hostname.replace(/^www\./, '').toLowerCase();
+        let path = orig.pathname || '/';
+        path = path.replace(/\/+/, '/');
+        const keepParams = new URLSearchParams();
+        const src = new URLSearchParams(orig.search);
+        if (/facebook\.com$/i.test(host)) {
+            const p = path.toLowerCase();
+            if (p.includes('/photo.php')) {
+                if (src.has('fbid')) keepParams.set('fbid', src.get('fbid'));
+                if (src.has('id')) keepParams.set('id', src.get('id'));
+            } else if (p.includes('/story.php')) {
+                if (src.has('story_fbid')) keepParams.set('story_fbid', src.get('story_fbid'));
+                if (src.has('id')) keepParams.set('id', src.get('id'));
+            }
+        }
+        const qs = keepParams.toString();
+        const canon = `https://${host}${path}${qs ? '?' + qs : ''}`.replace(/\/?$/, '');
+        return canon;
+    } catch (_) {
+        return (u || '').trim();
+    }
+}
+
+function hashString(str) {
+    try {
+        const s = String(str || '');
+        let h = 0;
+        for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
+        return ('h' + (h >>> 0).toString(16));
+    } catch (_) {
+        return '';
+    }
+}
+
+function createCleanDbPayload(result, url, contentText, platformLabel, analysisType) {
+    const cred = result && result.credibility ? result.credibility : {};
+    const explanation = (cred && cred.explanation) || '';
+    const slang = Array.isArray(result && result.slang_detected) ? result.slang_detected : [];
+    const claims = Array.isArray(result && result.claim_analysis) ? result.claim_analysis : [];
+    const pageName = (result && result.page_name) || null;
+    const sourceName = (result && result.source_name) || null;
+    const cleanText = String(contentText || '').slice(0, 500);
+    const score = Math.min(Math.round((cred.score || 0) * 100), 100);
+    return {
+        platform: platformLabel,
+        analysis: analysisType,
+        url: url || null,
+        canonicalUrl: normalizeUrlForCache(url || ''),
+        contentType: url ? 'Post/Article URL' : 'Text Content',
+        credibilityScore: score,
+        label: cred.label || '',
+        sourcesFound: cred.sources ?? 0,
+        factChecks: cred.factChecks ?? 0,
+        analyzedText: cleanText,
+        contentHash: hashString(cleanText),
+        pageName: pageName,
+        sourceName: sourceName,
+        reviewedClaims: claims,
+        explanation: explanation,
+        slang_detected: slang,
+        imageUrl: isValidImageUrl(result && result.image_url) ? result.image_url : null,
+        userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
+        userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
+        analyzed_at: firebase.firestore.FieldValue.serverTimestamp()
+    };
+}
+
+async function checkExistingVerification(url, contentText) {
+    try {
+        if (!window.firebase || !firebase.firestore) return null;
+        const db = firebase.firestore();
+        if (url) {
+            const canon = normalizeUrlForCache(url);
+            let qs = await db.collection('facebook_verification_results').where('canonicalUrl', '==', canon).limit(1).get();
+            if (qs.empty) {
+                qs = await db.collection('facebook_verification_results').where('url', '==', url).limit(1).get();
+            }
+            if (!qs.empty) {
+                const d = qs.docs[0];
+                return { id: d.id, ...d.data() };
+            }
+        } else if (contentText && contentText.trim()) {
+            const contentHash = hashString(contentText.trim());
+            let qs = await db.collection('facebook_verification_results').where('contentHash', '==', contentHash).limit(1).get();
+            if (qs.empty) {
+                qs = await db.collection('facebook_verification_results').where('analyzedText', '==', contentText.trim()).limit(1).get();
+            }
+            if (!qs.empty) {
+                const d = qs.docs[0];
+                return { id: d.id, ...d.data() };
+            }
+        }
+        return null;
+    } catch (_) {
+        return null;
+    }
+}
 
 // URL verification handler
 async function handleUrlVerification() {
@@ -51,6 +162,34 @@ async function handleUrlVerification() {
     // Proceed even if no extracted content; backend will use URL-based fallbacks
 
     try {
+        const existing = await checkExistingVerification(url, '');
+        if (existing) {
+            showVerificationResult('url', {
+                credibilityScore: Number(existing.credibilityScore || 0),
+                sources: Number(existing.sourcesFound || 0),
+                factChecks: Number(existing.factChecks || 0),
+                domain: extractDomain(existing.url || url),
+                credibilityExplanation: (existing.zylaFactCheck && (existing.zylaFactCheck.explanation || existing.zylaFactCheck.analysis)) || '',
+                credibilityLabel: existing.label || '',
+                mlDetails: null,
+                slangDetected: [],
+                sarcasmPercent: null,
+                sarcasmRisk: null,
+                tone: null,
+                fakeClaims: [],
+                realClaims: [],
+                claimAnalysis: Array.isArray(existing.reviewedClaims) ? existing.reviewedClaims : [],
+                claimsChecked: [],
+                hasGoogleClaims: !!(
+                    (Array.isArray(existing.reviewedClaims) && existing.reviewedClaims.some(x => String(x.source||'').toLowerCase()==='google')) ||
+                    (Array.isArray(existing.googleFactCheck) && existing.googleFactCheck.some(r => r && r.fact_check_result && Array.isArray(r.fact_check_result.claims) && r.fact_check_result.claims.length>0))
+                ),
+                pageName: existing.pageName || null,
+                resultId: existing.id || ''
+            });
+            showNotification('Loaded from existing verification.', 'success');
+            return;
+        }
         const contentForApi = effectiveContent || (url ? buildNonEmptyContentFromUrl(url) : '') || '';
         const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
             method: 'POST',
@@ -61,6 +200,50 @@ async function handleUrlVerification() {
         const result = await fcResp.json();
 
         const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
+
+        if (window.firebase && firebase.firestore) {
+            try {
+                await firebase.firestore().collection('facebook_verification_results').add({
+                    platform: 'Web',
+                    analysis: 'web-url',
+                    url: url || null,
+                    canonicalUrl: normalizeUrlForCache(url || ''),
+                    contentType: 'Article URL',
+                    credibilityScore: adjustedScore,
+                    label: result.credibility && result.credibility.label,
+                    sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
+                    factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
+                    analyzedText: contentForApi,
+                    contentHash: hashString(contentForApi),
+                    pageName: (result && result.page_name) || null,
+                    reviewedClaims: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
+                    zylaFactCheck: result.zyla || null,
+                    googleFactCheck: result.detailed_results || null,
+                    imageUrl: isValidImageUrl(result.image_url) ? result.image_url : null,
+                    userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
+                    userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
+                    analyzed_at: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (e) {
+                console.error('Error writing web analysis to facebook_verification_results:', e);
+            }
+        } else {
+            console.log('Web analysis payload:', {
+                platform: 'Web', analysis: 'web-url', url,
+                canonicalUrl: normalizeUrlForCache(url || ''),
+                contentType: 'Article URL', credibilityScore: adjustedScore,
+                label: result.credibility && result.credibility.label,
+                sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
+                factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
+                analyzedText: contentForApi,
+                contentHash: hashString(contentForApi),
+                pageName: (result && result.page_name) || null,
+                reviewedClaims: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
+                zylaFactCheck: result.zyla || null,
+                googleFactCheck: result.detailed_results || null,
+                imageUrl: isValidImageUrl(result.image_url) ? result.image_url : null
+            });
+        }
 
         showVerificationResult('url', {
             credibilityScore: adjustedScore,
@@ -79,7 +262,8 @@ async function handleUrlVerification() {
             realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
             claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : [],
-            hasGoogleClaims: !!result.has_google_claims
+            hasGoogleClaims: !!result.has_google_claims,
+            pageName: (result && result.page_name) || null
         });
     } catch (error) {
         console.error('Verification error:', error);
@@ -106,6 +290,24 @@ function extractDomain(url) {
         return new URL(url).hostname;
     } catch (_) {
         return 'Unknown';
+    }
+}
+
+function derivePageName(url) {
+    try {
+        if (!url) return '';
+        const u = new URL(url);
+        const host = u.hostname.replace(/^www\./, '');
+        if (host.includes('facebook.com')) {
+            const seg = u.pathname.split('/').filter(Boolean)[0] || '';
+            if (seg) return decodeURIComponent(seg).replace(/[-_]+/g, ' ').trim();
+            return 'Facebook';
+        }
+        return host;
+    } catch (e) {
+        const m = (url || '').match(/facebook\.com\/([A-Za-z0-9._-]+)/i);
+        if (m && m[1]) return decodeURIComponent(m[1]).replace(/[-_]+/g, ' ').trim();
+        return '';
     }
 }
 // Build a non-empty, human-readable sentence from a URL
@@ -150,6 +352,7 @@ function isSupportedFacebookPostUrl(url) {
         return (
             /\/share\/p\//.test(p) ||
             /\/share\/r\//.test(p) ||
+             /\/share\/v\//.test(p) ||
             /\/reel\//.test(p) ||
             /\/posts\//.test(p) ||
             /\/permalink\//.test(p) ||
@@ -248,6 +451,41 @@ async function handleFacebookVerification() {
             return;
         }
     }
+
+    try {
+        const existing = await checkExistingVerification(url || null, content || null);
+        if (existing) {
+            const analysisType = url ? 'facebook-url' : 'facebook-content';
+            showFacebookVerificationResult(analysisType, {
+                credibilityScore: Number(existing.credibilityScore || 0),
+                sources: Number(existing.sourcesFound || 0),
+                factChecks: Number(existing.factChecks || 0),
+                platform: 'Facebook',
+                contentType: url ? 'Post/Article URL' : 'Text Content',
+                url: existing.url || url || null,
+                pageName: existing.pageName || null,
+                credibilityExplanation: existing.explanation || ((existing.zylaFactCheck && (existing.zylaFactCheck.explanation || existing.zylaFactCheck.analysis)) || ''),
+                credibilityLabel: existing.label || '',
+                analyzedText: existing.analyzedText || content || '',
+                mlDetails: null,
+                slangDetected: Array.isArray(existing.slang_detected) ? existing.slang_detected : [],
+                sarcasmPercent: null,
+                sarcasmRisk: null,
+                tone: null,
+                fakeClaims: [],
+                realClaims: [],
+                claimAnalysis: Array.isArray(existing.reviewedClaims) ? existing.reviewedClaims : [],
+                claimsChecked: [],
+                hasGoogleClaims: !!(
+                    (Array.isArray(existing.reviewedClaims) && existing.reviewedClaims.some(x => String(x.source||'').toLowerCase()==='google')) ||
+                    (Array.isArray(existing.googleFactCheck) && existing.googleFactCheck.some(r => r && r.fact_check_result && Array.isArray(r.fact_check_result.claims) && r.fact_check_result.claims.length>0))
+                ),
+                resultId: existing.id || ''
+            });
+            showNotification('Loaded from existing verification.', 'success');
+            return;
+        }
+    } catch (_) {}
     
     // Analysis options removed
     
@@ -316,65 +554,39 @@ async function handleFacebookVerification() {
         const result = await response.json();
 
         const analysisType = url ? 'facebook-url' : 'facebook-content';
-        
-        // Use credibility score directly
-        const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
-        
+        const cleanPayload = createCleanDbPayload(result, url, contentForApi, 'Facebook', analysisType);
         let resultId = null;
         if (window.firebase && firebase.firestore) {
             try {
-                const resultDocRef = await firebase.firestore().collection('facebook_verification_results').add({
-                    platform: 'Facebook',
-                    analysis: analysisType,
-                    url: url || null,
-                    contentType: url ? 'Post/Article URL' : 'Text Content',
-                    credibilityScore: adjustedScore,
-                    label: result.credibility && result.credibility.label,
-                    sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
-                    factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
-                    analyzedText: contentForApi,
-                    userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
-                    userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
-                    analyzed_at: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                const resultDocRef = await firebase.firestore().collection('facebook_verification_results').add(cleanPayload);
                 resultId = resultDocRef.id;
             } catch (e) {
                 console.error('Error writing facebook_verification_results:', e);
                 showNotification('Failed to store analysis result. Check Firestore rules.', 'error');
             }
         } else {
-            console.log('FB verification result payload:', {
-                platform: 'Facebook',
-                analysis: analysisType,
-                url: url || null,
-                contentType: url ? 'Post/Article URL' : 'Text Content',
-                credibilityScore: adjustedScore,
-                label: result.credibility && result.credibility.label,
-                sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
-                factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
-                analyzedText: contentForApi
-            });
+            console.log('FB verification clean payload:', cleanPayload);
         }
 
         showFacebookVerificationResult(analysisType, {
-            credibilityScore: adjustedScore,
-            sources: (result.credibility && result.credibility.sources) ?? 0,
-            factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
+            credibilityScore: cleanPayload.credibilityScore,
+            sources: cleanPayload.sourcesFound,
+            factChecks: cleanPayload.factChecks,
             platform: 'Facebook',
-            contentType: url ? 'Post/Article URL' : 'Text Content',
-            url: url || null,
-            // Prefer Zyla's explanation/reason when available; fallback to overall explanation
-            credibilityExplanation: (result.zyla && (result.zyla.explanation || result.zyla.analysis)) || (result.credibility && result.credibility.explanation),
-            credibilityLabel: result.credibility.label,
-            analyzedText: contentForApi,
-            mlDetails: result.ml_details || null,
-            slangDetected: Array.isArray(result.slang_detected) ? result.slang_detected : [],
+            contentType: cleanPayload.contentType,
+            url: cleanPayload.url,
+            pageName: cleanPayload.pageName,
+            credibilityExplanation: cleanPayload.explanation,
+            credibilityLabel: result.credibility && result.credibility.label,
+            analyzedText: cleanPayload.analyzedText,
+            mlDetails: null,
+            slangDetected: Array.isArray(cleanPayload.slang_detected) ? cleanPayload.slang_detected : [],
             sarcasmPercent: (typeof result.sarcasm_percent === 'number') ? result.sarcasm_percent : null,
             sarcasmRisk: result.sarcasm_risk || null,
             tone: result.tone || null,
             fakeClaims: Array.isArray(result.fake_claims) ? result.fake_claims : [],
             realClaims: Array.isArray(result.real_claims) ? result.real_claims : [],
-            claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
+            claimAnalysis: Array.isArray(cleanPayload.reviewedClaims) ? cleanPayload.reviewedClaims : [],
             claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : [],
             hasGoogleClaims: !!result.has_google_claims,
             resultId: resultId
@@ -491,39 +703,27 @@ function showFacebookVerificationResult(type, data) {
 
     const reviewedClaimsSection = (activeCombined.length > 0) ? `
         <div style="margin-top:0.75rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Reviewed Claims</h4>
-            ${googleCombined.length === 0 ? `<div style="margin:0 0 0.5rem 0; color:#6b7280; font-size:0.9rem;">No Google Fact Check reviews found; showing other analysis sources.</div>` : ''}
             <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
                 ${activeCombined.map(c => `
-                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                    <li class="claim-item" style="padding:0.5rem; border:1px solid #1f2937; border-radius:6px; margin-bottom:0.5rem; background:#0b1220; color:#e5e7eb;">
                         <div><strong>Claim:</strong> ${safeTextForHtml(c.claim || 'N/A')}</div>
                         <div><strong>Reviewer:</strong> ${safeTextForHtml(c.reviewer || 'Unknown reviewer')}</div>
-                        <div><strong>Title:</strong> ${safeTextForHtml(c.rating || 'Unrated')}</div>
+                        <div><strong>Rating:</strong> ${safeTextForHtml(c.rating || 'Unrated')}</div>
                         <div><strong>Explanation:</strong> ${safeTextForHtml(c.explanation || 'No explanation')}</div>
-                        ${c.url ? `<div><a href="${c.url}" target="_blank">View fact check</a></div>` : (c.source === 'google' ? `<div><em>No fact-check URL available.</em></div>` : ``)}
+                        ${c.url ? `<div><a href="${c.url}" target="_blank">View fact check</a></div>` : ``}
                     </li>
                 `).join('')}
             </ul>
         </div>
-    ` : '';
+    ` : (googleCombined.length === 0 ? `
+        <div style="margin-top:0.5rem; color:#9ca3af;">No Zyla Fact Check review found.</div>
+    ` : '');
 
     const factCheckDetailsSection = `
         <div class="result-summary" style="margin-top:1rem;">
             <h4 style="margin:0 0 0.5rem 0;">Fact-Check Claims</h4>
             ${claimsOrderHtml}
             ${reviewedClaimsSection}
-            ${(!hasGoogleUrl) ? `
-                <div style="margin-top:0.75rem;">
-                    <h4 style="margin:0 0 0.5rem 0;">Sources:</h4>
-                    <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
-                        ${googleCombined.map(c => c.url ? `
-                            <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
-                                <div><a href="${c.url}" target="_blank">View fact check</a></div>
-                            </li>
-                        ` : '').join('')}
-                    </ul>
-                </div>
-            ` : ''}
         </div>
     `;
 
@@ -548,8 +748,8 @@ function showFacebookVerificationResult(type, data) {
             </div>
             <div class="result-details">
                 <div class="result-item">
-                    <span class="result-label">Platform:</span>
-                    <span class="result-value">${data.platform || 'Facebook'}</span>
+                    <span class="result-label">FB Page:</span>
+                    <span class="result-value">${safeTextForHtml(data.pageName || '')}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">Sources Found:</span>
@@ -622,6 +822,7 @@ function getFacebookDetailedSummary(data) {
 async function showVerificationResult(type, data) {
     // Store verification result in Firebase
     try {
+        const pageName = data.pageName || null;
         const verificationData = {
             type: type, // 'text' or 'url'
             content: type === 'text' ? articleContent.value.trim() : null,
@@ -630,6 +831,7 @@ async function showVerificationResult(type, data) {
             credibilityScore: data.credibilityScore,
             sourcesFound: data.sources,
             factChecks: data.factChecks,
+            pageName: pageName || null,
             verifiedBy: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
             verifierEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
             verifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -747,7 +949,7 @@ async function showVerificationResult(type, data) {
     const reviewedClaimsSection2 = (activeCombined2.length > 0) ? `
         <div style="margin-top:0.75rem;">
             <h4 style="margin:0 0 0.5rem 0;">Reviewed Claims</h4>
-            ${googleCombined2.length === 0 ? `<div style=\"margin:0 0 0.5rem 0; color:#6b7280; font-size:0.9rem;\">No Google Fact Check reviews found; showing other analysis sources.</div>` : ''}
+            ${googleCombined2.length === 0 ? `<div style=\"margin:0 0 0.5rem 0; color:#6b7280; font-size:0.9rem;\">No Google Fact Check reviews found.</div>` : ''}
             <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
                 ${activeCombined2.map(c => `
                     <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
@@ -803,8 +1005,8 @@ async function showVerificationResult(type, data) {
             </div>
             <div class="result-details">
                 <div class="result-item">
-                    <span class="result-label">Platform:</span>
-                    <span class="result-value">Web</span>
+                    <span class="result-label">Web Page:</span>
+                    <span class="result-value">${safeTextForHtml(pageName || '')}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">Sources Found:</span>
@@ -850,7 +1052,7 @@ async function showVerificationResult(type, data) {
                 </div>
             </div>
         </div>
-    `;
+`;
     
     // Create and show modal
     showModal('Credibility Analysis Complete', resultHtml);

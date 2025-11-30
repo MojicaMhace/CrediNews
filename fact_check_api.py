@@ -1158,6 +1158,8 @@ def fact_check_endpoint():
     title = data['title']
     content = data['content']
     url = data.get('url')
+    final_image_url = None
+    final_source_name = None
     
     # If a Facebook share link is supplied, resolve it to the canonical post URL first
     if url and 'facebook.com/share/' in url:
@@ -1239,10 +1241,13 @@ def fact_check_endpoint():
     # PRIORITY 2: Scrape URL (Only if content is missing)
     elif url:
         print(f"DEBUG: No content provided. Attempting to scrape URL: {url}")
-        # Try Playwright first
         scraped = scrape_with_playwright(url)
         scraped_text = scraped.get('text') if isinstance(scraped, dict) else (scraped or '')
         scraped_img = scraped.get('image_url') if isinstance(scraped, dict) else None
+        if scraped_img and not final_image_url:
+            final_image_url = scraped_img
+        if not final_source_name:
+            final_source_name = _credible_source_name(url)
         if scraped_text and len(scraped_text.strip()) > 20:
             zyla_seed_text = scraped_text
         else:
@@ -1268,6 +1273,18 @@ def fact_check_endpoint():
         except Exception:
             pass
     print(f"DEBUG: Final zyla_safe_input length={len(zyla_safe_input)}")
+
+    if url and not final_image_url:
+        try:
+            html_text = fetch_url_content(url)
+            final_image_url = _extract_og_image(html_text)
+        except Exception:
+            final_image_url = None
+    if url and not final_source_name:
+        try:
+            final_source_name = _credible_source_name(url)
+        except Exception:
+            final_source_name = _extract_domain(url or '')
 
     zyla = {}
     zyla_call_attempted = False
@@ -1473,6 +1490,9 @@ def fact_check_endpoint():
         try:
             bval = _credible_boost_for_url(url)
         except Exception:
+
+            has_negative_evidence = len(fake_claims) > 0
+            _has_fact_data = (len(scores) > 0)
             bval = 0.0
         has_negative_evidence = any((not isinstance(fc, dict)) or (fc.get('source') != 'zyla') or (bval <= 0) for fc in fake_claims)
         # Floor score to low threshold for credible domains with no negative evidence
@@ -1551,19 +1571,14 @@ def fact_check_endpoint():
         "factChecks": fact_checks_count
     }
 
-    image_url = None
-    try:
-        if url:
-            html_for_image = fetch_url_content(url)
-            image_url = scraped_img or _extract_og_image(html_for_image)
-    except Exception:
-        image_url = None
+    image_url = final_image_url
 
     return jsonify({
         'status': 'success',
         'credibility': credibility,
         'page_name': _credible_master_name(url),
         'image_url': image_url,
+        'source_name': final_source_name,
         'claims_checked': claims,  # May be empty if none found
         'detailed_results': all_results,
         'claim_analysis': claim_analysis,
@@ -1592,26 +1607,6 @@ def fact_check_endpoint():
         'sarcasm_risk': sarcasm_risk,
         'tone': ('Risk: Potential sarcasm may affect the meaning of the post.' if sarcasm_score >= 0.02 else 'Risk: Low – Not enough slang to indicate sarcasm.')
     })
-
-@app.route('/api/extract-image', methods=['POST'])
-def extract_image_endpoint():
-    try:
-        data = request.json or {}
-        url = data.get('url')
-        if not url:
-            return jsonify({'status': 'error', 'message': 'Missing url'}), 400
-        try:
-            if 'facebook.com/share/' in url:
-                resolved = extract_real_fb_url(url)
-                if resolved:
-                    url = resolved
-        except Exception:
-            pass
-        html_doc = fetch_url_content(url)
-        image_url = _extract_og_image(html_doc)
-        return jsonify({'status': 'success', 'image_url': image_url})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
