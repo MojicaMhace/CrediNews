@@ -11,6 +11,7 @@ from nltk.corpus import stopwords
 import re
 from typing import Dict, Any, List, Tuple, Optional
 from urllib.parse import urlparse, unquote
+import html
 
 # --- NEW: Load .env file explicitly ---
 try:
@@ -226,6 +227,50 @@ def _credible_source_name(url: Optional[str]) -> str:
         return domain
     except Exception:
         return _extract_domain(url or '')
+
+def _fb_page_from_url(url: str) -> Optional[str]:
+    try:
+        real = url
+        if isinstance(url, str) and "facebook.com/share/" in url.lower():
+            r = extract_real_fb_url(url)
+            if r:
+                real = r
+        from urllib.parse import urlparse, unquote
+        p = urlparse(real)
+        host = (p.netloc or '').lower()
+        if host.startswith('www.'):
+            host = host[4:]
+        if host != 'facebook.com':
+            return None
+        segs = [s for s in (p.path or '').split('/') if s]
+        if not segs:
+            return None
+        h = unquote(segs[0])
+        h = re.sub(r"[-_]+", " ", h).strip()
+        return h or None
+    except Exception:
+        return None
+
+def _credible_master_name(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    try:
+        for entry in CREDIBLE_SOCIAL_PATTERNS:
+            pat = entry.get('pattern')
+            if pat and re.search(pat, url, flags=re.IGNORECASE):
+                name = entry.get('name')
+                if name:
+                    return str(name)
+        domain = _extract_domain(url)
+        info = CREDIBLE_WEBSITES.get(domain)
+        if isinstance(info, dict) and info.get('name'):
+            return str(info['name'])
+        fb_name = _fb_page_from_url(url)
+        if fb_name:
+            return fb_name
+        return domain or None
+    except Exception:
+        return None
 
 def _now() -> float:
     return time.time()
@@ -590,6 +635,32 @@ def _extract_meta_content(html, name_or_property):
     m = re.search(rf"<meta[^>]*(?:name|property)=[\"']{re.escape(name_or_property)}[\"'][^>]*content=[\"']([\s\S]*?)[\"'][^>]*>", html, flags=re.IGNORECASE)
     return m.group(1).strip() if m else None
 
+def _extract_og_image(html: Optional[str]) -> Optional[str]:
+    if not html:
+        return None
+    for key in [
+        'og:image',
+        'twitter:image',
+        'og:image:url',
+        'og:image:secure_url'
+    ]:
+        val = _extract_meta_content(html, key)
+        if val:
+            try:
+                return html_unescape(val.strip())
+            except Exception:
+                try:
+                    return html.unescape(val.strip())
+                except Exception:
+                    return val.strip()
+    return None
+
+def html_unescape(s: str) -> str:
+    try:
+        return html.unescape(s)
+    except Exception:
+        return s
+
 def _html_to_text(html):
     # Remove tags and decode entities minimally
     text = re.sub(r"<[^>]+>", " ", html)
@@ -822,7 +893,7 @@ def fetch_url_content(url):
     return None
 
 
-def scrape_with_playwright(url: str) -> str:
+def scrape_with_playwright(url: str) -> Dict[str, Optional[str]]:
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
@@ -839,7 +910,7 @@ def scrape_with_playwright(url: str) -> str:
                     page.goto(url, timeout=15000)
                 except Exception:
                     browser.close()
-                    return ""
+                    return {"text": "", "image_url": None}
             try:
                 page.wait_for_selector("body", timeout=15000)
             except Exception:
@@ -855,6 +926,7 @@ def scrape_with_playwright(url: str) -> str:
                 except Exception:
                     pass
             text_content = ""
+            image_url = None
             for container_sel in [
                 '[role="article"]',
                 'div[role="main"]',
@@ -878,15 +950,36 @@ def scrape_with_playwright(url: str) -> str:
                             break
                 except Exception:
                     continue
+
+            # Extract Open Graph image from DOM
+            try:
+                for meta_sel in [
+                    'meta[property="og:image"]',
+                    'meta[name="og:image"]',
+                    'meta[property="og:image:url"]',
+                    'meta[property="og:image:secure_url"]',
+                    'meta[name="twitter:image"]'
+                ]:
+                    try:
+                        m = page.locator(meta_sel).first
+                        if m and m.count() > 0:
+                            raw = m.get_attribute('content')
+                            if raw:
+                                image_url = html_unescape(raw)
+                                break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
             try:
                 browser.close()
             except Exception:
                 pass
             text_content = re.sub(r"\s+", " ", (text_content or "")).strip()
-            return text_content
+            return {"text": text_content, "image_url": image_url}
     except Exception as e:
         print(f"Playwright scrape failed: {e}")
-        return ""
+        return {"text": "", "image_url": None}
 
 
 def extract_claims_from_url(url):
@@ -1147,7 +1240,9 @@ def fact_check_endpoint():
     elif url:
         print(f"DEBUG: No content provided. Attempting to scrape URL: {url}")
         # Try Playwright first
-        scraped_text = scrape_with_playwright(url)
+        scraped = scrape_with_playwright(url)
+        scraped_text = scraped.get('text') if isinstance(scraped, dict) else (scraped or '')
+        scraped_img = scraped.get('image_url') if isinstance(scraped, dict) else None
         if scraped_text and len(scraped_text.strip()) > 20:
             zyla_seed_text = scraped_text
         else:
@@ -1232,15 +1327,31 @@ def fact_check_endpoint():
             scores.append(max(0.8, conf_val))
         elif zyla['verdict'] == 'false':
             fake_claims.append(info)
-            # Invert confidence for false
-            scores.append(max(0.0, 1.0 - conf_val))
+            try:
+                bz = _credible_boost_for_url(url)
+            except Exception:
+                bz = 0.0
+            if bz > 0:
+                try:
+                    source_name = _credible_source_name(url or '')
+                    explanations.insert(0, f"Verified source: {source_name}. Inaccurate Zyla false verdict bypassed.")
+                except Exception:
+                    explanations.insert(0, "Verified source bypass applied.")
+                scores.append(0.70)
+            else:
+                # Apply normal negative scoring when source isn't verified
+                scores.append(max(0.0, 1.0 - conf_val))
         else:  # partially_true
             real_claims.append(info)
             # Fixed score for mixed/partial
             scores.append(0.65)
-            
+        
         if zyla.get('explanation'):
-            explanations.append(str(zyla['explanation']))
+            try:
+                if not (_credible_boost_for_url(url) > 0 and zyla.get('verdict') == 'false'):
+                    explanations.append(str(zyla['explanation']))
+            except Exception:
+                explanations.append(str(zyla['explanation']))
 
     # Always query Google Fact Check for claims to retrieve claimReview support
     run_google = True
@@ -1346,57 +1457,8 @@ def fact_check_endpoint():
     
 
     ml_details = None
-    # ML fallback when no Google claims
     if not has_google_claims:
-        aggregate_text = f"{title}\n\n{content}\n\n{url or ''}".strip()
-        ml = analyze_with_ml(aggregate_text)
-        ml_details = {
-            'label': ml.get('label'),
-            'confidence': ml.get('confidence'),
-            'evidence': ml.get('evidence')
-        }
-        synthetic = ml.get('synthetic_factcheck')
-        if synthetic:
-            # Add ML as a source
-            sources_set.add('ML Model')
-            # Treat synthetic as another claim to feed scoring
-            all_results.append({
-                'claim': 'ML Classification',
-                'fact_check_result': synthetic
-            })
-            # Score and explanation from ML synthetic to avoid Unverified
-            try:
-                ml_claim_result = calculate_credibility_score(synthetic)
-                scores.append(_clamp01(ml_claim_result.get('score', _neutral_score())))
-                explanations.append(ml_claim_result.get('explanation', ''))
-                fact_checks_count += 1
-            except Exception as e:
-                print(f"Failed to score ML synthetic: {e}")
-            # Also add to claim_analysis for UI
-            try:
-                claims_list = synthetic.get('claims', [])
-                for c in claims_list:
-                    reviews = c.get('claimReview', [])
-                    for review in reviews:
-                        fact_checks_count += 1
-                        rating_text = (review.get('textualRating') or '').lower()
-                        info = {
-                            'claim': c.get('text') or 'Model-detected evidence',
-                            'rating': review.get('textualRating'),
-                            'reviewer': 'ML Model',
-                            'title': review.get('title'),
-                            'url': None,
-                            'reviewDate': None,
-                            'explanation': f"ML classified as {review.get('textualRating')} with confidence { (ml.get('confidence') or 0.0) * 100:.0f}%",
-                            'source': 'ml'
-                        }
-                        claim_analysis.append(info)
-                        if any(word in rating_text for word in ['false']):
-                            fake_claims.append(info)
-                        if any(word in rating_text for word in ['true']):
-                            real_claims.append(info)
-            except Exception as e:
-                print(f"Failed to append ML synthetic claim: {e}")
+        ml_details = None
     
     # Calculate overall credibility blending Zyla, Google, ML
     if scores:
@@ -1408,7 +1470,11 @@ def fact_check_endpoint():
             boost = _credible_boost_for_url(url)
         except Exception:
             boost = 0.0
-        has_negative_evidence = len(fake_claims) > 0
+        try:
+            bval = _credible_boost_for_url(url)
+        except Exception:
+            bval = 0.0
+        has_negative_evidence = any((not isinstance(fc, dict)) or (fc.get('source') != 'zyla') or (bval <= 0) for fc in fake_claims)
         # Floor score to low threshold for credible domains with no negative evidence
         if boost > 0 and not has_negative_evidence and overall_score < CREDIBILITY_THRESHOLDS["unverified_upper"]:
             overall_score = max(overall_score, CREDIBILITY_THRESHOLDS["unverified_upper"])
@@ -1416,6 +1482,8 @@ def fact_check_endpoint():
             overall_score >= CREDIBILITY_THRESHOLDS["unverified_upper"] and overall_score < CREDIBILITY_THRESHOLDS["high"]
         ):
             overall_score = min(1.0, overall_score + boost)
+            if overall_score >= CREDIBILITY_THRESHOLDS["high"]:
+                overall_score = 0.74
             try:
                 source_name = _credible_source_name(url or '')
                 explanations.insert(0, f"Credible domain boost applied (+{boost:.2f}) for {source_name}.")
@@ -1424,11 +1492,24 @@ def fact_check_endpoint():
             except Exception:
                 explanations.insert(0, f"Credible domain boost applied (+{boost:.2f}).")
     else:
-        # No fact check data available
-        overall_score = _neutral_score()
-        _has_fact_data = False
-        overall_label = "Unverified"
-        overall_explanation = "No fact check data available for this content."
+        # No fact check data; apply credible domain baseline if URL is verified
+        try:
+            bval = _credible_boost_for_url(url)
+        except Exception:
+            bval = 0.0
+        if bval > 0 and not has_negative_evidence:
+            overall_score = max(CREDIBILITY_THRESHOLDS["unverified_upper"], min(1.0, _neutral_score() + bval))
+            _has_fact_data = True
+            try:
+                source_name = _credible_source_name(url or '')
+                explanations.insert(0, f"Credible domain baseline applied (+{bval:.2f}) for {source_name}.")
+            except Exception:
+                explanations.insert(0, f"Credible domain baseline applied (+{bval:.2f}).")
+        else:
+            overall_score = _neutral_score()
+            _has_fact_data = False
+            overall_label = "Unverified"
+            overall_explanation = "No fact check data available for this content."
 
     # Slang detection and sarcasm scoring (on combined text, with URL stripped)
     combined_text = f"{title} {content}"
@@ -1470,9 +1551,19 @@ def fact_check_endpoint():
         "factChecks": fact_checks_count
     }
 
+    image_url = None
+    try:
+        if url:
+            html_for_image = fetch_url_content(url)
+            image_url = scraped_img or _extract_og_image(html_for_image)
+    except Exception:
+        image_url = None
+
     return jsonify({
         'status': 'success',
         'credibility': credibility,
+        'page_name': _credible_master_name(url),
+        'image_url': image_url,
         'claims_checked': claims,  # May be empty if none found
         'detailed_results': all_results,
         'claim_analysis': claim_analysis,
