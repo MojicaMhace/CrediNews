@@ -307,7 +307,8 @@ async function handleFacebookVerification() {
             body: JSON.stringify({
                 title: 'Facebook Content',
                 content: contentForApi,
-                url: url || null
+                url: url || null,
+                fast: true
             })
         });
         if (!response.ok) {
@@ -356,6 +357,40 @@ async function handleFacebookVerification() {
             });
         }
 
+        // --- Poser Detection Integration ---
+        let poserHtml = '';
+        try {
+            let poserSourceUrl = (url || '').trim();
+            if (poserSourceUrl.includes('facebook.com/share/')) {
+                try {
+                    const r = await fetch('http://127.0.0.1:5000/api/resolve-facebook-share', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: poserSourceUrl })
+                    });
+                    if (r.ok) {
+                        const j = await r.json();
+                        if (j && j.resolved_url) poserSourceUrl = j.resolved_url;
+                    }
+                } catch (_) {}
+            }
+            const pageUrl = extractFacebookPageUrl(poserSourceUrl);
+            const poserTarget = pageUrl || poserSourceUrl;
+            if (poserTarget && poserTarget.includes('facebook.com')) {
+                const pdResp = await fetch('http://127.0.0.1:5001/api/poser/analyze_full', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: poserTarget })
+                });
+                if (pdResp.ok) {
+                    const pd = await pdResp.json();
+                    poserHtml = buildPoserSummaryHtml(pd);
+                }
+            }
+        } catch (e) {
+            console.warn('Poser detection failed:', e);
+        }
+
         showFacebookVerificationResult(analysisType, {
             credibilityScore: adjustedScore,
             sources: (result.credibility && result.credibility.sources) ?? 0,
@@ -377,7 +412,8 @@ async function handleFacebookVerification() {
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
             claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : [],
             hasGoogleClaims: !!result.has_google_claims,
-            resultId: resultId
+            resultId: resultId,
+            poserHtml: poserHtml
         });
     } catch (error) {
         console.error('Fact check API error:', error);
@@ -574,6 +610,7 @@ function showFacebookVerificationResult(type, data) {
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
+            ${data.poserHtml || ''}
             <div class="feedback-section compact" 
                  data-analysis="${type}"
                  data-platform="facebook"
@@ -1205,6 +1242,81 @@ function switchVerifySection(section) {
     }
 }
 
-// Default to Facebook section visible
 switchVerifySection('facebook');
+function extractFacebookPageUrl(u) {
+    try {
+        if (!u) return '';
+        const url = new URL(u);
+        if (!url.hostname.includes('facebook.com')) return '';
+        const path = url.pathname;
+        // story/permalink style: use id param
+        if (path.includes('/story.php') || path.includes('/permalink.php')) {
+            const id = url.searchParams.get('id');
+            if (id) return `https://www.facebook.com/${id}`;
+        }
+        const stopWords = ['/posts/', '/videos/', '/photos/', '/reel/'];
+        for (const stop of stopWords) {
+            const idx = path.indexOf(stop);
+            if (idx > 1) {
+                const base = path.substring(0, idx);
+                return `${url.protocol}//${url.hostname}${base}`;
+            }
+        }
+        // default: return without query/fragment
+        return `${url.protocol}//${url.hostname}${path}`;
+    } catch (e) {
+        return (u || '').split('?')[0];
+    }
+}
 
+//poser detect result
+function buildPoserSummaryHtml(pd) {
+    try {
+        const analysis = pd && pd.analysis ? pd.analysis : {};
+        let verdict = analysis.verdict || (pd && (pd.verdict || pd.classification)) || 'Unknown';
+        let score = (typeof analysis.final_trust_score === 'number') ? analysis.final_trust_score : (pd && typeof pd.credi_score === 'number' ? pd.credi_score : ((pd && pd.trust && pd.trust.raw_score) || 0));
+        const meta = pd && pd.metadata ? pd.metadata : {};
+        const name = meta.name || 'Unknown';
+        const followersRaw = Number(meta.followers_count || 0);
+        const likesRaw = Number(meta.fan_count || 0);
+        const audienceCount = Math.max(followersRaw, likesRaw);
+        const audienceLabel = followersRaw >= likesRaw ? 'followers' : 'likes';
+        const hasBadge = !!(meta.is_verified || String(meta.verification_status||'').toLowerCase().includes('verified'));
+        const badgeText = hasBadge ? 'Verified' : 'No Verified Badge';
+        const color = hasBadge ? '#16a34a' : (score >= 80 ? '#22c55e' : (score >= 55 ? '#f59e0b' : '#ef4444'));
+        const note = pd && pd.note ? pd.note : '';
+        let aiExplanation = (analysis && analysis.breakdown && analysis.breakdown.ai_explanation) ? analysis.breakdown.ai_explanation : (analysis.ai_explanation || '');
+        const aiRisk = (analysis && analysis.breakdown && analysis.breakdown.scoring_layers && typeof analysis.breakdown.scoring_layers.ai_risk === 'number') ? analysis.breakdown.scoring_layers.ai_risk : null;
+        const aiVerdict = (analysis && analysis.breakdown && analysis.breakdown.ai_verdict) ? analysis.breakdown.ai_verdict : ((typeof aiRisk === 'number') ? (aiRisk >= 70 ? 'Likely Poser' : (aiRisk <= 30 ? 'Likely Authentic' : 'Mixed Signals')) : '');
+        try {
+            const t = String(aiExplanation || '').toLowerCase();
+            const hasPic = !!(meta && meta.picture && meta.picture.data && meta.picture.data.url && !meta.picture.data.is_silhouette);
+            const hasBio = !!(meta && (meta.about || meta.description));
+            if (hasBadge && (/not verified|unverified|no verified|lacks official verification/.test(t))) {
+                aiExplanation = 'Verified account with official signals.';
+            } else if (audienceCount >= 100000 && (/low follower|few follower|no follower/.test(t))) {
+                aiExplanation = 'High audience and established presence.';
+            } else if (hasBio && (/no bio|missing bio|no description/.test(t))) {
+                aiExplanation = 'Bio present with details.';
+            } else if (hasPic && (/no profile picture|default picture|missing profile/.test(t))) {
+                aiExplanation = 'Custom profile image present.';
+            }
+        } catch (_) {}
+        return `
+            <div class="result-summary" style="margin-top:1rem; border-left:4px solid ${color};">
+                <h4 style="margin:0 0 0.5rem 0;">Source Risk (Poser Detection)</h4>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="min-width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:${color}20; color:${color}; font-weight:700;">${Math.max(0, Math.min(100, Math.round(score)))}%</div>
+                    <div>
+                        <div><strong>${verdict}</strong></div>
+                        <div style="color:#6b7280; font-size:0.9rem;">${name} • ${audienceCount.toLocaleString()} ${audienceLabel} • ${badgeText}</div>
+                        ${note ? `<div style="color:#6b7280; font-size:0.85rem;">${note}</div>` : ''}
+                        ${aiExplanation || typeof aiRisk === 'number' ? `<div style="color:#334155; font-size:0.85rem; margin-top:4px;">${aiExplanation || ''}${typeof aiRisk === 'number' ? ` • AI Risk: ${aiRisk}/100` : ''}${aiVerdict ? ` • AI Verdict: ${aiVerdict}` : ''}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        return '';
+    }
+}

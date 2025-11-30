@@ -1,8 +1,11 @@
 .env
+serviceAccountKey.json
+
 __pycache__/
 *.pyc
+.venv/
+venv/
 
 models/
-*.joblib
-*.json
 *.bin
+*.joblib

@@ -4,54 +4,56 @@ import re
 import time
 import threading
 import requests
+import hashlib
+import json
 from dotenv import load_dotenv
 from apify_client import ApifyClient
 from dateutil import parser as date_parser
-
+import firebase_admin
+from firebase_admin import credentials, firestore
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+
+# --- 1. AI AGENT SETUP (Groq) ---
+try:
+    from groq import Groq
+except ImportError:
+    print("Warning: 'groq' library not installed. AI Agent disabled.")
+    Groq = None
 
 app = Flask(__name__)
 CORS(app)
 
-# -------------------------------------------------------------------------
-# CONFIGURATION & ENV LOADING
-# -------------------------------------------------------------------------
-
 def _load_env_var(key: str, default: str = "") -> str:
     v = os.getenv(key)
-    if v:
-        return v
+    if v: return v
     try:
         env_path = os.path.join(os.path.dirname(__file__), ".env")
         if os.path.exists(env_path):
             with open(env_path, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
-                    if not line or line.startswith("#") or '=' not in line:
-                        continue
+                    if not line or line.startswith("#") or '=' not in line: continue
                     k, val = line.split("=", 1)
-                    if k.strip() == key:
-                        return val.strip().strip('"').strip("'").strip('`')
-    except Exception:
-        pass
+                    if k.strip() == key: return val.strip().strip('"').strip("'").strip('`')
+    except Exception: pass
     return default
 
 load_dotenv()
 
-APIFY_TOKEN = (
-    os.getenv("APIFY_TOKEN") 
-    or os.getenv("APIFY_API_TOKEN") 
-    or _load_env_var("APIFY_TOKEN")
-)
+# --- CONFIGURATION ---
+APIFY_TOKEN = (os.getenv("APIFY_TOKEN") or os.getenv("APIFY_API_TOKEN") or _load_env_var("APIFY_TOKEN"))
 META_GRAPH_TOKEN = _load_env_var("META_GRAPH_TOKEN")
 GRAPH_BASE_URL = (_load_env_var("GRAPH_BASE_URL", "https://graph.facebook.com/v24.0") or "https://graph.facebook.com/v24.0").strip().strip('`')
 META_APP_ID = _load_env_var("META_APP_ID")
 META_APP_SECRET = _load_env_var("META_APP_SECRET")
 POSER_ADMIN_SECRET = _load_env_var("POSER_ADMIN_SECRET")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+POSER_LOG_COLLECTION = _load_env_var("POSER_LOG_COLLECTION", "poser_detections")
+FORCE_APIFY = str(_load_env_var("FORCE_APIFY", "False")).strip().lower() in ("true","1","yes","y")
+
 REQUIRED_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_read_user_content"] 
 
 GRAPH_CACHE_TTL = int(_load_env_var("GRAPH_CACHE_TTL", "300"))
@@ -60,16 +62,118 @@ _GRAPH_CACHE_LOCK = threading.Lock()
 GRAPH_CACHE: Dict[str, Dict[str, Any]] = {}
 LAST_GRAPH_ERROR: Optional[Dict[str, Any]] = None
 
-# -------------------------------------------------------------------------
-# GRAPH API HELPERS
-# -------------------------------------------------------------------------
+# --- DATABASE COLLECTIONS ---
+RAW_DATA_COLLECTION = "analyzed_pages_cache" 
+VERDICT_COLLECTION = "poser_detections"      
+REGISTRY_COLLECTION = "verified_registry"
+OLD_CACHE_COLLECTION = "analyzed_pages_cache" 
+
+# Initialize AI Client
+AI_AGENT_REASON = None
+groq_lib_present = bool(Groq)
+groq_key_present = bool(GROQ_API_KEY)
+if groq_lib_present and groq_key_present:
+    groq_client = Groq(api_key=GROQ_API_KEY)
+    AI_AGENT_REASON = "ok"
+    print("AI Agent Online (Llama 3 via Groq)")
+else:
+    groq_client = None
+    AI_AGENT_REASON = "missing_library" if not groq_lib_present else "missing_key"
+    print("AI Agent Offline (Missing Key or Library)")
+
+if not firebase_admin._apps:
+    try:
+        import os
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Connected to CrediNews Firebase!")
+    except Exception as e:
+        print(f"Firebase Connection Error: {e}")
+
+try:
+    db = firestore.client()
+except Exception:
+    db = None
+    print(" Firestore client could not be initialized.")
+
+def _get_cache_key(url: str) -> str:
+    return hashlib.md5(url.strip().lower().encode('utf-8')).hexdigest()
+
+def _require_admin_secret(data: Optional[Dict[str, Any]] = None) -> bool:
+    secret = (POSER_ADMIN_SECRET or "").strip()
+    if not secret: return False
+
+    if request.headers.get("X-Admin-Secret") == secret:
+        return True
+
+    if data and data.get("admin_secret") == secret:
+        return True
+        
+    return False
 
 def _make_cache_key(path: str, params: Optional[Dict[str, Any]]) -> str:
     try:
         items = sorted(((params or {}).items()))
         return f"{path.strip('/')}?" + "&".join([f"{k}={v}" for k, v in items])
+    except Exception: return path.strip("/")
+
+def _check_verified_registry(url: str) -> Optional[Dict[str, Any]]:
+    try:
+        if not db: return None
+        raw = (url or "").strip()
+        clean = raw.strip('`').strip('"').strip("'")
+        candidates = [clean]
+        try:
+            from urllib.parse import urlparse
+            u = urlparse(clean)
+            scheme = (u.scheme or 'https').lower()
+            host = (u.netloc or '').lower()
+            path = (u.path or '/').strip() or '/'
+            if not path.startswith('/'): path = '/' + path
+            base_no_slash = f"{scheme}://{host}{path.rstrip('/')}"
+            base_with_slash = f"{scheme}://{host}{(path.rstrip('/') + '/') if path != '/' else '/'}"
+            candidates.extend([base_no_slash, base_with_slash])
+            if host.startswith('www.'):
+                host2 = host[4:]
+                candidates.extend([
+                    f"{scheme}://{host2}{path}",
+                    f"{scheme}://{host2}{path.rstrip('/')}",
+                    f"{scheme}://{host2}{(path.rstrip('/') + '/') if path != '/' else '/'}"
+                ])
+            else:
+                host2 = 'www.' + host if host else host
+                if host2:
+                    candidates.extend([
+                        f"{scheme}://{host2}{path}",
+                        f"{scheme}://{host2}{path.rstrip('/')}",
+                        f"{scheme}://{host2}{(path.rstrip('/') + '/') if path != '/' else '/'}"
+                    ])
+        except Exception:
+            pass
+        try:
+            candidates.append(_normalize_to_page_url(clean))
+        except Exception:
+            pass
+
+        for u in candidates:
+            try:
+                did = _get_cache_key(u)
+                snap = db.collection("verified_registry").document(did).get()
+                if snap.exists:
+                    return snap.to_dict()
+            except Exception:
+                continue
+
+        for u in candidates:
+            try:
+                qs = db.collection("verified_registry").where("url", "==", u).limit(1).get()
+                for s in qs:
+                    return s.to_dict()
+            except Exception:
+                continue
     except Exception:
-        return path.strip("/")
+        pass
+    return None
 
 def _set_last_graph_error(status_code: Any, details: str) -> None:
     global LAST_GRAPH_ERROR
@@ -79,25 +183,19 @@ def _set_last_graph_error(status_code: Any, details: str) -> None:
             "status_code": status_code,
             "details": (details or "")[:500]
         }
-    except Exception:
-        pass
+    except Exception: pass
 
 def _graph_get(path: str, params: Optional[Dict[str, Any]] = None, use_cache: bool = True) -> Dict[str, Any]:
-    if not META_GRAPH_TOKEN:
-        return {"error": "Missing META_GRAPH_TOKEN"}
-
+    if not META_GRAPH_TOKEN: return {"error": "Missing META_GRAPH_TOKEN"}
     params = dict(params or {})
     params["access_token"] = META_GRAPH_TOKEN
     url = f"{GRAPH_BASE_URL}/{path.strip('/')}"
-
     cache_key = _make_cache_key(path, params)
     now_ts = time.time()
     if use_cache:
         with _GRAPH_CACHE_LOCK:
             cached = GRAPH_CACHE.get(cache_key)
-            if cached and cached.get("expires_at", 0) > now_ts:
-                return cached["data"]
-
+            if cached and cached.get("expires_at", 0) > now_ts: return cached["data"]
     attempts = 0
     backoff = 0.5
     last_error = None
@@ -105,51 +203,30 @@ def _graph_get(path: str, params: Optional[Dict[str, Any]] = None, use_cache: bo
         attempts += 1
         try:
             resp = requests.get(url, params=params, timeout=10)
-            try:
-                body = resp.json()
-            except Exception:
-                body = None
-
+            try: body = resp.json()
+            except Exception: body = None
             if resp.status_code == 200:
                 data = body if isinstance(body, dict) else body or {}
                 if use_cache:
                     with _GRAPH_CACHE_LOCK:
                         GRAPH_CACHE[cache_key] = {"data": data, "expires_at": now_ts + GRAPH_CACHE_TTL}
-                        if len(GRAPH_CACHE) > GRAPH_CACHE_MAX_ENTRIES:
-                            try:
-                                GRAPH_CACHE.pop(next(iter(GRAPH_CACHE)), None)
-                            except Exception:
-                                pass
                 return data
-
-            # Handle OAuth error immediately
             if isinstance(body, dict) and "error" in body:
                 err = body.get("error") or {}
-                details = {
-                    "message": err.get("message"),
-                    "type": err.get("type"),
-                    "code": err.get("code"),
-                    "error_subcode": err.get("error_subcode")
-                }
                 if err.get("code") == 190:
-                    _set_last_graph_error(resp.status_code, str(details))
-                    return {"error": "OAuthException", "details": details}
-
+                    _set_last_graph_error(resp.status_code, str(err))
+                    return {"error": "OAuthException", "details": err}
             if resp.status_code in (429, 500, 502, 503):
-                last_error = body or resp.text
                 time.sleep(backoff)
                 backoff *= 2
                 continue
-
             _set_last_graph_error(resp.status_code, str(body or resp.text))
             return {"error": f"Graph error {resp.status_code}", "details": body or resp.text}
-
         except Exception as e:
             last_error = str(e)
             time.sleep(backoff)
             backoff *= 2
             continue
-
     _set_last_graph_error(None, str(last_error))
     return {"error": "Graph request failed after retries", "details": last_error}
 
@@ -162,76 +239,16 @@ def _debug_token_info(access_token: str) -> Dict[str, Any]:
         app_token = f"{META_APP_ID}|{META_APP_SECRET}"
         resp = requests.get(f"{GRAPH_BASE_URL}/debug_token", params={"input_token": access_token, "access_token": app_token}, timeout=10)
         data = resp.json().get("data") if resp.status_code == 200 else {}
-        now = datetime.now(timezone.utc)
-        expires_at = data.get("expires_at")
-        expires_days = None
-        if expires_at:
-            try:
-                if int(expires_at) > 0:
-                    delta = int(expires_at) - int(now.timestamp())
-                    expires_days = round(delta / 86400, 2)
-                else: expires_days = 99999.0
-            except Exception: expires_days = None
-        scopes = set(data.get("scopes") or [])
-        has_required_scopes = all(s in scopes for s in REQUIRED_SCOPES)
-        return {
-            "is_valid": bool(data.get("is_valid")), "expires_at": expires_at,
-            "expires_in_days": expires_days, "scopes": list(scopes),
-            "has_required_scopes": has_required_scopes
-        }
+        return {"is_valid": bool(data.get("is_valid"))}
     except Exception: return {}
 
 def _apify_health() -> Dict[str, Any]:
     try:
-        if not APIFY_TOKEN:
-            return {"token_loaded": False, "working": False}
-        c = ApifyClient(APIFY_TOKEN)
-        u = c.user().get()
-        return {"token_loaded": True, "working": True, "user_id": (u or {}).get("id")}
-    except Exception as e:
-        return {"token_loaded": bool(APIFY_TOKEN), "working": False, "error": str(e)[:200]}
-
-def _is_post_url(s: str) -> bool:
-    try:
-        from urllib.parse import urlparse, parse_qs
-        u = urlparse(s or "")
-        host = (u.netloc or "").lower()
-        if not host: return False
-        if ("facebook.com" not in host and "fb.com" not in host): return False
-        path = (u.path or "")
-        parts = [p for p in path.split("/") if p]
-        q = parse_qs(u.query or "")
-        if "story_fbid" in q or "fbid" in q: return True
-        indicators = {"posts", "videos", "photos", "permalink.php", "story.php", "watch", "marketplace", "groups"}
-        if any(p in indicators for p in parts): return True
-        if "groups" in parts and "permalink" in parts: return True
-        return False
-    except Exception: return False
-
-def is_allowed_page_or_profile_url(s: str) -> bool:
-    try:
-        from urllib.parse import urlparse, parse_qs
-        u = urlparse(s or "")
-        host = (u.netloc or "").lower()
-        if not host: return False
-        if ("facebook.com" not in host and "fb.com" not in host and "m.facebook.com" not in host and "mobile.facebook.com" not in host and "web.facebook.com" not in host): return False
-        if _is_post_url(s): return False
-        path = (u.path or "")
-        parts = [p for p in path.split("/") if p]
-        q = parse_qs(u.query or "")
-        if "profile.php" in parts and q.get("id"): return True
-        if parts and parts[0] in {"pages", "people"} and len(parts) >= 3 and re.match(r"^\d{5,}$", parts[-1] or ""): return True
-        if len(parts) == 1 and re.match(r"^[A-Za-z0-9_.-]+$", parts[0]): return True
-        return False
-    except Exception: return False
-
-def _normalize(value: float, min_v: float, max_v: float) -> float:
-    try:
-        if max_v <= min_v: return 0.0
-        v = max(min_v, min(max_v, float(value)))
-        rng = max_v - min_v
-        return (v - min_v) / rng
-    except Exception: return 0.0
+        if not APIFY_TOKEN: return {"token_loaded": False}
+        client = ApifyClient(APIFY_TOKEN)
+        u = client.user().get()
+        return {"token_loaded": True, "user_id": (u or {}).get("id")}
+    except Exception as e: return {"token_loaded": bool(APIFY_TOKEN), "error": str(e)[:200]}
 
 def parse_url(url: str) -> Dict[str, Any]:
     try:
@@ -239,12 +256,9 @@ def parse_url(url: str) -> Dict[str, Any]:
         u = urlparse((url or "").strip())
         host = (u.netloc or "").lower()
         if not host: return {"is_valid": False, "error": "Missing host"}
-        if not is_allowed_page_or_profile_url(url): return {"is_valid": False, "error": "Invalid Facebook Page/Profile URL"}
-        hint = "page" if "/pages/" in (u.path or "") else "profile" if "profile.php" in (u.path or "") else "unknown"
-        normalized = f"https://{host}{u.path}?{u.query}".rstrip("?")
-        return {"is_valid": True, "normalized_url": normalized, "type_hint": hint}
-    except Exception:
-        return {"is_valid": False, "error": "Invalid URL"}
+        if "facebook.com" not in host and "fb.com" not in host: return {"is_valid": False, "error": "Invalid URL"}
+        return {"is_valid": True, "normalized_url": url}
+    except Exception: return {"is_valid": False, "error": "Invalid URL"}
 
 def extract_fbid(url_or_id: str) -> str:
     if not url_or_id: return ""
@@ -253,7 +267,6 @@ def extract_fbid(url_or_id: str) -> str:
     try:
         from urllib.parse import urlparse, parse_qs
         u = urlparse(s)
-        if "facebook.com" not in (u.netloc or "") and "fb.com" not in (u.netloc or ""): return s
         qs = parse_qs(u.query or "")
         if "id" in qs and qs["id"]: return qs["id"][0]
         parts = [p for p in (u.path or "").split("/") if p]
@@ -263,409 +276,606 @@ def extract_fbid(url_or_id: str) -> str:
     except Exception: pass
     return s
 
+def _extract_first_link(text: str) -> Optional[str]:
+    """Helper to find the first http/https link in a text block"""
+    if not text: return None
+    match = re.search(r'(https?://[^\s]+)', text)
+    return match.group(1) if match else None
+
+def _resolve_fb_share_url(share_url: str) -> Optional[str]:
+    try:
+        if not share_url or "facebook.com/share/" not in share_url:
+            return None
+        r = requests.get(share_url, timeout=8, headers={"User-Agent": "CrediNews-Bot/1.0"})
+        if r.status_code != 200:
+            return None
+        m = re.search(r'<meta\s+property=["\']og:url["\']\s+content=["\'](https?://[^"\']+)["\']', r.text, re.IGNORECASE)
+        return m.group(1) if m else None
+    except Exception:
+        return None
+
+def _normalize_to_page_url(u: str) -> str:
+    try:
+        from urllib.parse import urlparse
+        url = urlparse(u)
+        path = (url.path or '').lower()
+        stops = ['/posts/', '/videos/', '/photos/', '/reel/', '/story.php', '/permalink.php']
+        for stop in stops:
+            idx = path.find(stop)
+            if idx > 1:
+                base = (url.scheme or 'https') + '://' + (url.netloc or '') + (url.path[:idx] or '/')
+                return base
+        return (url.scheme or 'https') + '://' + (url.netloc or '') + (url.path or '/')
+    except Exception:
+        return u
+
 def fetch_metadata(fbid: str) -> Dict[str, Any]:
-    base_fields = ["name", "link"]
+    base_fields = ["name", "link", "created_time", "start_info", "founded", "birthday"]
     res = _graph_get(fbid, {"fields": ",".join(base_fields)}, use_cache=True)
-    if _has_graph_error(res):
-        return res
-    if not isinstance(res, dict):
-        res = {}
-    optional_fields = [
-        "category","about","description","fan_count","followers_count","created_time","website",
-        "verification_status","is_verified"
-    ]
+    
+    if _has_graph_error(res): return res
+    if not isinstance(res, dict): res = {}
+
+    final_created_time = res.get("created_time")
+    if not final_created_time:
+        start = res.get("start_info", {})
+        if isinstance(start, dict) and start.get("date"):
+            try: 
+                final_created_time = date_parser.parse(start.get("date")).isoformat()
+            except: pass
+
+    if not final_created_time and res.get("founded"):
+        try: 
+            final_created_time = date_parser.parse(str(res.get("founded"))).isoformat()
+        except: pass
+
+    if final_created_time:
+        res["created_time"] = final_created_time
+
+    optional_fields = ["category","about","description","followers_count","website","verification_status","is_verified"]
     restricted = False
     for fld in optional_fields:
         r = _graph_get(fbid, {"fields": fld}, use_cache=True)
         if _has_graph_error(r):
             try:
-                det = r.get("details") or {}
-                err = det.get("error") or {}
-                if int(err.get("code") or 0) == 10:
-                    restricted = True
-            except Exception:
-                pass
-        elif isinstance(r, dict) and fld in r:
-            res[fld] = r.get(fld)
+                if int(((r.get("details") or {}).get("error") or {}).get("code") or 0) == 10: restricted = True
+            except: pass
+        elif isinstance(r, dict) and fld in r: res[fld] = r.get(fld)
+    
     pic_r = _graph_get(fbid, {"fields": "picture{url,is_silhouette}"}, use_cache=True)
-    if not _has_graph_error(pic_r) and isinstance(pic_r, dict) and pic_r.get("picture"):
-        res["picture"] = pic_r.get("picture")
+    if not _has_graph_error(pic_r) and isinstance(pic_r, dict) and pic_r.get("picture"): res["picture"] = pic_r.get("picture")
+    
     cover_r = _graph_get(fbid, {"fields": "cover{source}"}, use_cache=True)
-    if not _has_graph_error(cover_r) and isinstance(cover_r, dict) and cover_r.get("cover"):
-        res["cover"] = cover_r.get("cover")
-    # Recent posts count (may require permissions; skip on error)
+    if not _has_graph_error(cover_r) and isinstance(cover_r, dict) and cover_r.get("cover"): res["cover"] = cover_r.get("cover")
+    
     posts = _graph_get(f"{fbid}/posts", {"limit": 10, "fields": "created_time"}, use_cache=True)
-    posts_count = 0
     if not _has_graph_error(posts) and isinstance(posts, dict) and isinstance(posts.get("data"), list):
-        posts_count = len(posts.get("data") or [])
-    res["recent_posts_count"] = posts_count
-    # Resource type heuristic
-    if (res.get("fan_count") is not None) or res.get("category"):
-        res["resource_type"] = "page"
-    elif res.get("bio") or res.get("about"):
-        res["resource_type"] = "profile"
-    else:
-        res["resource_type"] = "unknown"
+        res["recent_posts_count"] = len(posts.get("data") or [])
+        try:
+            times = []
+            for p in (posts.get("data") or [])[:5]:
+                ct = p.get("created_time")
+                if ct:
+                    dt = datetime.fromisoformat(str(ct).replace("Z", "+00:00"))
+                    times.append(dt)
+            if len(times) >= 2:
+                newest = max(times)
+                oldest = min(times)
+                diff = newest - oldest
+                seconds = int(diff.total_seconds())
+                if seconds < 60:
+                    res["post_time_span"] = f"in {seconds} seconds"
+                elif seconds < 3600:
+                    res["post_time_span"] = f"in {seconds // 60} minutes"
+                elif seconds < 86400:
+                    res["post_time_span"] = f"in {seconds // 3600} hours"
+                else:
+                    res["post_time_span"] = f"across {seconds // 86400} days"
+        except Exception:
+            pass
+        
+    res["resource_type"] = "page" if (res.get("fan_count") is not None) else "profile"
     res["_permissions_restricted"] = restricted
+    res["_source"] = "graph" 
     return res
 
 def _parse_apify_date(s: Optional[str]) -> Optional[str]:
     try:
-        if not s:
-            return None
-        # we use dateutil so that we can parse the date 
+        if not s: return None
         dt = date_parser.parse(str(s))
-        if not dt.tzinfo:
-            dt = dt.replace(tzinfo=timezone.utc)
+        if not dt.tzinfo: dt = dt.replace(tzinfo=timezone.utc)
         return dt.isoformat()
-    except Exception:
-        return None
+    except Exception: return None
 
-#para sa fallback they system use a apify so when graph api doesnt allow us to get the needed data, ai=pify will be the one to do it.
 def run_apify_scraper(page_url: str) -> Optional[Dict[str, Any]]:
+    if db:
+        doc_id = _get_cache_key(page_url)
+        try:
+            doc = db.collection(RAW_DATA_COLLECTION).document(doc_id).get()
+            if doc.exists:
+                cached = doc.to_dict() or {}
+                has_sufficient = bool(cached.get("name")) and (
+                    bool(cached.get("recent_posts_count")) or bool(((cached.get("picture") or {}).get("data") or {}).get("url")) or bool((cached.get("cover") or {}).get("source"))
+                )
+                if has_sufficient:
+                    print(f"Found in Raw Cache (skipping Apify): {page_url}")
+                    return cached
+        except Exception as e:
+            print(f"Firebase Read Warning: {e}")
+
     try:
         token = APIFY_TOKEN
-        if not token:
-            print("❌ No Apify Token loaded.")
-            return None
-        
+        if not token: return None
         client = ApifyClient(token)
         print(f"Starting Apify Scan for: {page_url}...")
+
+        run_page = client.actor("apify/facebook-pages-scraper").call(run_input={"startUrls": [{"url": page_url}]})
+        page_data = {}
+        if run_page:
+            for item in client.dataset(run_page["defaultDatasetId"]).iterate_items():
+                page_data = item
+                break
+
+        run_posts = client.actor("apify/facebook-posts-scraper").call(
+            run_input={"startUrls": [{"url": page_url}], "resultsLimit": 5, "viewPort": {"width": 1920, "height": 1080}}
+        )
+        raw_posts = []
+        if run_posts:
+            for item in client.dataset(run_posts["defaultDatasetId"]).iterate_items():
+                raw_posts.append(item)
+
+        spam_score = 0
+        post_time_span = "" 
         
-        # Fetch last 5 posts for spam detection
-        run_input = {"startUrls": [{"url": page_url}], "maxPosts": 5}
-        run = client.actor("apify/facebook-pages-scraper").call(run_input=run_input)
-        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            created_iso = _parse_apify_date(item.get("pageCreationDate"))
-            pic_url = item.get("profilePicture")
-            is_silhouette = False if pic_url else True
-            verified_bool = bool(item.get("verified", False))
-            cover_url = item.get("coverPhotoUrl")
-
-            # Post analysis for Spam detection
-            raw_posts = item.get("posts", [])
-            recent_posts_count = len(raw_posts)
-            spam_score = 0
-            if recent_posts_count >= 5:
-                try:
-                    timestamps = []
-                    for p in raw_posts:
-                        if p.get("timestamp"):
-                            timestamps.append(date_parser.parse(str(p.get("timestamp"))))
+        repeated_link_penalty = 0
+        if len(raw_posts) >= 3:
+            last_links = []
+            for p in raw_posts[:3]:
+                link = p.get("link") or p.get("url") 
+                if not link:
+                    txt = p.get("text") or p.get("postText") or ""
+                    link = _extract_first_link(txt)
+                if link:
+                    last_links.append(link.strip().lower())
+            
+            if len(last_links) == 3 and (last_links[0] == last_links[1] == last_links[2]):
+                print(f"DETECTED REPEATED LINKS: {last_links[0]}")
+                repeated_link_penalty = -20
+        
+        if len(raw_posts) >= 2:
+            try:
+                timestamps = []
+                for p in raw_posts:
+                    ts = p.get("time") or p.get("timestamp")
+                    if ts: timestamps.append(date_parser.parse(str(ts)))
+                
+                if len(timestamps) >= 2:
+                    newest = max(timestamps)
+                    oldest = min(timestamps)
+                    diff = newest - oldest
+                    total_seconds = diff.total_seconds()
+                    
                     if len(timestamps) >= 5:
-                        newest = max(timestamps)
-                        oldest = min(timestamps)
-                        diff = newest - oldest
-                        # 5 posts in 1 hour -> Spam
-                        if diff.total_seconds() < 3600: spam_score = -20
-                        # 5 posts in 10 mins -> Bot
-                        if diff.total_seconds() < 600: spam_score = -40
-                except Exception: pass
+                        if total_seconds < 3600: spam_score = -20
+                        if total_seconds < 600: spam_score = -40
+                    
+                    if total_seconds < 60:
+                        post_time_span = f"in {int(total_seconds)} seconds"
+                    elif total_seconds < 3600:
+                        post_time_span = f"in {int(total_seconds // 60)} minutes"
+                    elif total_seconds < 86400:
+                        post_time_span = f"in {int(total_seconds // 3600)} hours"
+                    else:
+                        days = int(total_seconds // 86400)
+                        post_time_span = f"across {days} days"
+            except: pass
 
-            meta = {
-                "id": item.get("id") or item.get("facebookId"),
-                "name": item.get("name") or item.get("title"),
-                "username": item.get("username"),
-                "fan_count": int(item.get("likes", 0) or 0),
-                "followers_count": int(item.get("followers", 0) or 0),
-                "created_time": created_iso,
-                "is_verified": verified_bool,
-                "verification_status": "blue_verified" if verified_bool else "not_verified",
-                "link": item.get("url") or page_url,
-                "website": item.get("website") or item.get("pageWebsite"),
-                "picture": { "data": { "is_silhouette": is_silhouette, "url": pic_url } },
-                "cover": { "source": cover_url },
-                "about": item.get("intro") or item.get("bio") or "",
-                "recent_posts_count": recent_posts_count,
-                "spam_score": spam_score,
-                "resource_type": "page",
-                "_apify_fallback_used": True,
-                "_source": "apify"
-            }
-            return meta
-        return None
-    except Exception as e:
-        print(f"Apify Error: {e}")
-        return None
+        final_spam_score = spam_score + repeated_link_penalty
+
+        created_iso = _parse_apify_date(page_data.get("pageCreationDate"))
+        pic_url = page_data.get("profilePicture")
+        if not pic_url and raw_posts: pic_url = raw_posts[0].get("user", {}).get("profilePic")
+        name_found = page_data.get("name") or page_data.get("title")
+        if not name_found and raw_posts: name_found = raw_posts[0].get("user", {}).get("name")
+
+        apify_verified = bool(page_data.get("verified")) or bool(page_data.get("isVerified")) or bool(page_data.get("is_meta_verified"))
+        if not apify_verified:
+            try:
+                for p in raw_posts:
+                    u = p.get("user") or {}
+                    if bool(u.get("isVerified")) or bool(u.get("verified")):
+                        apify_verified = True
+                        break
+            except Exception:
+                pass
+
+        badge_name = str(page_data.get("badge") or "").strip().lower()
+        if badge_name == "blue":
+            apify_verified = True
+
+        def _safe_int(val: Any) -> int:
+            try:
+                if val is None:
+                    return 0
+                if isinstance(val, (int, float)):
+                    return int(val)
+                s = str(val).strip().replace(',', '')
+                if s[-1:].upper() in ('K','M'):
+                    mult = 1000 if s[-1:].upper() == 'K' else 1000000
+                    num = float(s[:-1]) if s[:-1] else 0.0
+                    return int(num * mult)
+                return int(float(s))
+            except Exception:
+                return 0
+
+        # Ensure username exists
+        extracted_username = page_data.get("username")
+        if not extracted_username:
+             extracted_username = extract_fbid(page_url)
+
+        meta = {
+            "id": page_data.get("id") or page_data.get("facebookId"),
+            "name": name_found,
+            "username": extracted_username,
+            "fan_count": _safe_int(page_data.get("likes")),
+            "followers_count": _safe_int(page_data.get("followers")),
+            "created_time": created_iso,
+            "is_verified": apify_verified,
+            "verification_status": "blue_verified" if apify_verified else "not_verified",
+            "link": page_url,
+            "website": page_data.get("website"),
+            "picture": { "data": { "url": pic_url, "is_silhouette": not bool(pic_url) } },
+            "cover": { "source": page_data.get("coverPhotoUrl") },
+            "about": page_data.get("intro") or page_data.get("bio") or "",
+            "recent_posts_count": len(raw_posts), 
+            "spam_score": final_spam_score,
+            "post_time_span": post_time_span,
+            "resource_type": "page",
+            "_apify_fallback_used": True
+        }
+
+        meta["raw_post_texts"] = [p.get("text") or p.get("postText") or "" for p in raw_posts[:3]]
+
+        try:
+            if (meta["followers_count"] or 0) == 0 or (meta["fan_count"] or 0) == 0:
+                for p in raw_posts:
+                    u = p.get("user") or {}
+                    fc = _safe_int(u.get("followers") or u.get("followersCount") or u.get("fans") or u.get("fanCount"))
+                    lk = _safe_int(u.get("likes") or u.get("likeCount"))
+                    if (meta["followers_count"] or 0) == 0 and fc > 0:
+                        meta["followers_count"] = fc
+                    if (meta["fan_count"] or 0) == 0 and lk > 0:
+                        meta["fan_count"] = lk
+                    if meta["followers_count"] > 0 and meta["fan_count"] > 0:
+                        break
+        except Exception:
+            pass
+
+        if not meta.get("name"): return None
+        
+        if db:
+            try:
+                doc_id = _get_cache_key(page_url)
+                meta["_cached_at"] = datetime.now(timezone.utc).isoformat()
+                meta["_original_url"] = page_url
+                db.collection(RAW_DATA_COLLECTION).document(doc_id).set(meta)
+            except Exception: pass
+
+        return meta
+    except Exception: return None
 
 def _merge_apify_into_meta(graph_meta: Dict[str, Any], apify_meta: Dict[str, Any]) -> Dict[str, Any]:
     merged = dict(graph_meta or {})
-    if not apify_meta:
-        return merged
-    for k in [
-        "fan_count","followers_count","created_time","is_verified","verification_status",
-        "website","link","name","id","username","about","description","picture","cover",
-        "recent_posts_count","spam_score"
-    ]:
-        if merged.get(k) in (None, "", 0):
-            v = apify_meta.get(k)
-            if v not in (None, ""):
-                merged[k] = v
+    if not apify_meta: return merged
+    
+    for k in ["fan_count","followers_count","created_time","website","link","name","username","about","description","recent_posts_count","spam_score", "post_time_span"]:
+        val = apify_meta.get(k)
+        if val not in (None, "", 0, [], {}):
+            if merged.get(k) in (None, "", 0, [], {}):
+                merged[k] = val
+    
+    if apify_meta.get("raw_post_texts"):
+        merged["raw_post_texts"] = apify_meta.get("raw_post_texts")
+    
+    status_g = str(merged.get("verification_status") or "").strip().lower()
+    graph_has_badge = bool(merged.get("is_verified")) or status_g in ("blue_verified", "verified", "meta_verified")
+    status_a = str(apify_meta.get("verification_status") or "").strip().lower()
+    apify_has_badge = bool(apify_meta.get("is_verified")) or bool(apify_meta.get("verified")) or status_a in ("blue_verified", "verified", "meta_verified") or str(apify_meta.get("badge") or "").strip().lower() == "blue" or bool(apify_meta.get("isVerified"))
+
+    if graph_has_badge or apify_has_badge:
+        merged["is_verified"] = True
+        merged["verification_status"] = "blue_verified"
+    else:
+        if not merged.get("is_verified"):
+            merged["is_verified"] = False
+            merged["verification_status"] = "not_verified"
+
+    apify_pic = apify_meta.get("picture", {}).get("data", {})
+    graph_pic = merged.get("picture", {}).get("data", {})
+    
+    if apify_pic.get("url") and not apify_pic.get("is_silhouette"):
+        if not graph_pic.get("url") or graph_pic.get("is_silhouette"):
+             merged["picture"] = apify_meta["picture"]
+
+    if apify_meta.get("cover") and apify_meta.get("cover").get("source"):
+        if not (merged.get("cover") or {}).get("source"):
+            merged["cover"] = apify_meta["cover"]
+        
+    if apify_meta.get("about") and not merged.get("about"):
+        merged["about"] = apify_meta["about"]
+
     merged["resource_type"] = merged.get("resource_type") or apify_meta.get("resource_type") or "page"
     merged["_apify_fallback_used"] = True
     merged["_source"] = (merged.get("_source") or "graph") + "+apify"
     return merged
 
-# -------------------------------------------------------------------------
-# UPDATED SCORING LOGIC (Stricter, Zombie Page Detection REMOVED)
-# -------------------------------------------------------------------------
+# --- AI AGENT ANALYSIS ---
+def run_ai_agent_analysis(profile_data):
+    """
+    Uses Llama 3 (via Groq) to analyze the 'vibe' and content of the page.
+    It reads the data collected by Graph/Apify.
+    """
+    if not groq_client:
+        return {"ai_score": 50, "explanation": "AI Agent Disabled (No Key or Library)"}
+
+    try:
+        # 1. Prepare the Evidence (From your Graph/Apify data)
+        bio = (profile_data.get("about") or profile_data.get("description") or "No bio available")[:800]
+        name = profile_data.get("name", "Unknown")
+        stats = f"Followers: {profile_data.get('followers_count', 0)}, Verified: {profile_data.get('is_verified')}"
+        
+        # Get post text (if available from Apify scrape)
+        recent_posts = " || ".join(profile_data.get("raw_post_texts", [])[:3])
+        if not recent_posts:
+            recent_posts = "No recent post text available."
+
+        prompt = f"""
+        You are a fraud detection expert for Philippine Social Media. 
+        Analyze this Facebook Page profile.
+        
+        DATA:
+        Name: {name}
+        Bio: {bio}
+        Stats: {stats}
+        Recent Posts Content: {recent_posts}
+        
+        TASK:
+        Determine if this page shows signs of being a "Poser" (Fake/Scam/Impostor) or Legitimate.
+        - Red Flags: Bad grammar, "PM Sent", generic stolen names, claiming to be official without verification.
+        - Green Flags: Professional bio, consistent branding, high followers.
+        
+        OUTPUT JSON ONLY:
+        {{
+            "ai_score": (0-100),  // 100 = Definitely FAKE/SCAM, 0 = Definitely REAL
+            "explanation": "Short 2 sentence reason."
+        }}
+        """
+
+        # 2. Ask the AI
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a JSON-only fraud analysis API."},
+                {"role": "user", "content": prompt}
+            ],
+            model="llama-3.3-70b-versatile", 
+            response_format={"type": "json_object"},
+            temperature=0.1 
+        )
+
+        # 3. Parse Result
+        return json.loads(chat_completion.choices[0].message.content)
+
+    except Exception as e:
+        print(f"AI Agent Error: {e}")
+        return {"ai_score": 50, "explanation": f"AI Analysis Failed: {str(e)[:50]}..."}
+
+# SCORING 
 def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
-    base = 50
-    layer1 = 0
-    layer2 = 0
-    layer3 = 0
+    base = 50; layer1 = 0; layer2 = 0; layer3 = 0
     
-    # Extract Data
-    restricted = bool(meta.get("_permissions_restricted"))
     pic = ((meta.get("picture") or {}).get("data") or {})
     has_pic = bool(pic.get("url")) and not bool(pic.get("is_silhouette"))
-    cover = meta.get("cover") or {}
-    has_cover = bool(cover.get("source"))
-    about_text = (meta.get("about") or meta.get("description") or meta.get("bio") or "").strip()
-    
+    has_cover = bool((meta.get("cover") or {}).get("source"))
     followers = int(max(int(meta.get("fan_count") or 0), int(meta.get("followers_count") or 0)))
     posts_count = int(meta.get("recent_posts_count") or 0)
+    status = str(meta.get("verification_status") or "").strip().lower()
+    verified = bool(meta.get("is_verified")) or status in ("blue_verified", "verified", "meta_verified")
+    website = meta.get("website")
+    site_has_fb = bool(meta.get("website_has_facebook"))
+    site_links_page = bool(meta.get("website_links_to_page"))
+    name_val = (meta.get("name") or meta.get("username") or "").strip().lower()
+    known_brands = {"one sports", "abs-cbn news", "gma news", "philippine sports commission", "rappler", "inquirer"}
+
+    # L1: Visuals/ Profile Info
+    if has_pic: layer1 += 12
+    else: layer1 -= 15
+    if has_cover: layer1 += 5
+    else: layer1 -= 5
+    if (meta.get("about") or meta.get("description")): layer1 += 6
     
-    # We still calculate this for other logic, but won't use it to punish.
-    is_mega_page = followers > 1_000_000
-
-    # LAYER 1: The Basics (Visuals)
-    if has_pic: 
-        layer1 += 10
-    else: 
-        # If it's a mega page, we forgive missing pic (might be API error)
-        layer1 += 0 if (restricted or is_mega_page) else -20 
-
-    if has_cover: 
-        layer1 += 5
-    else: 
-        layer1 += 0 if (restricted or is_mega_page) else -10
-
-    if about_text: 
-        layer1 += 10
-    else: 
-        layer1 += 0 if (restricted or is_mega_page) else -10
-
-    # LAYER 2: Verification and Follower Quality
-    verified = False
-    vs = (meta.get("verification_status") or "").lower()
+    # L2: Authority
+    if verified:
+        layer2 += 40
+    else:
+        layer2 -= 10
+        if site_links_page:
+            layer2 += 10
+        elif site_has_fb:
+            layer2 += 6
+        elif website:
+            layer2 += 0
     
-    if vs == "verified" or bool(meta.get("is_verified")): 
-        verified = True
-    
-    if verified: layer2 += 40
-    
-    if followers > 10000: layer2 += 20
-    elif followers >= 1000: layer2 += 10
-    elif followers >= 100: layer2 += 5
-    elif followers < 100:
-        layer2 += 0 if restricted else -10
-        if followers < 10 and not restricted: layer2 -= 10
+    # Followers influence (more conservative)
+    if followers >= 1000000: layer2 += 18
+    elif followers >= 100000: layer2 += 12
+    elif followers >= 10000: layer2 += 7
+    elif followers >= 1000: layer2 += 3
+    elif followers < 100: layer2 -= 5
 
+    if followers == 0 and posts_count > 0 and has_pic:
+        layer2 += 8
+    if name_val in known_brands:
+        layer2 += 15
+    
     # Age Logic
-    created_time = meta.get("created_time")
-    age_pts = 0
-    if created_time:
+    if meta.get("created_time"):
         try:
-            dt = datetime.fromisoformat(created_time.replace("Z","+00:00"))
-            days = (datetime.now(timezone.utc) - dt).days
-            if days > 365*3: age_pts = 10
-            elif days >= 365: age_pts = 5
-            elif days >= 90: age_pts = 0
-            elif days >= 30: age_pts = -10
-            else: age_pts = -20
-        except: age_pts = 0
+            dt = datetime.fromisoformat(meta.get("created_time").replace("Z","+00:00"))
+            if (datetime.now(timezone.utc) - dt).days > 365: layer2 += 8
+        except: pass
+    elif followers > 5000: layer2 += 3
+
+    # L3: Activity
+    if posts_count > 0: layer3 += 8
+    if posts_count >= 5 and followers >= 10000:
+        layer3 += 6
+    elif posts_count >= 5 and followers < 500:
+        layer3 -= 2
+    layer3 += meta.get("spam_score", 0)
+
+    # 1. Calculate Rule-Based Score (Math)
+    rule_score_raw = max(0, min(100, base + layer1 + layer2 + layer3))
+    if has_pic and meta.get("name"):
+        rule_score_raw = max(rule_score_raw, 55)
+    if verified:
+        rule_score_raw = min(rule_score_raw + 25, 92)
+
+    # 2. RUN THE AI AGENT (New Layer)
+    def _normalize_ai_explanation(m: Dict[str, Any], r: Dict[str, Any]) -> str:
+        exp = str(r.get("explanation") or "").strip()
+        followers_local = int(max(int(m.get("fan_count") or 0), int(m.get("followers_count") or 0)))
+        pic_local = ((m.get("picture") or {}).get("data") or {})
+        has_pic_local = bool(pic_local.get("url")) and not bool(pic_local.get("is_silhouette"))
+        has_bio_local = bool(m.get("about") or m.get("description"))
+        status_local = str(m.get("verification_status") or "").strip().lower()
+        verified_local = bool(m.get("is_verified")) or status_local in ("blue_verified","verified","meta_verified")
+        t = exp.lower()
+        if verified_local and ("not verified" in t or "unverified" in t or "no verified" in t or "lacks official verification" in t):
+            return "Verified account with official signals."
+        if followers_local >= 100000 and ("low follower" in t or "few follower" in t or "no follower" in t):
+            return "High audience and established presence."
+        if has_bio_local and ("no bio" in t or "missing bio" in t or "no description" in t):
+            return "Bio present with details."
+        if has_pic_local and ("no profile picture" in t or "default picture" in t or "missing profile" in t):
+            return "Custom profile image present."
+        return exp
+
+    ai_result = run_ai_agent_analysis(meta)
+    ai_score = ai_result.get("ai_score", 50)
+    ai_reason = _normalize_ai_explanation(meta, ai_result)
+
+    # 3. HYBRID MERGE (The "Brain" + "Math")
+    # Invert AI score: We want 'Trust Score' (100 = Real), but AI gave Risk Score.
+    ai_trust_score = 100 - ai_score
+    
+    # Logic: If rules are very certain (>90 or <30), trust the math.
+    # If rules are ambiguous (mid-range), let the AI sway the decision.
+    if rule_score_raw >= 90 or rule_score_raw <= 30:
+        final_score = rule_score_raw
     else:
-        # If Mega Page but date missing, give partial credit (assume old)
-        if is_mega_page: age_pts = 5
-        else: age_pts = 0 
-        
-    layer2 += age_pts
+        weight_rules = 0.30
+        final_score = (rule_score_raw * weight_rules) + (ai_trust_score * (1 - weight_rules))
 
-    # Category Bonus
-    category = (meta.get("category") or "").lower()
-    if any(k in category for k in ["news", "media", "public figure", "journalist"]):
-        layer2 += 5
-    
-    # LAYER 3: Activity & Anomalies (PENALTY REMOVED)
-    if posts_count >= 10: 
-        layer3 += 10
-    elif posts_count >= 1: 
-        layer3 += 5
-    else: 
-        # ZOMBIE PENALTY REMOVED
-        # We now treat 0 posts as Neutral (0 points)
-        # This handles API failures gracefully.
-        layer3 += 0
+    if verified and ai_score >= 70:
+        final_score = min(final_score, 75)
 
-    spam_penalty = meta.get("spam_score", 0)
-    layer3 += spam_penalty
-
-    website = (meta.get("website") or "").strip()
-    if website: layer3 += 5
-
-    # Verification Paradox Check
-    # Only penalize if Verified but literally ZERO followers (impossible)
-    if verified and followers == 0: layer3 += 0 if restricted else -30
-
-    # Calculate Final
-    raw = base + layer1 + layer2 + layer3
-    
-    if raw < 0: raw = 0
-    if raw > 100: raw = 100
-    
-    trust = raw / 100.0
-    is_trustworthy = trust >= 0.60
+    trust = final_score / 100.0
     
     return {
-        "raw_score": raw,
+        "raw_score": int(final_score),
         "trust_score": trust,
-        "is_trustworthy": is_trustworthy,
-        "layers": {"layer1": layer1, "layer2": layer2, "layer3": layer3},
-        "followers": followers,
-        "verified": verified,
-        "has_pic": has_pic,
-        "has_cover": has_cover,
-        "has_about": bool(about_text)
+        "meets_safety_threshold": trust >= 0.60,
+        "layers": {"layer1": layer1, "layer2": layer2, "layer3": layer3, "ai_risk": ai_score},
+        "ai_analysis": ai_reason,
+        "followers": followers
     }
 
-def _compute_page_signals(meta: Dict[str, Any]) -> Dict[str, Any]:
-    fan_count = int(meta.get("fan_count") or 0)
-    followers_count = int(meta.get("followers_count") or 0)
-    category = (meta.get("category") or "").lower()
-    created_time = meta.get("created_time")
-    website = meta.get("website") or ""
-    recent_posts_count = int(meta.get("recent_posts_count") or 0)
-    posting_frequency_last_30 = recent_posts_count / 30.0 if recent_posts_count else 0.0
-    posting_frequency_norm = _normalize(recent_posts_count, 0, 30)
-    audience = fan_count + followers_count
-    if audience >= 1000000: aud_score = 15
-    elif audience >= 100000: aud_score = 12
-    elif audience >= 10000: aud_score = 9
-    elif audience >= 1000: aud_score = 6
-    elif audience >= 100: aud_score = 3
-    else: aud_score = 1
-    age_score = 5
-    try:
-        dt = datetime.fromisoformat(created_time.replace('Z','+00:00')) if created_time else None
-        if dt:
-            days = (datetime.utcnow() - dt.replace(tzinfo=None)).days
-            if days >= 3650: age_score = 10
-            elif days >= 1825: age_score = 8
-            elif days >= 365: age_score = 6
-            elif days >= 90: age_score = 4
-            else: age_score = 2
-    except Exception:
-        age_score = 5
-    cat_bonus = 5 if ("news" in category or "media" in category or "public figure" in category or "journalist" in category) else 0
-    freq_bonus = 5 if posting_frequency_last_30 >= 0.5 else 2 if posting_frequency_last_30 > 0 else 0
-    raw_total = aud_score + age_score + cat_bonus + freq_bonus
-    return {
-        "fan_count": fan_count,
-        "followers_count": followers_count,
-        "category": category,
-        "created_time": created_time,
-        "website": website,
-        "posting_frequency_last_30": posting_frequency_last_30,
-        "posting_frequency_norm": posting_frequency_norm,
-        "scores": {
-            "audience": aud_score,
-            "page_age": age_score,
-            "category_bonus": cat_bonus,
-            "frequency_bonus": freq_bonus
-        },
-        "total_points": raw_total
-    }
+# Labels
+def _score_to_verdict(raw: int) -> str:
+    if raw >= 80: return "Low Risk - Likely Authentic / Trusted Source."
+    if raw >= 55: return "Moderate Risk - Suspicious. Mixed signals"
+    return "High Risk - Likely Poser."
 
-def _compute_poster_signals(meta: Dict[str, Any]) -> Dict[str, Any]:
-    pic = ((meta.get("picture") or {}).get("data") or {})
-    has_picture = bool(pic.get("url")) and not bool(pic.get("is_silhouette"))
-    has_bio = bool(meta.get("bio") or meta.get("about") or meta.get("description"))
-    recent_posts_count = int(meta.get("recent_posts_count") or 0)
-    profile_completeness = 10 if (has_picture and has_bio) else 7 if (has_picture or has_bio) else 4
-    suspicious_hits = 0  
-    normal_behavior = 6  
-    
-    if meta.get("spam_score", 0) < 0:
-        suspicious_hits = 5
-        suspicious_behavior = meta.get("spam_score")
-    else:
-        suspicious_behavior = 0
-        
-    base_raw = profile_completeness + normal_behavior
-    return {
-        "profile_completeness": profile_completeness,
-        "normal_behavior": normal_behavior,
-        "suspicious_behavior": suspicious_behavior,
-        "signals": {
-            "has_picture": has_picture,
-            "has_bio": has_bio,
-            "posting_frequency_last_30": recent_posts_count / 30.0 if recent_posts_count else 0.0,
-            "suspicious_hits": suspicious_hits
-        },
-        "total_points": base_raw
-    }
-
-def _score_to_verdict(raw_0_100: int) -> str:
-    if raw_0_100 >= 60: return "Trustworthy - Credible"
-    if raw_0_100 >= 40: return "Suspicious"
-    return "Low Trust - Poser"
+def _get_human_explanation(score: int) -> str:
+    if score >= 80: return "Based on the data, this account shows strong signs of authenticity."
+    if score >= 55: return "Based on the data, this account presents mixed signals and requires caution."
+    return "Based on the data, this looks risky due to missing details or suspicious activity."
 
 def build_response(url: str, meta: Dict[str, Any], score: Dict[str, Any], resolved_id: Optional[str] = None) -> Dict[str, Any]:
-    base = {
-        "input_url": url,
-        "inputs": {"resolved_id": resolved_id} if resolved_id else {},
-        "resource_type": meta.get("resource_type"),
+    # Extract AI data safely
+    ai_risk = score.get("layers", {}).get("ai_risk", 50)
+    ai_reason = score.get("ai_analysis") or "AI Analysis Pending"
+    
+    return {
+        "request": {
+            "url": url,
+            "hostname": _extract_hostname(url),
+            "resolved_id": resolved_id
+        },
+
+        #PAGE FACTS
         "metadata": {
+            "id": meta.get("id"),
             "name": meta.get("name"),
+            "username": meta.get("username"),
             "category": meta.get("category"),
             "fan_count": meta.get("fan_count"),
             "followers_count": meta.get("followers_count"),
             "created_time": meta.get("created_time"),
             "website": meta.get("website"),
             "link": meta.get("link"),
-            "recent_posts_count": meta.get("recent_posts_count")
+            "about": meta.get("about"),
+            "description": meta.get("description"),
+            "picture": meta.get("picture"),
+            "cover": meta.get("cover"),
+            "is_verified": meta.get("is_verified"),
+            "verification_status": meta.get("verification_status"),
+            "verification_source": meta.get("verification_source"),
+            "recent_posts_count": meta.get("recent_posts_count"),
+            "post_time_span": meta.get("post_time_span"),
+            "resource_type": meta.get("resource_type")
         },
-        "trust": {
-            "raw_score": score.get("raw_score"),
-            "trust_score": score.get("trust_score"),
-            "is_trustworthy": score.get("is_trustworthy"),
-            "layers": score.get("layers")
-        },
-        "credi_score": int(score.get("trust_score", 0) * 100),
-        "classification": _score_to_verdict(int(score.get("raw_score", 0))),
-        "verdict": _score_to_verdict(int(score.get("raw_score", 0))),
-        "note": (
-            "Analysis used Apify Fallback; normalized for scoring"
-            if meta.get("_apify_fallback_used")
-            else "Analysis uses Meta Graph API" + (" (permissions restricted)" if meta.get("_permissions_restricted") else "")
-        )
+
+        "analysis": {
+            # Final Verdict
+            "final_trust_score": int(score.get("trust_score", 0) * 100),
+            "verdict": _score_to_verdict(int(score.get("raw_score", 0))),
+            "human_explanation": _get_human_explanation(int(score.get("raw_score", 0))),
+            "safety_threshold_met": score.get("meets_safety_threshold"),
+            
+            #"Why - explain "
+            "breakdown": {
+                "rule_based_score": score.get("raw_score"),
+                "ai_agent_trust_score": 100 - ai_risk,
+                "ai_explanation": ai_reason,
+                "ai_score": ai_risk,
+                "ai_verdict": ("Likely Poser" if isinstance(ai_risk, int) and ai_risk >= 70 else ("Likely Authentic" if isinstance(ai_risk, int) and ai_risk <= 30 else "Mixed Signals")),
+                "scoring_layers": score.get("layers")
+            },
+            
+            "data_source_note": (
+                "Verified Registry (confirmed official)"
+                if str(meta.get("verification_source") or "").strip().lower() == "verified_registry"
+                else (
+                    "Apify public scrape (normalized)"
+                    if meta.get("_apify_fallback_used")
+                    else (
+                        "Apify attempted (no public data)"
+                        if meta.get("_apify_attempted") and not meta.get("_apify_fallback_used")
+                        else "Meta Graph API" + (" (limited access)" if meta.get("_permissions_restricted") else "")
+                    )
+                )
+            )
+        }
     }
-    try:
-        page_signals = _compute_page_signals(meta)
-        poster_signals = _compute_poster_signals(meta)
-        base["signals"] = {"page_level": page_signals, "poster_level": poster_signals}
-    except Exception:
-        base["signals"] = {"page_level": {"scores": {}}, "poster_level": {"signals": {}}}
-    return base
-
-def _neutral_fallback(url: str, err_details: Dict[str, Any]) -> Dict[str, Any]:
-    meta = {"resource_type": "unknown", "link": url}
-    score = {"raw_score": 50, "trust_score": 0.5, "is_trustworthy": False, "layers": {"layer1": 0, "layer2": 0, "layer3": 0}}
-    res = build_response(url, meta, score)
-    res["error"] = {"type": "permissions_required", "details": err_details}
-    return res
-
-def _require_admin_secret(data: Dict[str, Any]) -> bool:
-    s = (POSER_ADMIN_SECRET or "").strip()
-    if not s: return False
-    return (request.headers.get("X-Admin-Secret") == s) or ((data or {}).get("admin_secret") == s)
 
 
 @app.route("/", methods=["GET"])
 def index():
     return jsonify({
-        "status": "online", "service": "Poser Detection API", "graph_base_url": GRAPH_BASE_URL,
+        "status": "online", 
+        "service": "Poser Detection API", 
+        "graph_base_url": GRAPH_BASE_URL,
         "token_loaded": bool(META_GRAPH_TOKEN),
         "endpoints": {
             "/api/poser/health": "GET - Health/status",
@@ -675,133 +885,260 @@ def index():
 
 @app.route("/api/poser/health", methods=["GET"])
 def poser_health():
-    info = _debug_token_info(META_GRAPH_TOKEN) if META_GRAPH_TOKEN else {}
-    ap = _apify_health()
-    admin = _require_admin_secret({})
+    token_info = _debug_token_info(META_GRAPH_TOKEN) if META_GRAPH_TOKEN else {}
+    ap_health = _apify_health()
+    is_admin = _require_admin_secret({}) 
+
     return jsonify({
         "status": "ok",
-        "token_loaded": bool(META_GRAPH_TOKEN),
+        "firebase_connected": bool(db),
+        "admin_mode": is_admin,
         "graph_base_url": GRAPH_BASE_URL,
-        "token_is_valid": info.get("is_valid"),
-        "token_expires_in_days": info.get("expires_in_days"),
-        "has_required_scopes": info.get("has_required_scopes"),
         "last_graph_error": LAST_GRAPH_ERROR,
-        "apify_token_loaded": ap.get("token_loaded"),
-        "apify_working": ap.get("working"),
-        "apify_user_id": ap.get("user_id"),
-        "apify_error": ap.get("error"),
-        "admin_mode": admin,
-        "graph_cache_size": len(GRAPH_CACHE) if admin else None
+        "graph_cache_size": len(GRAPH_CACHE) if is_admin else None,
+        "meta_token_loaded": bool(META_GRAPH_TOKEN),
+        "meta_token_valid": token_info.get("is_valid"),
+        "meta_token_expires_in_days": token_info.get("expires_in_days"),
+        "apify_status": ap_health,
+        "ai_agent_online": bool(groq_client),
+        "ai_agent_reason": AI_AGENT_REASON,
+        "ai_agent_details": {"groq_lib_present": groq_lib_present, "groq_key_present": groq_key_present}
     })
 
-@app.route("/api/poser/detect", methods=["POST"])
-def poser_detect():
+@app.route("/api/poser/admin_mark_verified", methods=["POST"])
+def admin_mark_verified():
     data = request.get_json(force=True) or {}
     url = (data.get("url") or "").strip()
-    if not url: return jsonify({"error": "Missing url"}), 400
-    parsed = parse_url(url)
-    if not parsed.get("is_valid"): return jsonify({"error": parsed.get("error")}), 400
-    fbid = extract_fbid(url)
-    meta = fetch_metadata(fbid)
-    
-    if _has_graph_error(meta):
-        err = meta.get("details") or meta.get("error")
-        try:
-            code = (err.get("error") or {}).get("code") if isinstance(err, dict) else None
-        except Exception:
-            code = None
-        if code == 10:
-            ap_meta = run_apify_scraper(url)
-            if ap_meta:
-                score = compute_poser_score(ap_meta)
-                res = build_response(url, ap_meta, score, resolved_id=fbid)
-                return jsonify(res)
-            return jsonify(_neutral_fallback(url, err)), 200
-        return jsonify({"error": "Graph API error", "details": err}), 502
-        
-    # If restricted or audience missing, try Apify and merge
-    needs_fallback = bool(meta.get("_permissions_restricted")) or (
-        (meta.get("fan_count") in (None, 0)) and (meta.get("followers_count") in (None, 0))
-    )
-    if needs_fallback:
-        ap_meta = run_apify_scraper(url)
-        if ap_meta:
-            meta = _merge_apify_into_meta(meta, ap_meta)
-            
-    score = compute_poser_score(meta)
-    res = build_response(url, meta, score, resolved_id=fbid)
-    return jsonify(res)
+    if not url:
+        return jsonify({"error": "Missing url"}), 400
+    if (POSER_ADMIN_SECRET or "").strip():
+        # Allow either header or body secret
+        if request.headers.get("X-Admin-Secret") != (POSER_ADMIN_SECRET or "").strip() and not _require_admin_secret(data):
+            return jsonify({"error": "Forbidden"}), 403
+    if not db:
+        return jsonify({"error": "Database unavailable"}), 500
+    try:
+        resolved = _resolve_fb_share_url(url) if "facebook.com/share/" in url else None
+        base_url = _normalize_to_page_url(resolved or url)
+        target_urls = list({url, base_url, (resolved or url)})
+        payload = {
+            "_original_url": url,
+            "is_verified": True,
+            "verification_status": "blue_verified",
+            "verification_source": "verified_registry",
+            "last_updated": firestore.SERVER_TIMESTAMP
+        }
+        updated = []
+        for u in target_urls:
+            try:
+                did = _get_cache_key(u)
+                db.collection(RAW_DATA_COLLECTION).document(did).set(payload, merge=True)
+                updated.append(did)
+            except Exception:
+                continue
+        return jsonify({"status": "success", "updated_docs": updated, "targets": target_urls})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
+@app.route("/api/poser/admin_migrate_cache", methods=["POST"])
+def admin_migrate_cache():
+    data = request.get_json(force=True) or {}
+    if not _require_admin_secret(data):
+        return jsonify({"error": "Unauthorized"}), 401
+    if not db:
+        return jsonify({"error": "No database"}), 500
+    limit = int(data.get("limit") or 100)
+    migrated = []
+    skipped = []
+    try:
+        docs = db.collection(RAW_DATA_COLLECTION).limit(limit).get()
+        for d in docs:
+            try:
+                meta = d.to_dict() or {}
+                url = (meta.get("_original_url") or meta.get("link") or "").strip()
+                if not url:
+                    skipped.append(d.id)
+                    continue
+                score = compute_poser_score(meta)
+                res = build_response(url, meta, score, resolved_id=meta.get("id"))
+                did = _get_cache_key(url)
+                payload = {**res, "last_updated": firestore.SERVER_TIMESTAMP, "analysis": res}
+                db.collection(VERDICT_COLLECTION).document(did).set(payload, merge=True)
+                migrated.append(did)
+            except Exception:
+                skipped.append(d.id)
+                continue
+        return jsonify({"migrated_count": len(migrated), "skipped_count": len(skipped), "migrated": migrated[:50]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+#endpoint
 @app.route("/api/poser/analyze_full", methods=["POST"])
 def poser_analyze_full():
     data = request.get_json(force=True) or {}
-    url = (data.get("url") or data.get("id_or_url") or data.get("page_id") or "").strip()
+    url = (data.get("url") or data.get("id_or_url") or "").strip().strip('`').strip('"').strip("'")
     if not url: return jsonify({"error": "Missing url"}), 400
-    parsed = parse_url(url)
-    if not parsed.get("is_valid"): return jsonify({"error": parsed.get("error")}), 400
-    fbid = extract_fbid(url)
-    meta = fetch_metadata(fbid)
     
-    if _has_graph_error(meta):
-        err = meta.get("details") or meta.get("error")
+    parsed = parse_url(url)
+    if not parsed.get("is_valid"): return jsonify({"error": "Invalid URL"}), 400
+    
+    if "facebook.com/share/" in url:
+        resolved = _resolve_fb_share_url(url)
+        if resolved:
+            url = resolved
+            parsed = parse_url(url)
+    fbid = extract_fbid(url)
+    registry = None
+    try:
+        registry = _check_verified_registry(url)
+    except Exception:
+        registry = None
+
+    # --- 1. check muna first if may existing data na (Fastest) ---
+    if db:
         try:
-            code = (err.get("error") or {}).get("code") if isinstance(err, dict) else None
+            doc_id = _get_cache_key(url)
+            doc = db.collection(VERDICT_COLLECTION).document(doc_id).get()
+            if doc.exists:
+                existing_data = doc.to_dict() or {}
+                if existing_data.get("analysis"):
+                    return jsonify(existing_data["analysis"])
+                if existing_data.get("classification"):
+                     return jsonify(existing_data)
         except Exception:
-            code = None
-        if code == 10:
-            ap_meta = run_apify_scraper(url)
-            if ap_meta:
-                score = compute_poser_score(ap_meta)
-                res = build_response(url, ap_meta, score, resolved_id=fbid)
-                return jsonify(res)
-            return jsonify(_neutral_fallback(url, err)), 200
-        return jsonify({"error": "Graph API error", "details": err}), 502
+            pass
+
+    #raw data here
+    meta = None
+    if db:
+        try:
+            doc = db.collection(RAW_DATA_COLLECTION).document(doc_id).get()
+            if doc.exists:
+                cached = doc.to_dict() or {}
+                is_complete = (
+                    bool(cached.get("name")) and 
+                    (int(cached.get("followers_count") or 0) > 0 or int(cached.get("fan_count") or 0) > 0) and
+                    (cached.get("about") or cached.get("description"))
+                )
+                
+                if is_complete:
+                    meta = cached
+                    if meta.get("id"): fbid = meta.get("id")
+                else:
+                    print(f"Ignoring incomplete cache for: {url}")
+        except Exception:
+            pass
+
+    #scraping new datas here
+    if not meta:
+        base_page_url = _normalize_to_page_url(url)
+        meta = fetch_metadata(extract_fbid(base_page_url))
         
-    needs_fallback = bool(meta.get("_permissions_restricted")) or (
-        (meta.get("fan_count") in (None, 0)) and (meta.get("followers_count") in (None, 0))
-    )
-    if needs_fallback:
-        ap_meta = run_apify_scraper(url)
-        if ap_meta:
-            meta = _merge_apify_into_meta(meta, ap_meta)
-            
+        graph_pic = ((meta.get("picture") or {}).get("data") or {})
+        has_bad_pic = (not graph_pic.get("url")) or bool(graph_pic.get("is_silhouette"))
+        
+        # if graph api failed to get the data, apify will do it
+        needs_fallback = (
+            bool(meta.get("_permissions_restricted")) or 
+            (meta.get("fan_count") in (None, 0) and meta.get("followers_count") in (None, 0)) or
+            has_bad_pic or
+            (not ((meta.get("cover") or {}).get("source"))) or
+            (not (meta.get("name") or meta.get("username"))) or
+            (not meta.get("link")) or
+            (meta.get("recent_posts_count", 0) == 0) or
+            (not meta.get("about") and not meta.get("description"))
+        )
+
+        if FORCE_APIFY:
+            needs_fallback = True
+
+        if needs_fallback:
+            try:
+                meta["_apify_attempted"] = True
+            except Exception:
+                pass
+            ap_meta = run_apify_scraper(base_page_url)
+            if ap_meta:
+                meta = _merge_apify_into_meta(meta, ap_meta)
+                if not fbid and meta.get("id"):
+                    fbid = meta.get("id")
+            else:
+                try:
+                    meta["_apify_failed"] = True
+                except Exception:
+                    pass
+
+    try:
+        flags = _check_website_reciprocity(meta.get("website"), base_page_url or meta.get("link"), meta.get("username"))
+        meta.update(flags)
+    except Exception:
+        pass
+
+    # tas check kung existing sa verified_registry natin
+    try:
+        reg = registry or _check_verified_registry(url)
+        if reg and (reg.get("verified") or reg.get("is_verified") or reg.get("is_verified_source")):
+            meta["is_verified"] = True
+            meta["verification_status"] = "blue_verified"
+            meta["verification_source"] = "verified_registry"
+    except Exception:
+        pass
+    
+    if not meta.get("username") and fbid:
+        meta["username"] = fbid
+    elif not meta.get("username") and meta.get("link"):
+         meta["username"] = extract_fbid(meta["link"])
+
     score = compute_poser_score(meta)
     res = build_response(url, meta, score, resolved_id=fbid)
+
+    if db:
+        try:
+            doc_id = _get_cache_key(url)
+            
+            # Save Raw Data
+            meta_to_save = meta.copy()
+            meta_to_save['_cached_at'] = datetime.now(timezone.utc).isoformat()
+            meta_to_save['_original_url'] = url
+            db.collection(RAW_DATA_COLLECTION).document(doc_id).set(meta_to_save, merge=True)
+            
+            # Save Final Verdict
+            payload = {**res, "last_updated": firestore.SERVER_TIMESTAMP, "analysis": res}
+            db.collection(VERDICT_COLLECTION).document(doc_id).set(payload, merge=True)
+            
+        except Exception as e:
+            print(f"Failed to cache result: {e}")
+
     return jsonify(res)
 
-@app.route("/api/poser/analyze_poster", methods=["POST"])
-def poser_analyze_poster():
-    data = request.get_json(force=True) or {}
-    url = (data.get("url") or data.get("id_or_url") or "").strip()
-    if not url: return jsonify({"error": "Missing url"}), 400
-    parsed = parse_url(url)
-    if not parsed.get("is_valid"): return jsonify({"error": parsed.get("error")}), 400
-    fbid = extract_fbid(url)
-    meta = fetch_metadata(fbid)
-    if _has_graph_error(meta):
-        err = meta.get("details") or meta.get("error")
-        try:
-            code = (err.get("error") or {}).get("code") if isinstance(err, dict) else None
-        except Exception:
-            code = None
-        if code == 10:
-            ap_meta = run_apify_scraper(url)
-            if ap_meta:
-                score = compute_poser_score(ap_meta)
-                res = build_response(url, ap_meta, score, resolved_id=fbid)
-                return jsonify(res)
-            return jsonify(_neutral_fallback(url, err)), 200
-        return jsonify({"error": "Graph API error", "details": err}), 502
-    needs_fallback = bool(meta.get("_permissions_restricted")) or (
-        (meta.get("fan_count") in (None, 0)) and (meta.get("followers_count") in (None, 0))
-    )
-    if needs_fallback:
-        ap_meta = run_apify_scraper(url)
-        if ap_meta:
-            meta = _merge_apify_into_meta(meta, ap_meta)
-    score = compute_poser_score(meta)
-    res = build_response(url, meta, score, resolved_id=fbid)
-    return jsonify(res)
+def _extract_hostname(u: Optional[str]) -> Optional[str]:
+    try:
+        if not u: return None
+        from urllib.parse import urlparse
+        host = (urlparse(str(u)).netloc or "").lower()
+        return host
+    except Exception:
+        return None
+
+def _check_website_reciprocity(website_url: Optional[str], fb_link: Optional[str], username: Optional[str]) -> Dict[str, bool]:
+    flags = {"website_has_facebook": False, "website_links_to_page": False}
+    try:
+        if not website_url: return flags
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"}
+        r = requests.get(str(website_url), headers=headers, timeout=3)
+        html = (r.text or "").lower()
+        if "facebook.com" in html:
+            flags["website_has_facebook"] = True
+            uname = (username or "").strip().lower()
+            if uname and ("facebook.com/" + uname) in html:
+                flags["website_links_to_page"] = True
+            else:
+                link = (fb_link or "").strip().lower()
+                if link and link.replace("https://www.", "https://") in html:
+                    flags["website_links_to_page"] = True
+    except Exception:
+        pass
+    return flags
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(_load_env_var("PORT", "5001")), debug=True)
