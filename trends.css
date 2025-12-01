@@ -5,6 +5,36 @@
   align-items: stretch;
 }
 
+.pagination-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin: 20px auto;
+}
+.page-btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(148,163,184,0.24);
+  background: #0b1220;
+  color: #eaf2ff;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+.page-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.page-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+.page-info {
+  color: #9fb3c8;
+  font-weight: 700;
+}
+
 .trends-controls {
   display: flex;
   gap: 0.75rem;
