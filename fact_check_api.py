@@ -136,6 +136,9 @@ CREDIBLE_WEBSITES: Dict[str, Dict[str, Any]] = {
     'straitstimes.com':    {'score': 0.20, 'name': 'The Straits Times'},
 }
 
+# Optional URL patterns (e.g., official social pages) with associated boosts
+# Regex explains: Matches explicit verified handles to avoid fan pages
+# Combined List for Social Patterns
 CREDIBLE_SOCIAL_PATTERNS: List[Dict[str, Any]] = [
     # --- PHILIPPINES: Facebook Handles ---
     {'pattern': r"facebook\.com/(rapplerdotcom|rappler)", 'score': 0.25, 'name': 'Rappler (Facebook)'},
@@ -306,18 +309,6 @@ def extract_real_fb_url(share_url: str) -> Optional[str]:
         return None
     match = re.search(r'<meta\s+property=["\']og:url["\']\s+content=["\'](https?://[^"\']+)["\']', resp.text, re.IGNORECASE)
     return match.group(1) if match else None
-
-@app.route('/api/resolve-facebook-share', methods=['POST'])
-def resolve_facebook_share():
-    data = request.get_json(force=True) or {}
-    share_url = (data.get('url') or '').strip()
-    if not share_url:
-        return jsonify({'status': 'error', 'message': 'Missing url'}), 400
-    try:
-        resolved = extract_real_fb_url(share_url)
-        return jsonify({'status': 'success', 'resolved_url': resolved})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def query_zyla_fact_check(user_content: str) -> Dict[str, Any]:
     """
@@ -1175,7 +1166,6 @@ def fact_check_endpoint():
         resolved = extract_real_fb_url(url)
         if resolved:
             url = resolved
-            fast = True
     
     # Extract claims from the content
     claims = extract_claims(content, title)
@@ -1267,6 +1257,7 @@ def fact_check_endpoint():
                 if _claims:
                     zyla_seed_text = ". ".join(_claims[:3])
                 else:
+                    # Final fallback: URL Slug
                     zyla_seed_text = build_claim_from_url_slug(url)
             except Exception:
                 zyla_seed_text = build_claim_from_url_slug(url)
@@ -1298,7 +1289,8 @@ def fact_check_endpoint():
     zyla = {}
     zyla_call_attempted = False
     
-    if ZYLA_ENABLED and len(zyla_safe_input or "") > 5 and not fast:
+    # Ensure we actually trigger the call
+    if ZYLA_ENABLED and len(zyla_safe_input or "") > 5:
         zyla_call_attempted = True
         zyla_raw = query_zyla_fact_check(zyla_safe_input)
         zyla = parse_zyla_response(zyla_raw)
@@ -1378,7 +1370,8 @@ def fact_check_endpoint():
             except Exception:
                 explanations.append(str(zyla['explanation']))
 
-    run_google = not fast
+    # Always query Google Fact Check for claims to retrieve claimReview support
+    run_google = True
     if run_google:
         google_attempted_count = 0
         google_claims_found_count = 0
