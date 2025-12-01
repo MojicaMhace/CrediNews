@@ -10,6 +10,70 @@ const facebookUrl = document.getElementById('facebook-url');
 const facebookContent = document.getElementById('facebook-content');
 const facebookCharCount = document.getElementById('facebook-char-count');
 
+function setButtonLoading(btn, loading, labelWhile = 'Analyzing...') {
+    if (!btn) return;
+    if (loading) {
+        btn.disabled = true;
+        btn.classList.add('loading');
+        btn.dataset.originalHtml = btn.innerHTML;
+        btn.innerHTML = `<span class="btn-spinner"></span><span class="btn-text">${labelWhile}</span>`;
+    } else {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
+    }
+}
+
+const VERIFY_LOADING_MESSAGES = [
+  'Preparing verification...',
+  'Analyzing content...',
+  'Checking claims...',
+  'Consulting sources...',
+  'Running AI semantic analysis...',
+  'Aggregating results...'
+];
+
+function showVerifyLoading(title = 'Verify News') {
+  const existing = document.getElementById('verifyLoading');
+  if (existing) existing.remove();
+  const html = `
+    <div id="verifyLoading" class="verify-loading-overlay">
+      <div class="loading-panel">
+        <div class="ring"><div class="ring-core"></div></div>
+        <h3 class="loading-title">${title}</h3>
+        <p class="loading-subtitle" id="verifyLoadingSubtitle">${VERIFY_LOADING_MESSAGES[0]}</p>
+        <div class="loading-bar"><div class="loading-fill"></div></div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  const fill = document.querySelector('#verifyLoading .loading-fill');
+  let w = 10;
+  const barInterval = setInterval(() => {
+    w = w >= 95 ? 10 : w + 15;
+    if (fill) { fill.style.setProperty('--w', String(w)); fill.style.width = w + '%'; }
+  }, 600);
+  let i = 0;
+  const textInterval = setInterval(() => {
+    const el = document.getElementById('verifyLoadingSubtitle');
+    if (el) { i = (i + 1) % VERIFY_LOADING_MESSAGES.length; el.textContent = VERIFY_LOADING_MESSAGES[i]; }
+  }, 1500);
+  const overlayEl = document.getElementById('verifyLoading');
+  if (overlayEl) { overlayEl.dataset.barInterval = String(barInterval); overlayEl.dataset.textInterval = String(textInterval); }
+  document.documentElement.style.overflow = 'hidden';
+}
+
+function hideVerifyLoading() {
+  const el = document.getElementById('verifyLoading');
+  if (el) {
+    const barId = Number(el.dataset.barInterval || 0);
+    if (barId) clearInterval(barId);
+    const textId = Number(el.dataset.textInterval || 0);
+    if (textId) clearInterval(textId);
+    el.remove();
+  }
+  document.documentElement.style.overflow = '';
+}
+
 function isValidImageUrl(u) {
     try {
         if (!u || typeof u !== 'string') return false;
@@ -137,8 +201,8 @@ async function handleUrlVerification() {
     }
     
     // Disable button and show loading state
-    urlVerifyBtn.disabled = true;
-    urlVerifyBtn.textContent = 'Verifying...';
+    setButtonLoading(urlVerifyBtn, true, 'Analyzing...');
+    showVerifyLoading('Verify News');
     
     let effectiveContent = '';
     // Try to extract key claim from URL first
@@ -269,8 +333,8 @@ async function handleUrlVerification() {
         console.error('Verification error:', error);
         showNotification('Error connecting to verification services. Please try again later.', 'error');
     } finally {
-        urlVerifyBtn.disabled = false;
-        urlVerifyBtn.textContent = 'Verify URL';
+        setButtonLoading(urlVerifyBtn, false);
+        hideVerifyLoading();
     }
 }
 
@@ -352,7 +416,8 @@ function isSupportedFacebookPostUrl(url) {
         return (
             /\/share\/p\//.test(p) ||
             /\/share\/r\//.test(p) ||
-             /\/share\/v\//.test(p) ||
+            /\/share\/v\//.test(p) ||
+            /\/share\/[a-z0-9._-]+\/?/.test(p) ||
             /\/reel\//.test(p) ||
             /\/posts\//.test(p) ||
             /\/permalink\//.test(p) ||
@@ -490,8 +555,8 @@ async function handleFacebookVerification() {
     // Analysis options removed
     
     // Disable button and show loading state
-    facebookVerifyBtn.disabled = true;
-    facebookVerifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing Facebook Content...';
+    setButtonLoading(facebookVerifyBtn, true, 'Analyzing...');
+    showVerifyLoading('Verify News');
     
     if (window.firebase && firebase.firestore) {
         try {
@@ -631,9 +696,8 @@ async function handleFacebookVerification() {
         console.error('Fact check API error:', error);
         showNotification('Error connecting to fact check service. Please try again later.', 'error');
     } finally {
-        // Reset button
-        facebookVerifyBtn.disabled = false;
-        facebookVerifyBtn.innerHTML = '<i class="fab fa-facebook"></i> Analyze Facebook Content';
+        setButtonLoading(facebookVerifyBtn, false);
+        hideVerifyLoading();
     }
 }
 
