@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const goFacebookBtn = document.getElementById('show-facebook-verify');
-  const goUrlBtn = document.getElementById('show-url-verify');
   if (goFacebookBtn) goFacebookBtn.addEventListener('click', () => window.location.href = 'verify-news.html?section=facebook');
-  if (goUrlBtn) goUrlBtn.addEventListener('click', () => window.location.href = 'verify-news.html?section=url');
 
   const runBtn = document.getElementById('run-poser-btn');
   const urlInput = document.getElementById('poser-url');
