@@ -233,9 +233,9 @@ function updateAuthButton() {
         const ddNotifications = ensureDropdown.querySelector('#ddNotifications');
         if (ddNotifications) ddNotifications.onclick = (e) => { e.preventDefault(); window.location.href = 'notifications.html'; };
         const ddVerifications = ensureDropdown.querySelector('#ddVerifications');
-        if (ddVerifications) ddVerifications.onclick = (e) => { e.preventDefault(); window.location.href = 'report.html'; };
+        if (ddVerifications) ddVerifications.onclick = (e) => { e.preventDefault(); window.location.href = 'my-verifications.html'; };
         const ddPoserHistory = ensureDropdown.querySelector('#ddPoserHistory');
-        if (ddPoserHistory) ddPoserHistory.onclick = (e) => { e.preventDefault(); window.location.href = 'poser-detection.html'; };
+        if (ddPoserHistory) ddPoserHistory.onclick = (e) => { e.preventDefault(); window.location.href = 'poser-history.html'; };
 
         // Remove any visible Logout fallback if present
         const logoutFallback = document.getElementById('logoutFallback');
