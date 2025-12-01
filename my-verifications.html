@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Verifications - CrediNews</title>
+    
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="trends.css">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/logo2.png">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="index.html" class="logo">
+                    <img src="images/logo.png" class="brand-logo" alt="CrediNews">
+                    <span class="brand-text">CREDINEWS</span>
+                </a>
+            </div>
+            <div class="nav-menu">
+                <ul class="nav-links">
+                    <li><a href="index.html" class="nav-link">Home</a></li>
+                    <li><a href="verify-news.html" class="nav-link">Verify News</a></li>
+                    <li><a href="trends.html" class="nav-link">Trends</a></li>
+                    <li><a href="report.html" class="nav-link">Report</a></li>
+                    <li><a href="about.html" class="nav-link">About</a></li>
+                </ul>
+            </div>
+            <div class="nav-controls">
+                <div class="user-account-btn" id="userAccountBtn" style="display:none;">
+                    <i class="fas fa-user"></i>
+                    <span class="user-name">My Account</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <section class="latest-news-section">
+            <div class="container">
+                <h1 class="section-title">My Verification History</h1>
+                
+                <div class="trends-controls">
+                    <input id="myv-search" type="text" class="search-input" placeholder="Search your analyzed text...">
+                    <select id="myv-sort" class="sort-select">
+                        <option value="date_desc">Newest First</option>
+                        <option value="date_asc">Oldest First</option>
+                        <option value="score_desc">Credibility: High to Low</option>
+                        <option value="score_asc">Credibility: Low to High</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <div id="myv-feed" class="trends-grid">
+            <div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 2rem;">
+                <i class="fas fa-circle-notch fa-spin"></i> Loading your history...
+            </div>
+        </div>
+    </main>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <script src="firebase-config.js"></script>
+    <script src="my-verifications.js"></script>
+</body>
+</html>

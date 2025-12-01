@@ -24,12 +24,16 @@ async function logActivity(userId, action, details){
 function prefillUserData(uid){
   db.collection('users').doc(uid).get().then(doc=>{
     const data = doc.exists ? doc.data() : {};
-    (document.getElementById('ps_displayName')||{}).value = data.fullName || '';
+    (document.getElementById('ps_displayName')||{}).value = data.fullName || data.displayName || '';
     (document.getElementById('ps_username')||{}).value = data.username || '';
     (document.getElementById('ps_bio')||{}).value = data.bio || '';
     (document.getElementById('ps_location')||{}).value = data.location || '';
     (document.getElementById('ps_theme')||{}).value = data.theme || (localStorage.getItem('theme') || 'default');
     (document.getElementById('ps_language')||{}).value = data.language || (localStorage.getItem('language') || 'en');
+    const avatarEl = document.getElementById('ps_avatar');
+    if (avatarEl) avatarEl.src = data.photoURL || avatarEl.src;
+    const emailView = document.getElementById('ps_email_view');
+    if (emailView) emailView.value = data.email || (firebase.auth().currentUser ? firebase.auth().currentUser.email : '') || '';
   });
 }
 
@@ -38,7 +42,8 @@ async function saveProfile(uid){
   const username = (document.getElementById('ps_username')||{}).value || '';
   const bio = (document.getElementById('ps_bio')||{}).value || '';
   const location = (document.getElementById('ps_location')||{}).value || '';
-  await db.collection('users').doc(uid).set({ fullName, username, bio, location }, { merge:true });
+  const photoURL = (document.getElementById('ps_avatar')||{}).src || '';
+  await db.collection('users').doc(uid).set({ fullName, displayName: fullName, username, bio, location, photoURL }, { merge:true });
   await logActivity(uid, 'Updated Profile', { fullName, username });
   const user = firebase.auth().currentUser;
   if (user) await user.updateProfile({ displayName: fullName }).catch(()=>{});
@@ -131,12 +136,24 @@ function bindActions(uid){
   const pref = document.getElementById('savePreferencesBtn');
   const del = document.getElementById('deleteAccountBtn');
   const deact = document.getElementById('deactivateBtn');
+  const up = document.getElementById('ps_upload_btn');
+  const fi = document.getElementById('ps_photo');
+  const rm = document.getElementById('ps_remove_photo');
   if (sp) sp.addEventListener('click', ()=>saveProfile(uid));
   if (ce) ce.addEventListener('click', ()=>changeEmail(uid));
   if (cp) cp.addEventListener('click', ()=>changePassword(uid));
   if (pref) pref.addEventListener('click', ()=>savePreferences(uid));
   if (del) del.addEventListener('click', ()=>deleteAccount(uid));
   if (deact) deact.addEventListener('click', ()=>deactivateAccount(uid));
+  if (up && fi) up.addEventListener('click', ()=>fi.click());
+  if (fi) fi.addEventListener('change', ()=>{
+    const file = fi.files && fi.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => { const img = document.getElementById('ps_avatar'); if (img) img.src = e.target.result; };
+    reader.readAsDataURL(file);
+  });
+  if (rm) rm.addEventListener('click', ()=>{ const img = document.getElementById('ps_avatar'); if (img) img.src = 'images/logo.png'; });
 }
 
 document.addEventListener('DOMContentLoaded',()=>{

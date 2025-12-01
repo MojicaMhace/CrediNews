@@ -15,6 +15,7 @@ def _hash_url(url):
 
 VERIFIED_LIST = [
     # News
+    "https://www.facebook.com/bncphl",
     "https://www.facebook.com/gmanews",
     "https://www.facebook.com/abscbnNEWS",
     "https://www.facebook.com/ABSCBNnetwork",

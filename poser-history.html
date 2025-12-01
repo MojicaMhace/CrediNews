@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poser Detection History - CrediNews</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="poser-history.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="images/logo2.png">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand"><a href="index.html" class="logo"><img src="images/logo.png" class="brand-logo" alt="CrediNews"></a><span class="brand-text">CREDINEWS</span></div>
+      <div class="nav-menu"><ul class="nav-links"><li><a href="verify-news.html" class="nav-link">Verify News</a></li><li><a href="trends.html" class="nav-link">Trends</a></li><li><a href="report.html" class="nav-link">Report</a></li><li><a href="about.html" class="nav-link">About</a></li></ul></div>
+      <div class="nav-controls"><div class="user-account-btn" id="userAccountBtn" style="display:none;"><i class="fas fa-user"></i><span class="user-name">Loading...</span><i class="fas fa-chevron-down"></i><div class="user-dropdown" id="userDropdown"></div></div></div>
+    </div>
+  </nav>
+  <main class="main-content">
+    <section class="section active">
+      <div class="container" style="max-width:1100px;">
+        <h2 class="section-title">Poser Detection History</h2>
+        <div class="title-accent"></div>
+        <div id="historyGrid" class="trends-grid"></div>
+      </div>
+    </section>
+    <div id="historyModal" class="modal-overlay" style="display:none;"><div class="modal-content" style="max-width:720px;"><div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 id="modalTitle">Analysis</h3><button id="closeModal" class="btn-outline">Close</button></div><div id="modalBody"></div></div></div>
+  </main>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="script.js"></script>
+  <script src="poser-history.js"></script>
+</body>
+</html>

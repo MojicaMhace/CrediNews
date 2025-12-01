@@ -14,13 +14,16 @@ function iconFor(action){
 function renderItem(doc){
   const data = doc.data();
   const li = document.createElement('li');
-  const icon = iconFor(data.action);
+  const isNew = !data.readAt;
+  const icon = iconFor(data.type || data.action);
   li.className = `activity-item ${icon.cls}`;
+  if (isNew) li.style.boxShadow = '0 0 0 2px rgba(34,197,94,0.3) inset';
   li.innerHTML = `<div class="icon"><i class="fas ${icon.i}"></i></div>
     <div>
-      <div><strong>${data.action || 'Activity'}</strong></div>
-      <div class="meta">${fmt(data.timestamp)} • ${data.details ? JSON.stringify(data.details) : ''}</div>
-    </div>`;
+      <div><strong>${data.title || data.action || 'Notification'}</strong></div>
+      <div class="meta">${fmt((data.timestamp && data.timestamp.seconds)? new Date(data.timestamp.seconds*1000): data.timestamp)} • ${data.message || ''}</div>
+    </div>
+    <button class="btn" data-action="mark" data-id="${doc.id}">Mark as Read</button>`;
   return li;
 }
 
@@ -28,7 +31,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   firebase.auth().onAuthStateChanged(async user=>{
     if (!user){ window.location.href = 'login.html'; return; }
     const list = document.getElementById('activityList');
-    const q = await db.collection('account_activity').where('userId','==',user.uid).orderBy('timestamp','desc').get();
+    const q = await db.collection('notifications').where('userId','==',user.uid).orderBy('timestamp','desc').get();
     q.docs.forEach(d=> list.appendChild(renderItem(d)));
+    list.querySelectorAll('[data-action="mark"]').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const id = e.currentTarget.getAttribute('data-id');
+        await db.collection('notifications').doc(id).set({ readAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        e.currentTarget.textContent = 'Read';
+        e.currentTarget.disabled = true;
+        e.currentTarget.closest('.activity-item').style.boxShadow = 'none';
+      });
+    });
   });
 });

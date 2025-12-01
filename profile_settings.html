@@ -21,26 +21,60 @@
 
     <main class="settings-content">
       <section class="tab" id="tab-profile">
-        <h3>Public Profile</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Display Name</label>
-            <input type="text" id="ps_displayName" placeholder="Your name" />
+        <div class="ps-section-header">
+          <h3>Account Settings</h3>
+          <div class="ps-section-sub">Basic Info</div>
+        </div>
+
+        <div class="ps-panel">
+          <div class="profile-header">
+            <img id="ps_avatar" src="images/logo.png" alt="avatar">
+            <div class="profile-header-actions">
+              <button id="ps_upload_btn" class="btn ghost"><i class="fas fa-upload"></i> Upload new picture</button>
+              <button id="ps_remove_photo" class="btn danger-outline"><i class="fas fa-times"></i> Remove</button>
+              <input id="ps_photo" type="file" accept="image/*" style="display:none;">
+            </div>
           </div>
-          <div class="form-group">
-            <label>Username</label>
-            <input type="text" id="ps_username" placeholder="username" />
-          </div>
-          <div class="form-group full">
-            <label>Bio</label>
-            <textarea id="ps_bio" rows="4" placeholder="Tell people about you"></textarea>
-          </div>
-          <div class="form-group">
-            <label>Location</label>
-            <input type="text" id="ps_location" placeholder="City, Country" />
+
+          <div class="form-grid">
+            <div class="form-group list-row">
+              <label>Name</label>
+              <input type="text" id="ps_displayName" placeholder="Your name" />
+              <i class="fas fa-chevron-right chevron"></i>
+            </div>
+            <div class="form-group list-row">
+              <label>Username</label>
+              <input type="text" id="ps_username" placeholder="username" />
+              <i class="fas fa-chevron-right chevron"></i>
+            </div>
+            <div class="form-group full list-row">
+              <label>Bio</label>
+              <textarea id="ps_bio" rows="4" placeholder="Tell people about you"></textarea>
+              <i class="fas fa-chevron-right chevron"></i>
+            </div>
+            <div class="form-group list-row">
+              <label>Location</label>
+              <input type="text" id="ps_location" placeholder="City, Country" />
+              <i class="fas fa-chevron-right chevron"></i>
+            </div>
           </div>
         </div>
+
+        <div class="ps-section-header" style="margin-top:16px;">
+          <div class="ps-section-sub">Account Info</div>
+        </div>
+        <div class="ps-panel">
+          <div class="form-grid">
+            <div class="form-group list-row full">
+              <label>Email</label>
+              <input type="email" id="ps_email_view" placeholder="Email" disabled />
+              <i class="fas fa-chevron-right chevron"></i>
+            </div>
+          </div>
+        </div>
+
         <div class="actions">
+          <a class="btn ghost" href="index.html"><i class="fas fa-arrow-left"></i> Back</a>
           <button id="saveProfileBtn" class="btn primary"><i class="fas fa-save"></i> Save Profile</button>
           <a class="btn ghost" href="notifications.html"><i class="fas fa-bell"></i> Activity</a>
         </div>

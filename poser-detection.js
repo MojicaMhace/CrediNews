@@ -366,7 +366,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const breakdown = analysis.breakdown || {}; 
       
       const aiExplanation = breakdown.ai_explanation || analysis.ai_explanation || "No AI insight available.";
-      const aiRiskScore = breakdown.ai_risk_assessment; 
+      const aiRiskScore = (
+         (typeof breakdown.ai_score === 'number') ? breakdown.ai_score :
+         (typeof analysis.ai_score === 'number') ? analysis.ai_score :
+         (typeof meta.ai_score === 'number') ? meta.ai_score :
+         (analysis && analysis.trust && analysis.trust.layers && typeof analysis.trust.layers.ai_risk === 'number') ? analysis.trust.layers.ai_risk :
+         (typeof breakdown.ai_risk_assessment === 'number') ? breakdown.ai_risk_assessment : null
+      );
+      const aiVerdictText = (breakdown && breakdown.ai_verdict) ? breakdown.ai_verdict : (
+         (typeof aiRiskScore === 'number') ? (aiRiskScore >= 70 ? 'Likely Poser' : (aiRiskScore <= 30 ? 'Likely Authentic' : 'Mixed Signals')) : ''
+      );
 
       const posterScore = analysis.final_trust_score || 0;
       const scoreClass = getScoreClass(posterScore);
@@ -450,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const verifiedBanner = hasBadge ? `
         <div style="background:linear-gradient(135deg,#0ea5e9 0%,#38bdf8 100%);color:#07283b;padding:0.75rem 1rem;border-radius:10px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
           <i class="fas fa-check-circle" style="font-size:1.25rem;"></i>
-          <div><strong>100% Verified</strong><div style="font-size:0.9rem;opacity:.9;">Official Blue Badge detected.</div></div>
+          <div><strong>Verified</strong><div style="font-size:0.9rem;opacity:.9;">Official Blue Badge detected.</div></div>
         </div>` : '';
 
       const escapedInput = input.replace(/'/g, "\\'");
@@ -491,16 +500,25 @@ document.addEventListener('DOMContentLoaded', () => {
            </div>
          </div>
 
-         <div class="ai-agent-box" style="margin-top: 16px; padding: 12px 16px; background: rgba(15, 23, 42, 0.6); border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.15); color: #e5e7eb;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-              <i class="fas fa-robot" style="color:#60a5fa;"></i>
-              <div style="font-weight:700;">AI Agent Insight</div>
+            <div class="ai-agent-box" style="margin-top: 16px; padding: 12px 16px; background: rgba(15, 23, 42, 0.6); border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.15); color: #e5e7eb;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <i class="fas fa-robot" style="color:#60a5fa;"></i>
+                <div style="font-weight:700;">AI Agent Insight</div>
+              </div>
+              <div style="font-size:0.95rem; line-height:1.5;">
+                ${aiExplanation}
+                ${(() => { return (typeof aiRiskScore === 'number' || aiVerdictText) ? `<div style=\"margin-top:6px; opacity:.85;\">${typeof aiRiskScore === 'number' ? `AI Risk: ${aiRiskScore}/100` : ''}${aiVerdictText ? `${typeof aiRiskScore === 'number' ? ' • ' : ''}AI Verdict: ${aiVerdictText}` : ''}</div>` : ''; })()}
+                ${(() => {
+                   const aiTrust = (typeof (breakdown.ai_agent_trust_score) === 'number') ? breakdown.ai_agent_trust_score : (typeof aiRiskScore === 'number' ? (100 - aiRiskScore) : null);
+                   const ruleRaw = (typeof (breakdown.rule_based_score) === 'number') ? breakdown.rule_based_score : null;
+                   const final = (typeof posterScore === 'number') ? posterScore : null;
+                   if (typeof aiTrust === 'number' && typeof ruleRaw === 'number' && typeof final === 'number') {
+                     return `<div style=\"margin-top:6px; opacity:.7; font-size:.9rem;\">Final Score uses 70% AI + 30% Rules: AI Trust ${Math.round(aiTrust)}% • Rule Score ${Math.round(ruleRaw)}% → ${Math.round(final)}%</div>`;
+                   }
+                   return '';
+                })()}
+              </div>
             </div>
-            <div style="font-size:0.95rem; line-height:1.5;">
-              ${aiExplanation}
-              ${(() => { const v = (typeof aiRiskScore === 'number') ? (aiRiskScore >= 70 ? 'Likely Poser' : (aiRiskScore <= 30 ? 'Likely Legit' : 'Mixed Signals')) : ''; return (typeof aiRiskScore === 'number') ? `<div style="margin-top:6px; opacity:.85;">AI Risk: ${aiRiskScore}/100${v ? ` • AI Verdict: ${v}` : ''}</div>` : ''; })()}
-            </div>
-         </div>
 
          <div class="why-card">
            <h5>WHY THIS SCORE</h5>

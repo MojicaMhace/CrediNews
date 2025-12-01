@@ -24,7 +24,7 @@ except ImportError:
     Groq = None
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
 
 def _load_env_var(key: str, default: str = "") -> str:
     v = os.getenv(key)
@@ -64,7 +64,7 @@ LAST_GRAPH_ERROR: Optional[Dict[str, Any]] = None
 
 # --- DATABASE COLLECTIONS ---
 RAW_DATA_COLLECTION = "analyzed_pages_cache" 
-VERDICT_COLLECTION = "poser_detections"      
+VERDICT_COLLECTION = "poser_detections" 
 REGISTRY_COLLECTION = "verified_registry"
 OLD_CACHE_COLLECTION = "analyzed_pages_cache" 
 
@@ -284,7 +284,7 @@ def _extract_first_link(text: str) -> Optional[str]:
 
 def _resolve_fb_share_url(share_url: str) -> Optional[str]:
     try:
-        if not share_url or "facebook.com/share/" not in share_url:
+        if not share_url or "facebook.com/share/" in share_url:
             return None
         r = requests.get(share_url, timeout=8, headers={"User-Agent": "CrediNews-Bot/1.0"})
         if r.status_code != 200:
@@ -349,7 +349,7 @@ def fetch_metadata(fbid: str) -> Dict[str, Any]:
     if not _has_graph_error(cover_r) and isinstance(cover_r, dict) and cover_r.get("cover"): res["cover"] = cover_r.get("cover")
     
     posts = _graph_get(f"{fbid}/posts", {"limit": 10, "fields": "created_time"}, use_cache=True)
-    if not _has_graph_error(posts) and isinstance(posts, dict) and isinstance(posts.get("data"), list):
+    if not _has_graph_error(posts) and isinstance(posts.get("data"), list):
         res["recent_posts_count"] = len(posts.get("data") or [])
         try:
             times = []
@@ -511,7 +511,7 @@ def run_apify_scraper(page_url: str) -> Optional[Dict[str, Any]]:
         # Ensure username exists
         extracted_username = page_data.get("username")
         if not extracted_username:
-             extracted_username = extract_fbid(page_url)
+            extracted_username = extract_fbid(page_url)
 
         meta = {
             "id": page_data.get("id") or page_data.get("facebookId"),
@@ -558,7 +558,7 @@ def run_apify_scraper(page_url: str) -> Optional[Dict[str, Any]]:
                 doc_id = _get_cache_key(page_url)
                 meta["_cached_at"] = datetime.now(timezone.utc).isoformat()
                 meta["_original_url"] = page_url
-                db.collection(RAW_DATA_COLLECTION).document(doc_id).set(meta)
+                db.collection(RAW_DATA_COLLECTION).document(doc_id).set(meta, merge=True)
             except Exception: pass
 
         return meta
@@ -595,7 +595,7 @@ def _merge_apify_into_meta(graph_meta: Dict[str, Any], apify_meta: Dict[str, Any
     
     if apify_pic.get("url") and not apify_pic.get("is_silhouette"):
         if not graph_pic.get("url") or graph_pic.get("is_silhouette"):
-             merged["picture"] = apify_meta["picture"]
+            merged["picture"] = apify_meta["picture"]
 
     if apify_meta.get("cover") and apify_meta.get("cover").get("source"):
         if not (merged.get("cover") or {}).get("source"):
@@ -609,17 +609,16 @@ def _merge_apify_into_meta(graph_meta: Dict[str, Any], apify_meta: Dict[str, Any
     merged["_source"] = (merged.get("_source") or "graph") + "+apify"
     return merged
 
-# --- AI AGENT ANALYSIS ---
+#ai agent llma 3 
 def run_ai_agent_analysis(profile_data):
     """
     Uses Llama 3 (via Groq) to analyze the 'vibe' and content of the page.
-    It reads the data collected by Graph/Apify.
     """
     if not groq_client:
         return {"ai_score": 50, "explanation": "AI Agent Disabled (No Key or Library)"}
 
     try:
-        # 1. Prepare the Evidence (From your Graph/Apify data)
+        # 1. Prepare the Evidence (From Graph/Apify data)
         bio = (profile_data.get("about") or profile_data.get("description") or "No bio available")[:800]
         name = profile_data.get("name", "Unknown")
         stats = f"Followers: {profile_data.get('followers_count', 0)}, Verified: {profile_data.get('is_verified')}"
@@ -680,6 +679,7 @@ def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
     posts_count = int(meta.get("recent_posts_count") or 0)
     status = str(meta.get("verification_status") or "").strip().lower()
     verified = bool(meta.get("is_verified")) or status in ("blue_verified", "verified", "meta_verified")
+    verified_from_registry = str(meta.get("verification_source") or "").strip().lower() == "verified_registry"
     website = meta.get("website")
     site_has_fb = bool(meta.get("website_has_facebook"))
     site_links_page = bool(meta.get("website_links_to_page"))
@@ -743,33 +743,65 @@ def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
     # 2. RUN THE AI AGENT (New Layer)
     def _normalize_ai_explanation(m: Dict[str, Any], r: Dict[str, Any]) -> str:
         exp = str(r.get("explanation") or "").strip()
+        if not exp:
+            return "AI explanation unavailable."
         followers_local = int(max(int(m.get("fan_count") or 0), int(m.get("followers_count") or 0)))
         pic_local = ((m.get("picture") or {}).get("data") or {})
         has_pic_local = bool(pic_local.get("url")) and not bool(pic_local.get("is_silhouette"))
         has_bio_local = bool(m.get("about") or m.get("description"))
         status_local = str(m.get("verification_status") or "").strip().lower()
         verified_local = bool(m.get("is_verified")) or status_local in ("blue_verified","verified","meta_verified")
-        t = exp.lower()
-        if verified_local and ("not verified" in t or "unverified" in t or "no verified" in t or "lacks official verification" in t):
-            return "Verified account with official signals."
-        if followers_local >= 100000 and ("low follower" in t or "few follower" in t or "no follower" in t):
-            return "High audience and established presence."
-        if has_bio_local and ("no bio" in t or "missing bio" in t or "no description" in t):
-            return "Bio present with details."
-        if has_pic_local and ("no profile picture" in t or "default picture" in t or "missing profile" in t):
-            return "Custom profile image present."
-        return exp
+        # Apply targeted corrections while preserving the agent's narrative
+        try:
+            import re as _re
+            s = exp
+            if verified_local:
+                for pat in [r"\bnot verified\b", r"\bunverified\b", r"lacks official verification", r"no verified"]:
+                    s = _re.sub(pat, "official verification confirmed", s, flags=_re.I)
+            if followers_local >= 100000:
+                s = _re.sub(r"(low|few|no) follower(s)?", "massive reach", s, flags=_re.I)
+            if has_bio_local:
+                s = _re.sub(r"(no bio|missing bio|no description)", "bio present with details", s, flags=_re.I)
+            if has_pic_local:
+                s = _re.sub(r"(no profile picture|default picture|missing profile)", "custom profile image present", s, flags=_re.I)
+            if verified_local and ("registry" not in s.lower()):
+                s = s.rstrip() + " Registry and badge confirmed."
+            return s
+        except Exception:
+            # Fallback minimal correction
+            return (exp + (" Registry and badge confirmed." if verified_local else "")).strip()
 
     ai_result = run_ai_agent_analysis(meta)
     ai_score = ai_result.get("ai_score", 50)
     ai_reason = _normalize_ai_explanation(meta, ai_result)
 
-    # 3. HYBRID MERGE (The "Brain" + "Math")
-    # Invert AI score: We want 'Trust Score' (100 = Real), but AI gave Risk Score.
+    rationale_parts = []
+    if verified:
+        rationale_parts.append("official verification")
+    if followers >= 1000000:
+        rationale_parts.append("massive audience")
+    elif followers >= 100000:
+        rationale_parts.append("large audience")
+    elif followers >= 10000:
+        rationale_parts.append("active audience")
+    elif followers >= 1000:
+        rationale_parts.append("active audience")
+    if posts_count > 0:
+        rationale_parts.append("recent activity")
+    if has_pic:
+        rationale_parts.append("custom profile image")
+    if (meta.get("about") or meta.get("description")):
+        rationale_parts.append("detailed bio")
+    if site_links_page:
+        rationale_parts.append("website links back to page")
+    elif site_has_fb:
+        rationale_parts.append("website references Facebook")
+    if name_val in known_brands:
+        rationale_parts.append("recognized brand")
+    # remove explicit 'Verdict rationale' string
     ai_trust_score = 100 - ai_score
     
     # Logic: If rules are very certain (>90 or <30), trust the math.
-    # If rules are ambiguous (mid-range), let the AI sway the decision.
     if rule_score_raw >= 90 or rule_score_raw <= 30:
         final_score = rule_score_raw
     else:
@@ -778,6 +810,9 @@ def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
 
     if verified and ai_score >= 70:
         final_score = min(final_score, 75)
+
+    if verified_from_registry:
+        final_score = max(final_score, 90)
 
     trust = final_score / 100.0
     
@@ -805,6 +840,7 @@ def build_response(url: str, meta: Dict[str, Any], score: Dict[str, Any], resolv
     # Extract AI data safely
     ai_risk = score.get("layers", {}).get("ai_risk", 50)
     ai_reason = score.get("ai_analysis") or "AI Analysis Pending"
+    ai_rationale = ""
     
     return {
         "request": {
@@ -860,9 +896,7 @@ def build_response(url: str, meta: Dict[str, Any], score: Dict[str, Any], resolv
                     "Apify public scrape (normalized)"
                     if meta.get("_apify_fallback_used")
                     else (
-                        "Apify attempted (no public data)"
-                        if meta.get("_apify_attempted") and not meta.get("_apify_fallback_used")
-                        else "Meta Graph API" + (" (limited access)" if meta.get("_permissions_restricted") else "")
+                        "Meta Graph API" + (" (limited access)" if meta.get("_permissions_restricted") else "")
                     )
                 )
             )
@@ -912,7 +946,6 @@ def admin_mark_verified():
     if not url:
         return jsonify({"error": "Missing url"}), 400
     if (POSER_ADMIN_SECRET or "").strip():
-        # Allow either header or body secret
         if request.headers.get("X-Admin-Secret") != (POSER_ADMIN_SECRET or "").strip() and not _require_admin_secret(data):
             return jsonify({"error": "Forbidden"}), 403
     if not db:
@@ -936,6 +969,33 @@ def admin_mark_verified():
                 updated.append(did)
             except Exception:
                 continue
+        try:
+            for u in target_urls:
+                did = _get_cache_key(u)
+                meta_doc = db.collection(RAW_DATA_COLLECTION).document(did).get()
+                meta = (meta_doc.to_dict() or {}) if meta_doc.exists else {}
+                meta["is_verified"] = True
+                meta["verification_status"] = "blue_verified"
+                meta["verification_source"] = "verified_registry"
+                try:
+                    score = compute_poser_score(meta)
+                except Exception:
+                    score = {"raw_score": 95, "trust_score": 0.95, "layers": {"ai_risk": 0}, "ai_analysis": "Verified account with official signals. Registry and badge confirmed.", "followers": int(meta.get("followers_count") or 0)}
+                try:
+                    res = build_response(u, meta, score, resolved_id=meta.get("id"))
+                except Exception:
+                    res = {
+                        "metadata": {"is_verified": True, "verification_status": "blue_verified", "verification_source": "verified_registry"},
+                        "analysis": {
+                            "final_trust_score": int(score.get("trust_score", 0.95) * 100),
+                            "verdict": "Low Risk - Likely Authentic / Trusted Source.",
+                            "human_explanation": "Verified Registry: Official page confirmed. Strong signals of authenticity.",
+                            "data_source_note": "Verified Registry (confirmed official)"
+                        }
+                    }
+                db.collection(VERDICT_COLLECTION).document(did).set({**res, "analysis": res, "last_updated": firestore.SERVER_TIMESTAMP}, merge=True)
+        except Exception:
+            pass
         return jsonify({"status": "success", "updated_docs": updated, "targets": target_urls})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -977,8 +1037,11 @@ def admin_migrate_cache():
 def poser_analyze_full():
     data = request.get_json(force=True) or {}
     url = (data.get("url") or data.get("id_or_url") or "").strip().strip('`').strip('"').strip("'")
+    user_id = data.get('userID') or data.get('userId') or data.get('uid')
+    # 2. Check DB status early
+    if db is None:
+         return jsonify({"error": "Database connection failed at startup."}), 500
     if not url: return jsonify({"error": "Missing url"}), 400
-    
     parsed = parse_url(url)
     if not parsed.get("is_valid"): return jsonify({"error": "Invalid URL"}), 400
     
@@ -1001,10 +1064,53 @@ def poser_analyze_full():
             doc = db.collection(VERDICT_COLLECTION).document(doc_id).get()
             if doc.exists:
                 existing_data = doc.to_dict() or {}
+                try:
+                    reg2 = registry or _check_verified_registry(url)
+                except Exception:
+                    reg2 = None
+                if reg2 and (reg2.get("verified") or reg2.get("is_verified") or reg2.get("is_verified_source")):
+                    try:
+                        resp = existing_data.get("analysis") or existing_data
+                        if isinstance(resp, dict):
+                            md = resp.get("metadata") or {}
+                            md["is_verified"] = True
+                            md["verification_status"] = "blue_verified"
+                            md["verification_source"] = "verified_registry"
+                            resp["metadata"] = md
+                            an = resp.get("analysis") or {}
+                            an["data_source_note"] = "Verified Registry (confirmed official)"
+                            try:
+                                raw_score = int((an.get("breakdown") or {}).get("rule_based_score") or 80)
+                            except Exception:
+                                raw_score = 80
+                            final_score = max(90, raw_score)
+                            an["final_trust_score"] = final_score
+                            an["verdict"] = "Low Risk - Likely Authentic / Trusted Source."
+                            an["human_explanation"] = "Verified Registry: Official page confirmed. Strong signals of authenticity."
+                            bd = an.get("breakdown") or {}
+                            try:
+                                new_ai = run_ai_agent_analysis(md)
+                                ai_score = int(new_ai.get("ai_score", 50))
+                                ai_expl = _normalize_ai_explanation(md, new_ai)
+                                bd["ai_score"] = ai_score
+                                bd["ai_agent_trust_score"] = 100 - ai_score
+                                bd["ai_explanation"] = ai_expl
+                                bd["ai_verdict"] = ("Likely Poser" if ai_score >= 70 else ("Likely Authentic" if ai_score <= 30 else "Mixed Signals"))
+                            except Exception:
+                                bd["ai_explanation"] = "Verified account with official signals. Registry and badge confirmed."
+                                bd["ai_agent_trust_score"] = 100
+                                bd["ai_verdict"] = "Likely Authentic"
+                            bd["rule_based_score"] = max(int(bd.get("rule_based_score") or 80), 90)
+                            an["breakdown"] = bd
+                            resp["analysis"] = an
+                            db.collection(VERDICT_COLLECTION).document(doc_id).set({**resp, "analysis": resp, "last_updated": firestore.SERVER_TIMESTAMP}, merge=True)
+                            return jsonify(resp)
+                    except Exception:
+                        pass
                 if existing_data.get("analysis"):
                     return jsonify(existing_data["analysis"])
                 if existing_data.get("classification"):
-                     return jsonify(existing_data)
+                    return jsonify(existing_data)
         except Exception:
             pass
 
@@ -1087,11 +1193,12 @@ def poser_analyze_full():
     if not meta.get("username") and fbid:
         meta["username"] = fbid
     elif not meta.get("username") and meta.get("link"):
-         meta["username"] = extract_fbid(meta["link"])
+          meta["username"] = extract_fbid(meta["link"])
 
     score = compute_poser_score(meta)
     res = build_response(url, meta, score, resolved_id=fbid)
 
+    # --- SAVE FINAL VERDICT AND USER ID ---
     if db:
         try:
             doc_id = _get_cache_key(url)
@@ -1102,12 +1209,22 @@ def poser_analyze_full():
             meta_to_save['_original_url'] = url
             db.collection(RAW_DATA_COLLECTION).document(doc_id).set(meta_to_save, merge=True)
             
-            # Save Final Verdict
-            payload = {**res, "last_updated": firestore.SERVER_TIMESTAMP, "analysis": res}
+            # Save Final Verdict (to poser_detections collection)
+            payload = {
+                **res, 
+                "last_updated": firestore.SERVER_TIMESTAMP, 
+                "analysis": res,
+                "userID": user_id, 
+                "feedback": { 
+                    "agreeCount": 0,
+                    "disagreeCount": 0,
+                    "voters": {}
+                }
+            }
             db.collection(VERDICT_COLLECTION).document(doc_id).set(payload, merge=True)
             
-        except Exception as e:
-            print(f"Failed to cache result: {e}")
+        except Exception as e: 
+             print(f"Failed to cache result: {e}")
 
     return jsonify(res)
 
