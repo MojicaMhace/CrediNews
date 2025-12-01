@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="fact_check_styles.css">
     <link rel="stylesheet" href="verify-news.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/logo2.png">
+    <link rel="icon" type="image/png" href="images/logo2.png">
+    <link rel="apple-touch-icon" href="images/logo2.png">
 </head>
 <body class="verify-news-page">
     <!-- Navigation -->
@@ -15,11 +18,7 @@
         <div class="nav-container">
             <div class="nav-brand">
                 <a href="index.html" class="logo">
-                    <svg width="24" height="28" viewBox="0 0 24 28" class="brand-logo">
-                        <path d="M12 2 L20 5 L20 14 Q20 18 17 21 Q14 24 12 26 Q10 24 7 21 Q4 18 4 14 L4 5 Z" 
-                              fill="white" stroke="white" stroke-width="1"/>
-                        <path d="M8 12 L11 15 L16 10" stroke="#2D3748" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
+                    <img src="images/logo.png" class="brand-logo" alt="CrediNews logo">
                     <span class="brand-text">CREDINEWS</span>
                 </a>
             </div>
@@ -49,35 +48,10 @@
                 <!-- Toggle Buttons -->
                 <div class="toggle-buttons">
                     <button id="show-facebook-verify" class="toggle-btn active">Verify Facebook News</button>
-                    <button id="show-url-verify" class="toggle-btn">Verify News Article</button>
                     <button id="open-poser-detection" class="toggle-btn">Poser Detection</button>
                 </div>
 
-                <!-- Verify by URL Section -->
-                <div id="url-verify-section" style="display: none;">
-                    <div class="verify-card">
-                        <div class="card-header">
-                            <i class="fas fa-link card-icon"></i>
-                            <h2 class="card-title">Verify News Article</h2>
-                        </div>
-                        <p class="card-description">Enter the URL of a news article to analyze its credibility.</p>
-                        
-                        <div class="form-group">
-                            <label for="article-url" class="form-label">Article URL</label>
-                            <input 
-                                type="url" 
-                                id="article-url" 
-                                class="form-input" 
-                                placeholder="https://example.com/news-article"
-                            >
-                        </div>
-                        
-                        <button type="button" class="verify-btn" id="verify-url-btn">
-                            <i class="fas fa-search"></i>
-                            Verify URL
-                        </button>
-                    </div>
-                </div>
+                
 
                 <!-- Verify Facebook News Section -->
                 <div id="facebook-verify-section">

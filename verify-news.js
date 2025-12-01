@@ -742,8 +742,8 @@ function showFacebookVerificationResult(type, data) {
     `;
 
     const explanationSection = data.credibilityExplanation ? `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Explanation</h4>
+        <div class="panel trust">
+            <div class="panel-title"><span class="label">Explanation</span></div>
             <p>${safeTextForHtml(data.credibilityExplanation)}</p>
         </div>
     ` : '';
@@ -801,11 +801,12 @@ function showFacebookVerificationResult(type, data) {
     const hasGoogleUrl = googleCombined.some(c => !!c.url);
     const claimsOrderHtml = hasGoogleUrl ? '' : `${realClaimsSection}${fakeClaimsSection}`;
 
-    const reviewedClaimsSection = (activeCombined.length > 0) ? `
-        <div style="margin-top:0.75rem;">
-            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+    const reviewedClaimsPanel = (activeCombined.length > 0) ? `
+        <div class="panel">
+            <div class="panel-title"><span class="label">Reviewed Claims</span></div>
+            <ul>
                 ${activeCombined.map(c => `
-                    <li class="claim-item" style="padding:0.5rem; border:1px solid #1f2937; border-radius:6px; margin-bottom:0.5rem; background:#0b1220; color:#e5e7eb;">
+                    <li>
                         <div><strong>Claim:</strong> ${safeTextForHtml(c.claim || 'N/A')}</div>
                         <div><strong>Reviewer:</strong> ${safeTextForHtml(c.reviewer || 'Unknown reviewer')}</div>
                         <div><strong>Rating:</strong> ${safeTextForHtml(c.rating || 'Unrated')}</div>
@@ -816,17 +817,49 @@ function showFacebookVerificationResult(type, data) {
             </ul>
         </div>
     ` : (googleCombined.length === 0 ? `
-        <div style="margin-top:0.5rem; color:#9ca3af;">No Zyla Fact Check review found.</div>
+        <div class="panel"><div class="panel-title"><span class="label">Reviewed Claims</span></div><div style="color:#9ca3af;">No Zyla Fact Check review found.</div></div>
     ` : '');
 
+    const realPanelHtml = (!hasGoogle || googleReal.length === 0) ? '' : `
+        <div class="panel trust">
+          <div class="panel-title"><span class="label">Verified Claims</span></div>
+          <ul>
+            ${googleReal.slice(0, 2).map(rc => `
+              <li>
+                <div><strong>Claim:</strong> ${safeTextForHtml(rc.claim || 'N/A')}</div>
+                <div><strong>Reviewer:</strong> ${safeTextForHtml(rc.reviewer || 'Unknown reviewer')}</div>
+                <div><strong>Title:</strong> ${safeTextForHtml(rc.rating || rc.textualRating || 'Unrated')}</div>
+                <div><strong>Explanation:</strong> ${safeTextForHtml(rc.explanation || 'No explanation')}</div>
+                ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
+              </li>
+            `).join('')}
+          </ul>
+        </div>`;
+
+    const fakePanelHtml = (!hasGoogle || googleFake.length === 0) ? '' : `
+        <div class="panel risk">
+          <div class="panel-title"><span class="label">Debunked Claims</span></div>
+          <ul>
+            ${googleFake.slice(0, 2).map(fc => `
+              <li>
+                <div><strong>Claim:</strong> ${safeTextForHtml(fc.claim || 'N/A')}</div>
+                <div><strong>Reviewer:</strong> ${safeTextForHtml(fc.reviewer || 'Unknown reviewer')}</div>
+                <div><strong>Title:</strong> ${safeTextForHtml(fc.rating || fc.textualRating || 'Unrated')}</div>
+                <div><strong>Explanation:</strong> ${safeTextForHtml(fc.explanation || 'No explanation')}</div>
+                ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
+              </li>
+            `).join('')}
+          </ul>
+        </div>`;
+
     const factCheckDetailsSection = `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Fact-Check Claims</h4>
-            ${claimsOrderHtml}
-            ${reviewedClaimsSection}
-        </div>
+        ${realPanelHtml}
+        ${fakePanelHtml}
+        ${(!realPanelHtml && !fakePanelHtml) ? reviewedClaimsPanel : ''}
     `;
 
+    const ps = getPoserStyleClass(data.credibilityScore);
+    const hl = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-neutral'; return 'hl-bad'; })(Number(data.credibilityScore||0));
     const resultHtml = `
         <div class="verification-result facebook-result">
             <div class="result-header">
@@ -836,41 +869,37 @@ function showFacebookVerificationResult(type, data) {
                 </div>
                 <div class="content-type">${data.contentType || 'Post'}</div>
             </div>
-            <div class="result-score">
-                <div class="score-circle score-${getScoreClassByLabel(data.credibilityLabel)}">
-                    <span class="score-number">${data.credibilityScore}</span>
-                    <span class="score-label">%</span>
+            <div class="summary-band ${ps}">
+                <div class="score-donut ${ps}" style="--pct:${data.credibilityScore}">
+                  <div class="inner">
+                    <div class="num">${data.credibilityScore}</div>
+                    <div class="pct">%</div>
+                  </div>
                 </div>
-                <div class="score-description">
-                    <h3>CREDIBILITY SCORE - <span class="credibility-label ${getCredibilityClass(data.credibilityLabel)}">${data.credibilityLabel || ''}</span></h3>
-                    <p>${getFacebookScoreSummary(data.credibilityScore)}</p>
+                <div class="summary-text">
+                  <div class="classification-row">
+                    <span class="risk-icon ${ps}"><i class="fas fa-shield-alt"></i></span>
+                    <h3 class="${hl}">${data.credibilityLabel || ''}</h3>
+                  </div>
+                  <div class="accent-bar ${ps}"></div>
+                  <p>${getFacebookScoreSummary(data.credibilityScore)}</p>
                 </div>
             </div>
-            <div class="result-details">
-                <div class="result-item">
-                    <span class="result-label">FB Page:</span>
-                    <span class="result-value">${safeTextForHtml(data.pageName || '')}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Sources Found:</span>
-                    <span class="result-value">${data.sources ?? 0}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Fact Checks:</span>
-                    <span class="result-value">${data.factChecks ?? 0}</span>
-                </div>
-                ${data.url ? `
-                <div class="result-item">
-                    <span class="result-label">URL:</span>
-                    <span class="result-value url-value">${data.url}</span>
-                </div>
-                ` : ''}
+            <div class="panels-row">
+              <div class="panel trust">
+                <div class="panel-title"><span class="label">Analyzed Text</span></div>
+                ${data.analyzedText ? `<p>${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
+              </div>
+              <div class="panel metrics">
+                <div class="panel-title"><span class="label">Metrics</span></div>
+                <ul>
+                  <li><strong>FB Page:</strong> ${safeTextForHtml(data.pageName || '')}</li>
+                  <li><strong>Sources Found:</strong> ${data.sources ?? 0}</li>
+                  <li><strong>Fact Checks:</strong> ${data.factChecks ?? 0}</li>
+                  ${data.url ? `<li><strong>URL:</strong> <span class="url-value">${data.url}</span></li>` : ''}
+                </ul>
+              </div>
             </div>
-            ${data.analyzedText ? `
-            <div class="result-summary analyzed-text ${getHighlightClassByLabel(data.credibilityLabel)}">
-                <h4 style="margin:0 0 0.5rem 0;">Analyzed Text</h4>
-                <p>${safeTextForHtml(data.analyzedText)}</p>
-            </div>` : ''}
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
@@ -1047,13 +1076,12 @@ async function showVerificationResult(type, data) {
     const hasGoogleUrl2 = googleCombined2.some(c => !!c.url);
     const claimsOrderHtml2 = hasGoogleUrl2 ? '' : `${realClaimsSection}${fakeClaimsSection}`;
 
-    const reviewedClaimsSection2 = (activeCombined2.length > 0) ? `
-        <div style="margin-top:0.75rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Reviewed Claims</h4>
-            ${googleCombined2.length === 0 ? `<div style=\"margin:0 0 0.5rem 0; color:#6b7280; font-size:0.9rem;\">No Google Fact Check reviews found.</div>` : ''}
-            <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
+    const reviewedClaimsPanel2 = (activeCombined2.length > 0) ? `
+        <div class="panel">
+            <div class="panel-title"><span class="label">Reviewed Claims</span></div>
+            <ul>
                 ${activeCombined2.map(c => `
-                    <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
+                    <li>
                         <div><strong>Claim:</strong> ${safeTextForHtml(c.claim || 'N/A')}</div>
                         <div><strong>Reviewer:</strong> ${safeTextForHtml(c.reviewer || 'Unknown reviewer')}</div>
                         <div><strong>Title:</strong> ${safeTextForHtml(c.rating || 'Unrated')}</div>
@@ -1065,26 +1093,56 @@ async function showVerificationResult(type, data) {
         </div>
     ` : '';
 
+    const realPanelHtml2 = (!hasGoogle || googleReal.length === 0) ? '' : `
+        <div class="panel trust">
+          <div class="panel-title"><span class="label">Verified Claims</span></div>
+          <ul>
+            ${googleReal.slice(0, 2).map(rc => `
+              <li>
+                <div><strong>Claim:</strong> ${safeTextForHtml(rc.claim || 'N/A')}</div>
+                <div><strong>Reviewer:</strong> ${safeTextForHtml(rc.reviewer || 'Unknown reviewer')}</div>
+                <div><strong>Title:</strong> ${safeTextForHtml(rc.rating || rc.textualRating || 'Unrated')}</div>
+                <div><strong>Explanation:</strong> ${safeTextForHtml(rc.explanation || 'No explanation')}</div>
+                ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
+              </li>
+            `).join('')}
+          </ul>
+        </div>`;
+
+    const fakePanelHtml2 = (!hasGoogle || googleFake.length === 0) ? '' : `
+        <div class="panel risk">
+          <div class="panel-title"><span class="label">Debunked Claims</span></div>
+          <ul>
+            ${googleFake.slice(0, 2).map(fc => `
+              <li>
+                <div><strong>Claim:</strong> ${safeTextForHtml(fc.claim || 'N/A')}</div>
+                <div><strong>Reviewer:</strong> ${safeTextForHtml(fc.reviewer || 'Unknown reviewer')}</div>
+                <div><strong>Title:</strong> ${safeTextForHtml(fc.rating || fc.textualRating || 'Unrated')}</div>
+                <div><strong>Explanation:</strong> ${safeTextForHtml(fc.explanation || 'No explanation')}</div>
+                ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
+              </li>
+            `).join('')}
+          </ul>
+        </div>`;
+
     const factCheckDetailsSection = `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Fact-Check Claims</h4>
-            ${claimsOrderHtml2}
-            ${reviewedClaimsSection2}
-            ${(!hasGoogleUrl2) ? `
-                <div style="margin-top:0.75rem;">
-                    <h4 style="margin:0 0 0.5rem 0;">Sources:</h4>
-                    <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
-                        ${googleCombined2.map(c => c.url ? `
-                            <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
-                                <div><a href="${c.url}" target="_blank">View fact check</a></div>
-                            </li>
-                        ` : '').join('')}
-                    </ul>
-                </div>
-            ` : ''}
-        </div>
+        ${realPanelHtml2}
+        ${fakePanelHtml2}
+        ${(!realPanelHtml2 && !fakePanelHtml2) ? reviewedClaimsPanel2 : ''}
+        ${(!hasGoogleUrl2) ? `
+            <div class="panel">
+                <div class="panel-title"><span class="label">Sources</span></div>
+                <ul>
+                    ${googleCombined2.map(c => c.url ? `
+                        <li><a href="${c.url}" target="_blank">View fact check</a></li>
+                    ` : '').join('')}
+                </ul>
+            </div>
+        ` : ''}
     `;
 
+    const ps2 = getPoserStyleClass(data.credibilityScore);
+    const hl2 = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-neutral'; return 'hl-bad'; })(Number(data.credibilityScore||0));
     const resultHtml = `
         <div class="verification-result url-result">
             <div class="result-header">
@@ -1094,43 +1152,37 @@ async function showVerificationResult(type, data) {
                 </div>
                 <div class="content-type">${data.domain || 'Article'}</div>
             </div>
-            <div class="result-score">
-                <div class="score-circle score-${getScoreClassByLabel(data.credibilityLabel)}">
-                    <span class="score-number">${data.credibilityScore}</span>
-                    <span class="score-label">%</span>
+            <div class="summary-band ${ps2}">
+                <div class="score-donut ${ps2}" style="--pct:${data.credibilityScore}">
+                  <div class="inner">
+                    <div class="num">${data.credibilityScore}</div>
+                    <div class="pct">%</div>
+                  </div>
                 </div>
-                <div class="score-description">
-                    <h3>CREDIBILITY SCORE - <span class="credibility-label ${getCredibilityClass(data.credibilityLabel)}">${data.credibilityLabel || ''}</span></h3>
-                    <p>${getScoreSummary(data.credibilityScore)}</p>
+                <div class="summary-text">
+                  <div class="classification-row">
+                    <span class="risk-icon ${ps2}"><i class="fas fa-shield-alt"></i></span>
+                    <h3 class="${hl2}">${data.credibilityLabel || ''}</h3>
+                  </div>
+                  <div class="accent-bar ${ps2}"></div>
+                  <p>${getScoreSummary(data.credibilityScore)}</p>
                 </div>
             </div>
-            <div class="result-details">
-                <div class="result-item">
-                    <span class="result-label">Web Page:</span>
-                    <span class="result-value">${safeTextForHtml(pageName || '')}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Sources Found:</span>
-                    <span class="result-value">${data.sources ?? 0}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Fact Checks:</span>
-                    <span class="result-value">${data.factChecks ?? 0}</span>
-                </div>
-                
-                ${type === 'url' && articleUrl && articleUrl.value ? `
-                <div class="result-item">
-                    <span class="result-label">URL:</span>
-                    <span class="result-value url-value">${articleUrl.value}</span>
-                </div>
-                ` : ''}
+            <div class="panels-row">
+              <div class="panel trust">
+                <div class="panel-title"><span class="label">Analyzed Text</span></div>
+                ${data.analyzedText ? `<p>${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
+              </div>
+              <div class="panel metrics">
+                <div class="panel-title"><span class="label">Metrics</span></div>
+                <ul>
+                  <li><strong>Web Page:</strong> ${safeTextForHtml(pageName || '')}</li>
+                  <li><strong>Sources Found:</strong> ${data.sources ?? 0}</li>
+                  <li><strong>Fact Checks:</strong> ${data.factChecks ?? 0}</li>
+                  ${type === 'url' && articleUrl && articleUrl.value ? `<li><strong>URL:</strong> <span class="url-value">${articleUrl.value}</span></li>` : ''}
+                </ul>
+              </div>
             </div>
-            ${data.analyzedText ? `
-            <div class="result-summary analyzed-text ${getHighlightClassByLabel(data.credibilityLabel)}">
-                <h4 style="margin:0 0 0.5rem 0;">Analyzed Text</h4>
-                <p>${safeTextForHtml(data.analyzedText)}</p>
-            </div>` : ''}
-
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
@@ -1163,6 +1215,13 @@ async function showVerificationResult(type, data) {
 function getScoreClass(score) {
     if (score >= 70) return 'high';
     if (score >= 50) return 'medium';
+    return 'low';
+}
+
+function getPoserStyleClass(score) {
+    const s = Number(score || 0);
+    if (s >= 75) return 'high';
+    if (s >= 50) return 'medium';
     return 'low';
 }
 
