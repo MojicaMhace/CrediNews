@@ -158,10 +158,10 @@ function renderCards(data) {
 
     const labelText = String(item.label || (score >= 75 ? 'CREDIBLE' : (score >= 50 ? 'MIXED' : 'UNVERIFIED'))).toUpperCase();
     var labelClass = 'hl-neutral';
-    if (score >= 75) labelClass = 'hl-good';
-    else if (score >= 50) labelClass = 'hl-neutral';
-    else if (score > 0) labelClass = 'hl-bad';
-    if (labelText === 'UNVERIFIED') labelClass = 'hl-neutral';
+    if (labelText.includes('CREDIBLE') || labelText.includes('HIGH')) labelClass = 'hl-good';
+    else if (labelText.includes('MIXED')) labelClass = 'hl-mixed';
+    else if (labelText.includes('LOW')) labelClass = 'hl-bad';
+    else if (labelText.includes('UNVERIFIED') || labelText.includes('NEUTRAL')) labelClass = 'hl-neutral';
 
     const fb = item.feedback || {};
     const agreeCount = fb.agreeCount || 0;
@@ -203,6 +203,28 @@ function renderCards(data) {
   });
 
   if (typeof attachVoteListeners === 'function') attachVoteListeners();
+
+  if (window.firebase && firebase.firestore) {
+    const uid = getUserId();
+    const db = firebase.firestore();
+    const cards = Array.from(container.querySelectorAll('.trend-card'));
+    cards.forEach(async (c) => {
+      const id = c.getAttribute('data-id');
+      if (!id) return;
+      try {
+        const vSnap = await db.collection('facebook_verification_results').doc(id).collection('votes').doc(uid).get();
+        if (vSnap.exists) {
+          const t = (vSnap.data() || {}).type;
+          const agreeBtn = c.querySelector('.vote-btn.agree');
+          const disagreeBtn = c.querySelector('.vote-btn.disagree');
+          if (t === 'agree') agreeBtn && agreeBtn.classList.add('selected');
+          if (t === 'disagree') disagreeBtn && disagreeBtn.classList.add('selected');
+          if (agreeBtn) agreeBtn.disabled = true;
+          if (disagreeBtn) disagreeBtn.disabled = true;
+        }
+      } catch(_e) {}
+    });
+  }
 }
 
 function attachVoteListeners(){}
@@ -230,7 +252,8 @@ function openResultModal(data) {
   const hl = (function(l){
     const t = String(l||'').toLowerCase();
     if (t.includes('credible') || t.includes('high')) return 'hl-good';
-    if (t.includes('mixed') || t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
+    if (t.includes('mixed')) return 'hl-mixed';
+    if (t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
     if (t.includes('low')) return 'hl-bad';
     return 'hl-neutral';
   })(label);
@@ -351,32 +374,23 @@ if (action === 'vote-agree' || action === 'vote-disagree') {
     try {
         await firebase.firestore().runTransaction(async (tx) => {
             const snap = await tx.get(docRef);
-            if (!snap.exists) return; // Document doesn't exist
+            if (!snap.exists) return;
+
+            const voteRef = docRef.collection('votes').doc(uid);
+            const vSnap = await tx.get(voteRef);
+            if (vSnap.exists) return;
 
             const data = snap.data();
-            // Get existing feedback or initialize defaults
             const fb = data.feedback || { agreeCount: 0, disagreeCount: 0, voters: {} };
-            
-            // MIGRATION FIX: If voters is an Array (old data) or missing, reset it to an empty Object
-            if (Array.isArray(fb.voters) || !fb.voters) {
-                fb.voters = {};
-            }
-
-            // Check if this user already voted in the new Map
+            if (Array.isArray(fb.voters) || !fb.voters) fb.voters = {};
             if (fb.voters[uid]) return;
 
-            // Update the counts
-            if (voteType === 'agree') {
-                fb.agreeCount = Number(fb.agreeCount || 0) + 1;
-            } else {
-                fb.disagreeCount = Number(fb.disagreeCount || 0) + 1;
-            }
+            if (voteType === 'agree') fb.agreeCount = Number(fb.agreeCount || 0) + 1;
+            else fb.disagreeCount = Number(fb.disagreeCount || 0) + 1;
 
-            // Save the vote in the Map
             fb.voters[uid] = voteType;
-
-            // Write back to Firestore
             tx.update(docRef, { feedback: fb });
+            tx.set(voteRef, { type: voteType, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
         });
 
         // --- Update UI Immediately (Optimistic Update) ---

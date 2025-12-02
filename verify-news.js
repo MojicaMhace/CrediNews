@@ -751,18 +751,22 @@ function showFacebookVerificationResult(type, data) {
     const mlSection = '';
 
     const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
-        <div class="result-summary" style="margin-top:1rem; border-left-color:#1877f2;">
-            <h4 style="margin:0 0 0.5rem 0;">Slang Detection</h4>
-            <div><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</div>
-            ${(typeof data.sarcasmPercent === 'number') ? `<div><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</div>` : ''}
-            ${data.sarcasmRisk ? `<div><strong>Risk:</strong> ${data.sarcasmRisk}</div>` : ''}
+        <div class="panel metrics">
+            <div class="panel-title"><span class="label">Slang Detection</span></div>
+            <ul>
+                <li><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</li>
+                ${(typeof data.sarcasmPercent === 'number') ? `<li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>` : ''}
+                ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
+            </ul>
         </div>
     ` : (typeof data.sarcasmPercent === 'number' ? `
-        <div class="result-summary" style="margin-top:1rem; border-left-color:#1877f2;">
-            <h4 style="margin:0 0 0.5rem 0;">Slang Detection</h4>
-            <div><em>No slang words detected.</em></div>
-            <div><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</div>
-            ${data.sarcasmRisk ? `<div><strong>Risk:</strong> ${data.sarcasmRisk}</div>` : ''}
+        <div class="panel metrics">
+            <div class="panel-title"><span class="label">Slang Detection</span></div>
+            <ul>
+                <li><em>No slang words detected.</em></li>
+                <li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>
+                ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
+            </ul>
         </div>
     ` : '');
 
@@ -802,7 +806,7 @@ function showFacebookVerificationResult(type, data) {
     const claimsOrderHtml = hasGoogleUrl ? '' : `${realClaimsSection}${fakeClaimsSection}`;
 
     const reviewedClaimsPanel = (activeCombined.length > 0) ? `
-        <div class="panel trust">
+        <div class="panel">
             <div class="panel-title"><span class="label">Reviewed Claims</span></div>
             <ul>
                 ${activeCombined.map(c => `
@@ -817,7 +821,7 @@ function showFacebookVerificationResult(type, data) {
             </ul>
         </div>
     ` : (googleCombined.length === 0 ? `
-        <div class="panel trust"><div class="panel-title"><span class="label">Reviewed Claims</span></div><div style="color:#9ca3af;">No Zyla Fact Check review found.</div></div>
+        <div class="panel"><div class="panel-title"><span class="label">Reviewed Claims</span></div><div style="color:#9ca3af;">No Zyla Fact Check review found.</div></div>
     ` : '');
 
     const realPanelHtml = (!hasGoogle || googleReal.length === 0) ? '' : `
@@ -859,7 +863,15 @@ function showFacebookVerificationResult(type, data) {
     `;
 
     const ps = getPoserStyleClass(data.credibilityScore);
-    const hl = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-neutral'; return 'hl-bad'; })(Number(data.credibilityScore||0));
+    const hl = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-mixed'; return 'hl-bad'; })(Number(data.credibilityScore||0));
+    const textHL = (function(l,s){
+      const t = String(l||'').toLowerCase();
+      if (t.includes('credible') || s>=75) return 'hl-good';
+      if (t.includes('mixed') || s>=50) return 'hl-mixed';
+      if (t.includes('low')) return 'hl-bad';
+      if (t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
+      return 'hl-neutral';
+    })(data.credibilityLabel, Number(data.credibilityScore||0));
     const resultHtml = `
         <div class="verification-result facebook-result">
             <div class="result-header">
@@ -888,7 +900,7 @@ function showFacebookVerificationResult(type, data) {
             <div class="panels-row">
               <div class="panel trust">
                 <div class="panel-title"><span class="label">Analyzed Text</span></div>
-                ${data.analyzedText ? `<p>${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
+                ${data.analyzedText ? `<p class="${textHL}">${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
               </div>
               <div class="panel metrics">
                 <div class="panel-title"><span class="label">Metrics</span></div>
@@ -935,7 +947,7 @@ function getFacebookScoreSummary(score) {
     if (score >= 75) {
         return 'The content aligns with verified information and shows no signs of misinformation.';
     } else if (score >= 55) {
-        return 'Contains both reliable and questionable information. Consider cross-referencing.';
+        return 'Contains mixed information. Some claims may be true while others are disputed.';
     } else if (score >= 46) {
         return 'We could not find sufficient evidence to verify this content. Proceed with caution.';
     } else {
@@ -1026,18 +1038,22 @@ async function showVerificationResult(type, data) {
     const mlSection = '';
 
     const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Slang Detection</h4>
-            <div><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</div>
-            ${(typeof data.sarcasmPercent === 'number') ? `<div><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</div>` : ''}
-            ${data.sarcasmRisk ? `<div><strong>Risk:</strong> ${data.sarcasmRisk}</div>` : ''}
+        <div class="panel metrics">
+            <div class="panel-title"><span class="label">Slang Detection</span></div>
+            <ul>
+                <li><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</li>
+                ${(typeof data.sarcasmPercent === 'number') ? `<li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>` : ''}
+                ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
+            </ul>
         </div>
     ` : (typeof data.sarcasmPercent === 'number' ? `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Slang Detection</h4>
-            <div><em>No slang words detected.</em></div>
-            <div><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</div>
-            ${data.sarcasmRisk ? `<div><strong>Risk:</strong> ${data.sarcasmRisk}</div>` : ''}
+        <div class="panel metrics">
+            <div class="panel-title"><span class="label">Slang Detection</span></div>
+            <ul>
+                <li><em>No slang words detected.</em></li>
+                <li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>
+                ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
+            </ul>
         </div>
     ` : '');
     
@@ -1077,7 +1093,7 @@ async function showVerificationResult(type, data) {
     const claimsOrderHtml2 = hasGoogleUrl2 ? '' : `${realClaimsSection}${fakeClaimsSection}`;
 
     const reviewedClaimsPanel2 = (activeCombined2.length > 0) ? `
-        <div class="panel trust">
+        <div class="panel">
             <div class="panel-title"><span class="label">Reviewed Claims</span></div>
             <ul>
                 ${activeCombined2.map(c => `
@@ -1142,7 +1158,15 @@ async function showVerificationResult(type, data) {
     `;
 
     const ps2 = getPoserStyleClass(data.credibilityScore);
-    const hl2 = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-neutral'; return 'hl-bad'; })(Number(data.credibilityScore||0));
+    const hl2 = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-mixed'; return 'hl-bad'; })(Number(data.credibilityScore||0));
+    const textHL2 = (function(l,s){
+      const t = String(l||'').toLowerCase();
+      if (t.includes('credible') || s>=75) return 'hl-good';
+      if (t.includes('mixed') || s>=50) return 'hl-mixed';
+      if (t.includes('low')) return 'hl-bad';
+      if (t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
+      return 'hl-neutral';
+    })(data.credibilityLabel, Number(data.credibilityScore||0));
     const resultHtml = `
         <div class="verification-result url-result">
             <div class="result-header">
@@ -1171,7 +1195,7 @@ async function showVerificationResult(type, data) {
             <div class="panels-row">
               <div class="panel trust">
                 <div class="panel-title"><span class="label">Analyzed Text</span></div>
-                ${data.analyzedText ? `<p>${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
+                ${data.analyzedText ? `<p class="${textHL2}">${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
               </div>
               <div class="panel metrics">
                 <div class="panel-title"><span class="label">Metrics</span></div>
@@ -1230,8 +1254,8 @@ function getScoreClassByLabel(label) {
     const t = String(label || '').trim().toLowerCase();
     if (!t) return 'neutral';
     if (t === 'credible') return 'high';
-    if (t === 'mixed') return 'medium';
-    if (t.includes('unverified')) return 'neutral';
+    if (t === 'mixed') return 'medium'; // Maps to orange/yellow usually
+    if (t.includes('unverified')) return 'neutral'; // Maps to grey/blue
     if (t.includes('low credibility')) return 'low';
     return 'neutral';
 }
@@ -1241,9 +1265,9 @@ function getScoreSummary(score) {
     if (score >= 75) {
         return 'The content aligns with verified information and shows no signs of misinformation.';
     } else if (score >= 55) {
-        return 'Contains both reliable and questionable information. Consider cross-referencing.';
+        return 'Contains mixed information. Some claims may be true while others are disputed or lack context.';
     } else if (score >= 46) {
-        return 'We could not find sufficient evidence to verify this content. Proceed with caution.';
+        return 'We could not find sufficient evidence to verify this content. It has not been debunked, but it is not confirmed.';
     } else {
         return 'This post may contain false or misleading information. Please verify before sharing.';
     }
@@ -1255,8 +1279,8 @@ function getCredibilityClass(label) {
     if (!t) return 'neutral-credibility';
     if (t === 'low credibility' || t.includes('low credibility')) return 'low-credibility';
     if (t === 'credible') return 'high-credibility';
-    if (t === 'mixed') return 'medium-credibility';
-    if (t.includes('unverified')) return 'neutral-credibility';
+    if (t === 'mixed') return 'medium-credibility'; // Ensure CSS has .medium-credibility
+    if (t.includes('unverified')) return 'neutral-credibility'; // Ensure CSS has .neutral-credibility
     return 'neutral-credibility';
 }
 
@@ -1531,27 +1555,17 @@ document.addEventListener('click', async function(e) {
         await firebase.firestore().runTransaction(async (tx) => {
             const snap = await tx.get(docRef);
             const data = snap.exists ? snap.data() : {};
-
-            const feedback = data.feedback || { agreeCount: 0, disagreeCount: 0, voters: {} };
-
-            if (Array.isArray(feedback.voters) || !feedback.voters) {
-                feedback.voters = {};
-            }
-
-            const prev = feedback.voters[user.uid];
+            const feedback = data.feedback || { agreeCount: 0, disagreeCount: 0 };
+            const voters = data.voters || {};
+            const prev = voters[user.uid];
             const next = feedbackChoice;
-
             if (prev === next) return;
-
             if (prev === 'agree') feedback.agreeCount = Math.max(0, Number(feedback.agreeCount || 0) - 1);
             if (prev === 'disagree') feedback.disagreeCount = Math.max(0, Number(feedback.disagreeCount || 0) - 1);
-
             if (next === 'agree') feedback.agreeCount = Number(feedback.agreeCount || 0) + 1;
             if (next === 'disagree') feedback.disagreeCount = Number(feedback.disagreeCount || 0) + 1;
-
-            feedback.voters[user.uid] = next;
-
-            tx.set(docRef, { feedback }, { merge: true });
+            voters[user.uid] = next;
+            tx.set(docRef, { feedback, voters }, { merge: true });
         });
         showNotification('Your vote has been recorded.', 'success');
     } catch (err) {

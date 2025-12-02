@@ -483,6 +483,7 @@
 .view-details-btn { background: transparent; border: none; color: #94a3b8; font-family: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: color 0.2s ease; padding: 8px 16px; }
 .view-details-btn:hover { color: #ffffff; }
 .trend-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(148,163,184,0.1); padding-top: 8px; margin-top: auto; }
+.trend-actions { display: flex; gap: 10px; align-items: center; white-space: nowrap; }
 
 /* Placeholder image container */
 .trend-image-container { height: 200px; width: 100%; flex-shrink: 0; background: #1e293b; display: flex; align-items: center; justify-content: center; overflow: hidden; }

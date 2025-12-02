@@ -1161,46 +1161,38 @@ def fact_check_endpoint():
     final_image_url = None
     final_source_name = None
     
-    # If a Facebook share link is supplied, resolve it to the canonical post URL first
+    # ... [Keep your existing URL resolution and Claim Extraction logic] ...
+    # (Lines 870 to 980 in your original file remain identical)
+    
     if url and 'facebook.com/share/' in url:
         resolved = extract_real_fb_url(url)
         if resolved:
             url = resolved
     
-    # Extract claims from the content
     claims = extract_claims(content, title)
     
-    # If a URL is provided, augment with claims extracted from the page
     if url:
         try:
             url_claims = extract_claims_from_url(url)
-            # Prefer URL claims when content is just the URL
             if len(content.strip()) <= 10 or content.strip().lower().startswith(('http://', 'https://')):
                 claims = url_claims or claims
             else:
-                # Merge and de-duplicate preserving order
                 merged = claims + [c for c in url_claims if c.lower() not in [x.lower() for x in claims]]
                 claims = merged
         except Exception as e:
             print(f"URL extraction error: {e}")
     
-    # Final filtering to remove placeholders
     claims = [c for c in claims if not _is_placeholder_claim(c)]
     
-    # Ensure we have at least one candidate (avoid adding generic title)
     if not claims:
-        # Use URL slug-based fallback to avoid empty claims list
         claims = [build_claim_from_url_slug(url)] if url else []
     
-    # Limit to 5 to keep API efficient
     claims = claims[:5]
     
-    # Zyla Labs primary check (choose best statement)
     primary_statement = None
     if claims:
         primary_statement = claims[0]
     else:
-        # First, try to extract a key claim from the URL using heuristics
         if url:
             try:
                 url_claims = extract_claims_from_url(url)
@@ -1209,38 +1201,28 @@ def fact_check_endpoint():
                     claims.insert(0, primary_statement)
             except Exception:
                 primary_statement = None
-        # If still missing, try fetching raw URL content
         if not primary_statement and (content.strip().lower().startswith(('http://', 'https://')) or content.strip().lower().startswith(('url:', 'facebook url:'))):
             try:
-                html = fetch_url_content(url or content)
-                text = _html_to_text(html) if html else None
-                primary_statement = (_safe_sent_tokenize(text or '') or [text or title or content])[0]
+                html_text_fetch = fetch_url_content(url or content)
+                text_fetched = _html_to_text(html_text_fetch) if html_text_fetch else None
+                primary_statement = (_safe_sent_tokenize(text_fetched or '') or [text_fetched or title or content])[0]
             except Exception:
                 primary_statement = title or content
-        # If still missing, build from URL slug
         if not primary_statement and url:
             primary_statement = build_claim_from_url_slug(url)
-        # Last resort: use first sentence of title+content
         if not primary_statement:
             combined = f"{title}. {content}"
             primary_statement = (_safe_sent_tokenize(combined) or [combined])[0]
 
-    # Prefer using caption/content for Facebook URLs (login-gated pages)
     if url and 'facebook.com' in url.lower() and content:
         primary_statement = content.strip() or primary_statement
 
     zyla_seed_text = ""
     _c = (content or "").strip()
 
-    # PRIORITY 1: Use User Content (Raw)
-    # We ignore whether it has a URL or not. If the user pasted it, we use it.
     if len(_c) >= 5:
         zyla_seed_text = _c
-        print(f"DEBUG: Using User Content for Zyla: {_c[:50]}...")
-
-    # PRIORITY 2: Scrape URL (Only if content is missing)
     elif url:
-        print(f"DEBUG: No content provided. Attempting to scrape URL: {url}")
         scraped = scrape_with_playwright(url)
         scraped_text = scraped.get('text') if isinstance(scraped, dict) else (scraped or '')
         scraped_img = scraped.get('image_url') if isinstance(scraped, dict) else None
@@ -1251,18 +1233,15 @@ def fact_check_endpoint():
         if scraped_text and len(scraped_text.strip()) > 20:
             zyla_seed_text = scraped_text
         else:
-            # Fallback to requests extraction
             try:
                 _claims = extract_claims_from_url(url) or []
                 if _claims:
                     zyla_seed_text = ". ".join(_claims[:3])
                 else:
-                    # Final fallback: URL Slug
                     zyla_seed_text = build_claim_from_url_slug(url)
             except Exception:
                 zyla_seed_text = build_claim_from_url_slug(url)
 
-    # Prepare final safe input
     zyla_safe_input = build_zyla_safe_input(zyla_seed_text)
     if not zyla_safe_input:
         try:
@@ -1272,7 +1251,6 @@ def fact_check_endpoint():
                 zyla_safe_input = build_zyla_safe_input(build_claim_from_url_slug(url))
         except Exception:
             pass
-    print(f"DEBUG: Final zyla_safe_input length={len(zyla_safe_input)}")
 
     if url and not final_image_url:
         try:
@@ -1289,20 +1267,16 @@ def fact_check_endpoint():
     zyla = {}
     zyla_call_attempted = False
     
-    # Ensure we actually trigger the call
     if ZYLA_ENABLED and len(zyla_safe_input or "") > 5:
         zyla_call_attempted = True
         zyla_raw = query_zyla_fact_check(zyla_safe_input)
         zyla = parse_zyla_response(zyla_raw)
 
-    # Calculate domain boost early
     domain_boost = 0.0
     if url:
-        # Note: calling the internal helper with underscore
         domain_boost = _credible_boost_for_url(url)
     credible_fb_bypass = bool(url and 'facebook.com' in (url or '').lower() and domain_boost > 0)
 
-    # Containers for unified results
     all_results = []
     scores = []
     explanations = []
@@ -1312,9 +1286,7 @@ def fact_check_endpoint():
     fake_claims = []
     real_claims = []
 
-    # Integrate Zyla into claims sections if it returned a verdict
     if zyla.get('verdict') in {'true', 'false', 'partially_true'}:
-        # Build a pseudo-claim analysis entry from Zyla
         rating_text = 'Partially True' if zyla['verdict'] == 'partially_true' else zyla['verdict'].title()
         info = {
             'claim': zyla.get('claim') or zyla_safe_input or primary_statement,
@@ -1331,7 +1303,6 @@ def fact_check_endpoint():
         for s in zyla.get('sources') or []:
             sources_set.add(s)
 
-        # Get confidence, default to high (0.9) if missing
         conf_val = zyla.get('confidence')
         if isinstance(conf_val, (int, float)):
             conf_val = float(conf_val)
@@ -1340,27 +1311,29 @@ def fact_check_endpoint():
 
         if zyla['verdict'] == 'true':
             real_claims.append(info)
-            # Force True verdict to be at least 0.8
             scores.append(max(0.8, conf_val))
         elif zyla['verdict'] == 'false':
-            fake_claims.append(info)
+            # --- LOGIC FIX: Check for Credible Bypass FIRST ---
             try:
                 bz = _credible_boost_for_url(url)
             except Exception:
                 bz = 0.0
+            
             if bz > 0:
-                try:
-                    source_name = _credible_source_name(url or '')
-                    explanations.insert(0, f"Verified source: {source_name}. Inaccurate Zyla false verdict bypassed.")
-                except Exception:
-                    explanations.insert(0, "Verified source bypass applied.")
-                scores.append(0.70)
+                # BYPASS ACTIVE: Source is credible, ignore Zyla false positive.
+                # Set Score to 0.74 (Mixed/High-Mixed) so it doesn't cross into "Credible" (0.75+)
+                # IMPORTANT: Do NOT add to fake_claims, so 'has_negative_evidence' stays False.
+                
+                info['explanation'] = f"Verified source: {final_source_name or 'Source'}. Inaccurate Zyla false verdict bypassed."
+                real_claims.append(info) # Treat as real/neutral for UI purposes
+                explanations.insert(0, f"Verified source: {final_source_name or 'Source'}. Inaccurate Zyla false verdict bypassed.")
+                scores.append(0.74) 
             else:
-                # Apply normal negative scoring when source isn't verified
+                # GENUINE FAKE: No credible boost found
+                fake_claims.append(info)
                 scores.append(max(0.0, 1.0 - conf_val))
-        else:  # partially_true
+        else:
             real_claims.append(info)
-            # Fixed score for mixed/partial
             scores.append(0.65)
         
         if zyla.get('explanation'):
@@ -1370,13 +1343,11 @@ def fact_check_endpoint():
             except Exception:
                 explanations.append(str(zyla['explanation']))
 
-    # Always query Google Fact Check for claims to retrieve claimReview support
     run_google = True
+    google_attempted_count = 0
+    google_claims_found_count = 0
+
     if run_google:
-        google_attempted_count = 0
-        google_claims_found_count = 0
-        
-        # Only query Google with meaningful claims; skip noisy Facebook fallbacks
         is_facebook = bool(url and 'facebook.com' in (url or '').lower())
         meaningful_claims = [c for c in claims if _is_meaningful_statement(c)]
 
@@ -1384,11 +1355,9 @@ def fact_check_endpoint():
             return not re.search(r"pfbid", (c or ''), flags=re.IGNORECASE)
         meaningful_claims = [c for c in meaningful_claims if _is_not_facebook_id(c)]
 
-        # If Facebook URL and no meaningful extracted claims, skip Google fallback entirely
         if is_facebook and not meaningful_claims:
             pass
         else:
-            # Also consider using the user's primary statement if meaningful and not duplicated
             if _is_meaningful_statement(primary_statement) and primary_statement not in meaningful_claims:
                 meaningful_claims.insert(0, primary_statement)
 
@@ -1399,7 +1368,7 @@ def fact_check_endpoint():
                     'claim': claim,
                     'fact_check_result': result
                 })
-            # Process the fact check results to calculate credibility
+            
             for result in all_results:
                 fc_result = result["fact_check_result"]
                 if fc_result and "claims" in fc_result:
@@ -1407,7 +1376,7 @@ def fact_check_endpoint():
                         google_claims_found_count += len(fc_result.get("claims", []))
                     except Exception:
                         pass
-                    # Score/explanation
+                    
                     claim_result = calculate_credibility_score(fc_result)
                     _score = _clamp01(claim_result["score"])
                     if credible_fb_bypass and _score < _neutral_score():
@@ -1415,10 +1384,8 @@ def fact_check_endpoint():
                     scores.append(_score)
                     explanations.append(claim_result["explanation"]) 
 
-                    # Detailed parsing for UI
                     for c in fc_result.get("claims", []):
                         reviews = c.get("claimReview", [])
-                        # If no reviews, still include the claim with unrated info
                         if not reviews:
                             info = {
                                 'claim': c.get('text') or result['claim'],
@@ -1452,58 +1419,48 @@ def fact_check_endpoint():
                             }
                             claim_analysis.append(info)
 
-                            # Identify fake/misleading claims
                             if any(word in rating_text for word in [
                                 'false', 'fake', 'pants on fire', 'incorrect', 'misleading', 'mostly false'
                             ]):
                                 if not credible_fb_bypass:
                                     fake_claims.append(info)
-                            # Identify real/true claims
+                            
                             if any(word in rating_text for word in [
                                 'true', 'mostly true', 'accurate', 'correct'
                             ]):
                                 real_claims.append(info)
 
-    # Removed duplicate processing loop to prevent double entries and duplicated scores
-
-    # Determine if Google Fact Check produced any claims
     has_google_claims = any(
         r.get('fact_check_result') and r['fact_check_result'].get('claims') for r in all_results
     ) or any((isinstance(x, dict) and x.get('source') == 'google') for x in claim_analysis)
 
-    
-
     ml_details = None
-    if not has_google_claims:
-        ml_details = None
-    
-    # Calculate overall credibility blending Zyla, Google, ML
+
+    # --- FIX: Define 'has_negative_evidence' GLOBALLY before checking scores ---
+    # This prevents UnboundLocalError in the else block
+    has_negative_evidence = (len(fake_claims) > 0)
+
     if scores:
         overall_score = sum(scores) / len(scores)
-        # Track that we have fact-check data to determine labeling later
         _has_fact_data = True
-        # Apply credible domain boost for borderline cases (no explicit negative evidence)
+        
         try:
             boost = _credible_boost_for_url(url)
         except Exception:
             boost = 0.0
-        try:
-            bval = _credible_boost_for_url(url)
-        except Exception:
 
-            has_negative_evidence = len(fake_claims) > 0
-            _has_fact_data = (len(scores) > 0)
-            bval = 0.0
-        has_negative_evidence = any((not isinstance(fc, dict)) or (fc.get('source') != 'zyla') or (bval <= 0) for fc in fake_claims)
-        # Floor score to low threshold for credible domains with no negative evidence
+        # Logic for Credible Boost (bumping up score if source is trusted and no fake claims)
         if boost > 0 and not has_negative_evidence and overall_score < CREDIBILITY_THRESHOLDS["unverified_upper"]:
             overall_score = max(overall_score, CREDIBILITY_THRESHOLDS["unverified_upper"])
+        
         if boost > 0 and not has_negative_evidence and (
             overall_score >= CREDIBILITY_THRESHOLDS["unverified_upper"] and overall_score < CREDIBILITY_THRESHOLDS["high"]
         ):
             overall_score = min(1.0, overall_score + boost)
+            # Cap credible boost at 0.74 if no explicit fact check confirmed it
             if overall_score >= CREDIBILITY_THRESHOLDS["high"]:
-                overall_score = 0.74
+                overall_score = 0.74 
+            
             try:
                 source_name = _credible_source_name(url or '')
                 explanations.insert(0, f"Credible domain boost applied (+{boost:.2f}) for {source_name}.")
@@ -1512,13 +1469,16 @@ def fact_check_endpoint():
             except Exception:
                 explanations.insert(0, f"Credible domain boost applied (+{boost:.2f}).")
     else:
-        # No fact check data; apply credible domain baseline if URL is verified
+        # No fact check data found (Empty Scores)
         try:
             bval = _credible_boost_for_url(url)
         except Exception:
             bval = 0.0
+        
+        # FIX: 'has_negative_evidence' is now safely accessible here
         if bval > 0 and not has_negative_evidence:
-            overall_score = max(CREDIBILITY_THRESHOLDS["unverified_upper"], min(1.0, _neutral_score() + bval))
+            # Apply boost to baseline, capped at 0.74 (Mixed)
+            overall_score = max(CREDIBILITY_THRESHOLDS["unverified_upper"], min(0.74, _neutral_score() + bval))
             _has_fact_data = True
             try:
                 source_name = _credible_source_name(url or '')
@@ -1526,25 +1486,21 @@ def fact_check_endpoint():
             except Exception:
                 explanations.insert(0, f"Credible domain baseline applied (+{bval:.2f}).")
         else:
+            # UNVERIFIED CASE: No scores, no boost
             overall_score = _neutral_score()
             _has_fact_data = False
-            overall_label = "Unverified"
+            overall_label = "UNVERIFIED"
             overall_explanation = "No fact check data available for this content."
 
-    # Slang detection and sarcasm scoring (on combined text, with URL stripped)
     combined_text = f"{title} {content}"
-    # Strip URLs from text to avoid false slang detection
     text_for_slang = re.sub(r'https?://\S+|www\.\S+', '', combined_text).strip()
     slang_found = detect_slang_words(text_for_slang)
     sarcasm_score, sarcasm_risk = compute_sarcasm_score(text_for_slang, slang_found)
 
-    # Apply sarcasm deduction only when slang words are detected
-    # Low sarcasm (<2% slang): subtract up to ~2 points; potential: subtract ~5 points
     if slang_found:
         deduction_points = 5 if sarcasm_score >= 0.02 else 2
         overall_score = max(0.0, min(1.0, overall_score - (deduction_points / 100.0)))
 
-    # Determine overall label AFTER deductions so label matches displayed score
     if _has_fact_data:
         if overall_score >= CREDIBILITY_THRESHOLDS["high"]:
             overall_label = "CREDIBLE"
@@ -1559,7 +1515,6 @@ def fact_check_endpoint():
             overall_label = "LOW CREDIBILITY"
             overall_explanation = "This news contains disputed claims or inaccuracies according to fact checkers."
 
-        # Add specific explanations if available
         if explanations:
             overall_explanation += " Details: " + " ".join(explanations[:2])
 
@@ -1579,7 +1534,7 @@ def fact_check_endpoint():
         'page_name': _credible_master_name(url),
         'image_url': image_url,
         'source_name': final_source_name,
-        'claims_checked': claims,  # May be empty if none found
+        'claims_checked': claims,
         'detailed_results': all_results,
         'claim_analysis': claim_analysis,
         'fake_claims': fake_claims,
@@ -1589,17 +1544,6 @@ def fact_check_endpoint():
         'zyla_enabled': bool(ZYLA_ENABLED),
         'zyla_attempted': bool(zyla_call_attempted),
         'zyla_input_preview': zyla_safe_input[:160],
-        'zyla_debug': {
-            'endpoint': ZYLA_API_URL,
-            'enabled': bool(ZYLA_ENABLED),
-            'attempted': bool(zyla_call_attempted),
-            'input_len': len(zyla_safe_input or '')
-        },
-        'debug': {
-            'google_attempted_count': int(locals().get('google_attempted_count', 0)),
-            'google_claims_found_count': int(locals().get('google_claims_found_count', 0)),
-            'scores_count': len(scores)
-        },
         'ml_details': ml_details,
         'slang_detected': slang_found,
         'sarcasm_score': sarcasm_score,
