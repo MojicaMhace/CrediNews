@@ -802,7 +802,7 @@ function showFacebookVerificationResult(type, data) {
     const claimsOrderHtml = hasGoogleUrl ? '' : `${realClaimsSection}${fakeClaimsSection}`;
 
     const reviewedClaimsPanel = (activeCombined.length > 0) ? `
-        <div class="panel">
+        <div class="panel trust">
             <div class="panel-title"><span class="label">Reviewed Claims</span></div>
             <ul>
                 ${activeCombined.map(c => `
@@ -817,7 +817,7 @@ function showFacebookVerificationResult(type, data) {
             </ul>
         </div>
     ` : (googleCombined.length === 0 ? `
-        <div class="panel"><div class="panel-title"><span class="label">Reviewed Claims</span></div><div style="color:#9ca3af;">No Zyla Fact Check review found.</div></div>
+        <div class="panel trust"><div class="panel-title"><span class="label">Reviewed Claims</span></div><div style="color:#9ca3af;">No Zyla Fact Check review found.</div></div>
     ` : '');
 
     const realPanelHtml = (!hasGoogle || googleReal.length === 0) ? '' : `
@@ -1077,7 +1077,7 @@ async function showVerificationResult(type, data) {
     const claimsOrderHtml2 = hasGoogleUrl2 ? '' : `${realClaimsSection}${fakeClaimsSection}`;
 
     const reviewedClaimsPanel2 = (activeCombined2.length > 0) ? `
-        <div class="panel">
+        <div class="panel trust">
             <div class="panel-title"><span class="label">Reviewed Claims</span></div>
             <ul>
                 ${activeCombined2.map(c => `
@@ -1531,17 +1531,27 @@ document.addEventListener('click', async function(e) {
         await firebase.firestore().runTransaction(async (tx) => {
             const snap = await tx.get(docRef);
             const data = snap.exists ? snap.data() : {};
-            const feedback = data.feedback || { agreeCount: 0, disagreeCount: 0 };
-            const voters = data.voters || {};
-            const prev = voters[user.uid];
+
+            const feedback = data.feedback || { agreeCount: 0, disagreeCount: 0, voters: {} };
+
+            if (Array.isArray(feedback.voters) || !feedback.voters) {
+                feedback.voters = {};
+            }
+
+            const prev = feedback.voters[user.uid];
             const next = feedbackChoice;
+
             if (prev === next) return;
+
             if (prev === 'agree') feedback.agreeCount = Math.max(0, Number(feedback.agreeCount || 0) - 1);
             if (prev === 'disagree') feedback.disagreeCount = Math.max(0, Number(feedback.disagreeCount || 0) - 1);
+
             if (next === 'agree') feedback.agreeCount = Number(feedback.agreeCount || 0) + 1;
             if (next === 'disagree') feedback.disagreeCount = Number(feedback.disagreeCount || 0) + 1;
-            voters[user.uid] = next;
-            tx.set(docRef, { feedback, voters }, { merge: true });
+
+            feedback.voters[user.uid] = next;
+
+            tx.set(docRef, { feedback }, { merge: true });
         });
         showNotification('Your vote has been recorded.', 'success');
     } catch (err) {

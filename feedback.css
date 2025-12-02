@@ -21,19 +21,19 @@
 }
 
 .feedback-container {
-  width: 540px;
-  max-width: 92vw;
+  width: 720px;
+  max-width: 96vw;
   background: var(--fb-card);
   border: 1px solid var(--fb-border);
-  border-radius: 14px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.40);
   overflow: hidden;
   color: var(--fb-text);
   animation: fbFadeIn 280ms ease-out;
 }
 
 .feedback-header {
-  padding: 16px 18px;
+  padding: 20px 22px;
   border-bottom: 1px solid var(--fb-border);
 }
 .feedback-title {
@@ -43,11 +43,11 @@
 }
 
 .feedback-body {
-  padding: 18px;
+  padding: 22px;
 }
 
 .feedback-actions {
-  padding: 14px 18px;
+  padding: 16px 22px;
   border-top: 1px solid var(--fb-border);
   display: flex;
   gap: 12px;
@@ -101,7 +101,7 @@ textarea.feedback-textarea {
   border-radius: 10px;
   padding: 10px 12px;
 }
-textarea.feedback-textarea { min-height: 120px; resize: vertical; }
+textarea.feedback-textarea { min-height: 160px; resize: vertical; }
 select.feedback-select:focus,
 textarea.feedback-textarea:focus { outline: 2px solid var(--fb-accent); }
 
