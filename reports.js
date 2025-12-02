@@ -165,7 +165,7 @@
       },
       options: { 
         plugins: { 
-          legend: { position: 'bottom' },
+          legend: { position: 'bottom', labels: { color: '#FFFFFF', font: { weight: 'bold' } } },
           tooltip: {
             callbacks: {
               label: (ctx) => {

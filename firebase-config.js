@@ -24,6 +24,7 @@ try {
     window.firebaseDb = firebase.firestore();
     window.firebaseApp = firebase.app();
     window.firebaseConfig = firebaseConfig;
+    try { window.firebaseDb.settings({ experimentalForceLongPolling: true, useFetchStreams: false }); } catch (_) {}
     
     console.log('✅ Firebase services exported globally');
     

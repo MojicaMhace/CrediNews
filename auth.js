@@ -4,6 +4,7 @@ class AuthManager {
     constructor() {
         console.log('🔧 AuthManager constructor called');
         this.googleProvider = new firebase.auth.GoogleAuthProvider();
+        try { this.googleProvider.setCustomParameters({ prompt: 'select_account' }); } catch (_) {}
         this.init();
     }
 
@@ -274,8 +275,24 @@ class AuthManager {
         try {
             this.showInfo(`${actionText} with Google...`);
             
-            // Firebase Google OAuth
-            const result = await firebase.auth().signInWithPopup(this.googleProvider);
+            // Ensure supported environment (served over http/https and storage enabled)
+            const protocolOk = ['http:', 'https:', 'chrome-extension:'].includes(window.location.protocol);
+            if (!protocolOk) {
+                this.showError('Open the site via http://localhost or https and ensure cookies/storage are enabled.');
+                return;
+            }
+            // Attempt popup first, then fallback to redirect if blocked or unsupported
+            let result;
+            try {
+                result = await firebase.auth().signInWithPopup(this.googleProvider);
+            } catch (popupErr) {
+                console.warn('Popup sign-in failed, falling back to redirect:', popupErr);
+                if (popupErr && (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/operation-not-supported-in-this-environment')) {
+                    await firebase.auth().signInWithRedirect(this.googleProvider);
+                    return; // Flow continues on redirect return page
+                }
+                throw popupErr;
+            }
             const user = result.user;
             
             // Check if user exists in Firestore
@@ -319,6 +336,12 @@ class AuthManager {
                 errorMessage = 'Sign-in was cancelled. Please try again.';
             } else if (error.code === 'auth/popup-blocked') {
                 errorMessage = 'Popup was blocked. Please allow popups and try again.';
+            } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
+                errorMessage = 'Serve the site over http/https (e.g., http://localhost) and enable cookies/storage.';
+            } else if (error.code === 'auth/operation-not-allowed') {
+                errorMessage = 'Google sign-in is disabled in Firebase Auth. Enable it in the console.';
+            } else if (error.code === 'auth/unauthorized-domain') {
+                errorMessage = 'This domain is not authorized. Add it under Firebase Auth → Authorized domains.';
             }
             
             this.showError(errorMessage);
@@ -1086,3 +1109,22 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(style);
 });
+    if (firebase && firebase.auth) {
+        firebase.auth().getRedirectResult().then((result) => {
+            if (result && result.user) {
+                const user = result.user;
+                const authData = {
+                    uid: user.uid,
+                    email: user.email,
+                    fullName: user.displayName || 'Google User',
+                    isAuthenticated: true,
+                    provider: 'google',
+                    loginTime: new Date().toISOString()
+                };
+                sessionStorage.setItem('authData', JSON.stringify(authData));
+                setTimeout(() => { window.location.href = 'index.html'; }, 500);
+            }
+        }).catch((err) => {
+            console.warn('Redirect result error:', err);
+        });
+    }

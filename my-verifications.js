@@ -245,7 +245,7 @@ function renderCards(docs) {
 
     // 4. Construct the Card HTML
     return `
-      <div class="trend-card" data-id="${d.id}">
+      <div class="my-verification-card" data-id="${d.id}">
         ${imageTag}
         
         <div class="card-body" data-action="open">
@@ -319,7 +319,7 @@ function start(user) {
               .orderBy('analyzed_at', 'desc')
               .limit(50);
 
-  q.onSnapshot(snapshot => {
+  const unsubscribe = q.onSnapshot(snapshot => {
     const rawDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
     // Filter by User ID
@@ -333,6 +333,11 @@ function start(user) {
     container.innerHTML = '<div style="color:#ef4444; padding:2rem; text-align:center;">Error loading history. Please try again later.</div>';
   });
 
+  try {
+    window.addEventListener('beforeunload', () => { try { unsubscribe && unsubscribe(); } catch(_){} });
+    window.addEventListener('pagehide', () => { try { unsubscribe && unsubscribe(); } catch(_){} });
+  } catch(_){}
+
   if (searchInput) searchInput.addEventListener('input', (e) => { currentQuery = e.target.value; applyFilters(); });
   if (sortSelect) sortSelect.addEventListener('change', (e) => { currentSort = e.target.value; applyFilters(); });
 }
@@ -340,7 +345,7 @@ function start(user) {
 // --- EVENT LISTENERS ---
 
 document.addEventListener('click', (e) => {
-    const card = e.target.closest('.trend-card');
+    const card = e.target.closest('.my-verification-card');
     if (!card) return;
     
     const actionEl = e.target.closest('[data-action]');

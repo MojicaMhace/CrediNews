@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrediNews - Admin Panel</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #e5e7eb; padding: 32px; }
+        .container { max-width: 900px; margin: 24px auto; background: #111827; padding: 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.35); border: 1px solid #1f2937; }
+        h1 { color: #e5e7eb; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+        
+        /* Table Styles */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #374151; color: #e5e7eb; }
+        th { background-color: #1f2937; color: #cbd5e1; }
+        
+        /* Button Styles */
+        .btn { border: none; padding: 8px 12px; cursor: pointer; border-radius: 6px; font-weight: 600; background: #374151; color: #e5e7eb; }
+        .btn-approve { background-color: #16a34a; color: #e5e7eb; margin-right: 5px; }
+        .btn-reject { background-color: #ef4444; color: #e5e7eb; }
+        .btn:hover { filter: brightness(1.1); }
+        
+        .status { font-style: italic; color: #9ca3af; }
+        .badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+        .badge-verified { background:#16a34a20; color:#16a34a; border:1px solid #16a34a40; }
+        .badge-missing { background:#ef444420; color:#ef4444; border:1px solid #ef444440; }
+        .container a { color: #93c5fd; text-decoration: none; }
+        .container a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Admin Verification Queue</h1>
+    <p>Manage user requests to verify news sources.</p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>URL / Page Name</th>
+                <th>Requested At</th>
+                <th>Registry Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="requestTable">
+            <tr><td colspan="3">Loading pending requests...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script type="module">
+    // 1. SIMPLE PASSWORD CHECK (The "Poor Man's Login")
+    const secret = prompt("Enter Admin Password:");
+    if(secret !== "CrediNews_040412") { // CHANGE THIS PASSWORD
+        document.body.innerHTML = "<h1 style='color:red; text-align:center; margin-top:50px;'>ACCESS DENIED</h1>";
+        throw new Error("Wrong Password");
+    }
+
+    // 2. IMPORT FIREBASE
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, where } 
+    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // 3. YOUR FIREBASE CONFIGURATION
+    // Go to Firebase Console -> Project Settings -> General -> Scroll down to "Your apps" -> CDN
+    const firebaseConfig = {
+        apiKey: "AIzaSyBB-DI9bjMXFx4-DFw2Nbr5F4Av7YCgM2U",          
+        authDomain: "credinews-2e5c0.firebaseapp.com", 
+        projectId: "credinews-2e5c0", 
+        storageBucket: "credinews-2e5c0.firebasestorage.app",
+  messagingSenderId: "862665853708",
+  appId: "1:862665853708:web:bb9dcef6418920df7c1729"         
+    };
+
+    // Initialize
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // COLLECTION NAMES (Make sure these match what you use in your main app)
+    const PENDING_COLLECTION = "pending_verifications"; 
+    const VERIFIED_COLLECTION = "verified_registry"; 
+
+    // 4. FUNCTION TO LOAD REQUESTS
+    async function loadRequests() {
+        const tableBody = document.getElementById('requestTable');
+        tableBody.innerHTML = ""; // Clear loading text
+
+        try {
+            const querySnapshot = await getDocs(collection(db, PENDING_COLLECTION));
+            
+            if (querySnapshot.empty) {
+                tableBody.innerHTML = "<tr><td colspan='3' class='status'>No pending requests found.</td></tr>";
+                return;
+            }
+
+            for (const docSnap of querySnapshot.docs) {
+                const data = docSnap.data();
+                const row = document.createElement('tr');
+                let dateStr = "N/A";
+                if(data.timestamp) dateStr = new Date(data.timestamp.toDate()).toLocaleDateString();
+                const normalized = (data.url || '').trim().replace(/[`'\"]/g, '');
+                let inRegistry = false;
+                try {
+                    const regQ = query(collection(db, VERIFIED_COLLECTION), where('url','==', normalized));
+                    const regSnap = await getDocs(regQ);
+                    inRegistry = !regSnap.empty;
+                } catch (e) { inRegistry = false; }
+                const badge = inRegistry ? `<span class="badge badge-verified">Verified</span>` : `<span class="badge badge-missing">Not in Registry</span>`;
+                row.innerHTML = `
+                    <td><a href="${data.url}" target="_blank">${data.url}</a></td>
+                    <td>${dateStr}</td>
+                    <td>${badge}</td>
+                    <td>
+                        <button class="btn btn-approve" id="app-${docSnap.id}">Approve</button>
+                        <button class="btn btn-reject" id="rej-${docSnap.id}">Reject</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+                document.getElementById(`app-${docSnap.id}`).onclick = () => approveRequest(docSnap.id, data.url);
+                document.getElementById(`rej-${docSnap.id}`).onclick = () => rejectRequest(docSnap.id);
+            }
+        } catch (error) {
+            console.error("Error loading docs: ", error);
+            tableBody.innerHTML = "<tr><td colspan='3' style='color:red;'>Error loading data. Check console.</td></tr>";
+        }
+    }
+
+    // 5. APPROVE FUNCTION
+    async function approveRequest(docId, url) {
+        if(!confirm(`Verify this URL?\n${url}`)) return;
+
+        try {
+            // A. Add to the OFFICIAL Verified Database
+            const normalizedUrl = (url || '').trim().replace(/[`'\"]/g, '');
+            await addDoc(collection(db, VERIFIED_COLLECTION), {
+                url: normalizedUrl,
+                is_verified_source: true,
+                is_verified: true,
+                category: "Official Entity",
+                added_at: serverTimestamp(),
+                notes: "Manually verified by System based on pending requests."
+            });
+
+            // B. Delete from Pending
+            await deleteDoc(doc(db, PENDING_COLLECTION, docId));
+
+            // C. Update analyzed_pages_cache to reflect verified status as well
+            try {
+                await fetch('http://127.0.0.1:5001/api/poser/admin_mark_verified', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
+                    body: JSON.stringify({ url: normalizedUrl, admin_secret: secret })
+                });
+            } catch (e) {
+                console.warn('Cache update failed:', e);
+            }
+
+            alert("Success! URL added to Verified Database.");
+            loadRequests(); // Refresh the list
+        } catch (error) {
+            alert("Error: " + error.message);
+        }
+    }
+
+    // 6. REJECT FUNCTION
+    async function rejectRequest(docId) {
+        if(!confirm("Are you sure you want to reject and delete this request?")) return;
+
+        try {
+            await deleteDoc(doc(db, PENDING_COLLECTION, docId));
+            loadRequests(); // Refresh the list
+        } catch (error) {
+            alert("Error: " + error.message);
+        }
+    }
+
+    // Load data on start
+    loadRequests();
+</script>
+
+</body>
+</html>

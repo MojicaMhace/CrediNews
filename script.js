@@ -4,7 +4,6 @@ console.log('🚀 Script.js loaded successfully!');
 // Basic functionality for the main page
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 DOM Content Loaded - Starting initialization...');
-    alert('JavaScript loaded! DOM ready.');
     
     // Initialize smooth scrolling for navigation links
     initializeSmoothScrolling();
@@ -249,7 +248,7 @@ function updateAuthButton() {
     if (typeof firebase !== 'undefined' && firebase.auth) {
         console.log('🔥 Using Firebase auth state for navbar');
         firebase.auth().onAuthStateChanged((user) => {
-            if (user) {
+            if (user && (user.emailVerified || user.providerData.some(p=>p.providerId!== 'password'))) {
                 const displayName = user.displayName || user.email || 'User';
                 showLoggedInUI(displayName, user.email || '', user.photoURL || '');
             } else {
@@ -311,7 +310,6 @@ function initializeSmoothScrolling() {
 
 function initializeInteractiveElements() {
     console.log('🔧 Initializing interactive elements...');
-    alert('initializeInteractiveElements called!');
     
     // Add any interactive functionality for buttons, forms, etc.
     const buttons = document.querySelectorAll('.check-btn');
@@ -333,14 +331,7 @@ function initializeInteractiveElements() {
 // Initialize button redirect functionality
 function initializeButtonRedirects() {
     console.log('🔗 Initializing button redirects...');
-    alert('initializeButtonRedirects called!');
-    
-    // Debug: Check if buttons exist
     console.log('🔍 Looking for buttons...');
-    console.log('verifyBtn element:', document.getElementById('verifyBtn'));
-    console.log('analyzeBtn element:', document.getElementById('analyzeBtn'));
-    console.log('verifyNewsBtn element:', document.getElementById('verifyNewsBtn'));
-    console.log('demoBtn element:', document.getElementById('demoBtn'));
     
     // Verify button - redirect to verify-news.html
     const verifyBtn = document.getElementById('verifyBtn');
@@ -353,8 +344,6 @@ function initializeButtonRedirects() {
             window.location.href = 'verify-news.html';
         });
         console.log('✅ Verify button redirect initialized');
-    } else {
-        console.error('❌ verifyBtn not found!');
     }
     
     // Analyze button - redirect to verify-news.html (submit-news removed)
@@ -368,8 +357,6 @@ function initializeButtonRedirects() {
             window.location.href = 'verify-news.html';
         });
         console.log('✅ Analyze button redirect initialized');
-    } else {
-        console.error('❌ analyzeBtn not found!');
     }
     
     // Verify News button (in the verify news section) - redirect to verify-news.html
@@ -382,8 +369,6 @@ function initializeButtonRedirects() {
             window.location.href = 'verify-news.html';
         });
         console.log('✅ Verify News button redirect initialized');
-    } else {
-        console.error('❌ verifyNewsBtn not found!');
     }
     
     // Demo button - scroll to verify news section for demo
@@ -399,13 +384,9 @@ function initializeButtonRedirects() {
                     behavior: 'smooth',
                     block: 'start'
                 });
-            } else {
-                console.error('❌ verify-news section not found!');
             }
         });
         console.log('✅ Demo button functionality initialized');
-    } else {
-        console.error('❌ demoBtn not found!');
     }
     
     console.log('🎉 All button redirects initialized successfully');
@@ -425,9 +406,8 @@ function initializeButtonRedirects() {
     
     if (analyzeBtnFallback) {
         analyzeBtnFallback.onclick = function() {
-            alert('Analyze button clicked! Redirecting to submit-news.html');
             console.log('📊 FALLBACK: Analyze button clicked via onclick');
-            window.location.href = 'submit-news.html';
+            window.location.href = 'verify-news.html';
         };
         console.log('✅ Fallback onclick handler added to analyzeBtn');
     }
@@ -778,3 +758,63 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Navbar init error:', e);
     }
 });
+function enforceAccessRules() {
+    const path = String(location.pathname.split('/').pop() || '').toLowerCase();
+    const softRestricted = new Set(['verify-news.html','poser-detection.html']);
+    const restricted = new Set(['my-verifications.html','poser-history.html','profile_settings.html','notifications.html']);
+    const viewOnly = new Set(['trends.html','report.html']);
+    const applyGuestView = () => { document.body.classList.add('guest-view-only'); };
+    const removeGuestView = () => { document.body.classList.remove('guest-view-only'); removeGuestBanner(); enableInputs(); };
+    const doRedirect = () => { const target = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search); window.location.href = target; };
+    const isVerified = (u) => !!(u && (u.emailVerified || (Array.isArray(u.providerData) && u.providerData.some(p => p && p.providerId && p.providerId !== 'password'))));
+    const insertGuestBanner = () => {
+        if (document.querySelector('.guest-warning')) return;
+        const el = document.createElement('div');
+        el.className = 'guest-warning';
+        el.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span> You need a verified account to use this feature.</span> <a href="login.html">Login</a>';
+        if (path === 'poser-detection.html') {
+            const toggles = document.querySelector('.toggle-buttons');
+            if (toggles && toggles.parentNode) { toggles.parentNode.insertBefore(el, toggles); return; }
+            const runBtn = document.getElementById('run-poser-btn');
+            const parent = runBtn ? runBtn.parentNode : null;
+            if (parent && runBtn) { parent.insertBefore(el, runBtn); return; }
+            const card = document.querySelector('.verify-card.poser-card');
+            const header = card ? card.querySelector('.card-header') : null;
+            if (header && card) { card.insertBefore(el, header.nextSibling); return; }
+        }
+        const container = document.querySelector('.verify-news-container') || document.querySelector('.container') || document.body;
+        container.insertBefore(el, container.firstChild);
+    };
+    const removeGuestBanner = () => { const x = document.querySelector('.guest-warning'); if (x) x.remove(); };
+    const disableInputs = () => {
+        let selectors = [];
+        if (path === 'verify-news.html') selectors = ['#article-url','#verify-url-btn','#facebook-url','#facebook-content','#verify-facebook-btn'];
+        else if (path === 'poser-detection.html') selectors = ['#poser-url','#run-poser-btn'];
+        selectors.forEach(sel => { document.querySelectorAll(sel).forEach(el => { try { el.setAttribute('disabled','disabled'); el.setAttribute('aria-disabled','true'); el.setAttribute('readonly','readonly'); el.disabled = true; if ('readOnly' in el) el.readOnly = true; el.tabIndex = -1; el.classList.add('is-disabled'); el.title = 'Requires verified account'; } catch(_){} }); });
+    };
+    const enableInputs = () => {
+        ['#article-url','#verify-url-btn','#facebook-url','#facebook-content','#verify-facebook-btn','#poser-url','#run-poser-btn'].forEach(sel => { document.querySelectorAll(sel).forEach(el => { try { el.removeAttribute('disabled'); el.removeAttribute('aria-disabled'); el.classList.remove('is-disabled'); el.title = ''; } catch(_){} }); });
+    };
+    const check = (u) => {
+        const ok = isVerified(u);
+        if (softRestricted.has(path)) {
+            if (!ok) { applyGuestView(); insertGuestBanner(); disableInputs(); return; }
+            removeGuestView();
+            return;
+        }
+        if (restricted.has(path)) {
+            if (!ok) { doRedirect(); return; }
+            removeGuestView();
+            return;
+        }
+        if (viewOnly.has(path)) {
+            if (!ok) { applyGuestView(); return; }
+            removeGuestView();
+        }
+    };
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        firebase.auth().onAuthStateChanged(user => check(user));
+    } else {
+        check(null);
+    }
+}

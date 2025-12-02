@@ -22,18 +22,15 @@
                     <span class="brand-text">CREDINEWS</span>
                 </a>
             </div>
-            <div class="nav-menu">
-                <ul class="nav-links">
-                <li><a href="index.html" class="nav-link">Home</a></li>
-                <li><a href="verify-news.html" class="nav-link active">Verify News</a></li>
-                <li><a href="trends.html" class="nav-link">Trends</a></li>
-                <li><a href="report.html" class="nav-link">Report</a></li>
-                <li><a href="about.html" class="nav-link">About</a></li>
-
-                </ul>
+            <div class="user-account-btn" id="userAccountBtn" style="display:none;">
+              <i class="fas fa-user"></i>
+              <span class="user-name">Credi News</span>
+              <i class="fas fa-chevron-down"></i>
+              <div class="user-dropdown" id="userDropdown"></div>
             </div>
-        </div>
-    </nav>
+          </div>
+      </nav>
+    </div>
 
     <!-- Main Content -->
     <main class="main-content">
@@ -133,6 +130,7 @@
     
     <!-- Firebase Configuration -->
     <script src="firebase-config.js"></script>
+    <script src="script.js"></script>
     
     <!-- JavaScript -->
     <link rel="stylesheet" href="feedback.css">

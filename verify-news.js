@@ -123,36 +123,39 @@ function hashString(str) {
 }
 
 function createCleanDbPayload(result, url, contentText, platformLabel, analysisType) {
-    const cred = result && result.credibility ? result.credibility : {};
-    const explanation = (cred && cred.explanation) || '';
+  const cred = result && result.credibility ? result.credibility : {};
+  const explanation = (cred && cred.explanation) || '';
     const slang = Array.isArray(result && result.slang_detected) ? result.slang_detected : [];
     const claims = Array.isArray(result && result.claim_analysis) ? result.claim_analysis : [];
     const pageName = (result && result.page_name) || null;
     const sourceName = (result && result.source_name) || null;
     const cleanText = String(contentText || '').slice(0, 500);
-    const score = Math.min(Math.round((cred.score || 0) * 100), 100);
-    return {
-        platform: platformLabel,
-        analysis: analysisType,
-        url: url || null,
-        canonicalUrl: normalizeUrlForCache(url || ''),
-        contentType: url ? 'Post/Article URL' : 'Text Content',
-        credibilityScore: score,
-        label: cred.label || '',
-        sourcesFound: cred.sources ?? 0,
-        factChecks: cred.factChecks ?? 0,
-        analyzedText: cleanText,
-        contentHash: hashString(cleanText),
-        pageName: pageName,
-        sourceName: sourceName,
-        reviewedClaims: claims,
-        explanation: explanation,
-        slang_detected: slang,
-        imageUrl: isValidImageUrl(result && result.image_url) ? result.image_url : null,
-        userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
-        userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
-        analyzed_at: firebase.firestore.FieldValue.serverTimestamp()
-    };
+  const score = Math.min(Math.round((cred.score || 0) * 100), 100);
+  return {
+    platform: platformLabel,
+    analysis: analysisType,
+    url: url || null,
+    canonicalUrl: normalizeUrlForCache(url || ''),
+    contentType: url ? 'Post/Article URL' : 'Text Content',
+    credibilityScore: score,
+    label: cred.label || '',
+    aiScore: score,
+    aiVerdict: cred.label || '',
+    aiExplanation: explanation || ((result && result.zyla && (result.zyla.explanation || result.zyla.analysis)) || ''),
+    sourcesFound: cred.sources ?? 0,
+    factChecks: cred.factChecks ?? 0,
+    analyzedText: cleanText,
+    contentHash: hashString(cleanText),
+    pageName: pageName,
+    sourceName: sourceName,
+    reviewedClaims: claims,
+    explanation: explanation,
+    slang_detected: slang,
+    imageUrl: isValidImageUrl(result && result.image_url) ? result.image_url : null,
+    userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
+    userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
+    analyzed_at: firebase.firestore.FieldValue.serverTimestamp()
+  };
 }
 
 async function checkExistingVerification(url, contentText) {
@@ -268,25 +271,28 @@ async function handleUrlVerification() {
         if (window.firebase && firebase.firestore) {
             try {
                 await firebase.firestore().collection('facebook_verification_results').add({
-                    platform: 'Web',
-                    analysis: 'web-url',
-                    url: url || null,
-                    canonicalUrl: normalizeUrlForCache(url || ''),
-                    contentType: 'Article URL',
-                    credibilityScore: adjustedScore,
-                    label: result.credibility && result.credibility.label,
-                    sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
-                    factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
-                    analyzedText: contentForApi,
-                    contentHash: hashString(contentForApi),
-                    pageName: (result && result.page_name) || null,
-                    reviewedClaims: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
-                    zylaFactCheck: result.zyla || null,
-                    googleFactCheck: result.detailed_results || null,
-                    imageUrl: isValidImageUrl(result.image_url) ? result.image_url : null,
-                    userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
-                    userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
-                    analyzed_at: firebase.firestore.FieldValue.serverTimestamp()
+                  platform: 'Web',
+                  analysis: 'web-url',
+                  url: url || null,
+                  canonicalUrl: normalizeUrlForCache(url || ''),
+                  contentType: 'Article URL',
+                  credibilityScore: adjustedScore,
+                  label: result.credibility && result.credibility.label,
+                  aiScore: adjustedScore,
+                  aiVerdict: (result.credibility && result.credibility.label) || '',
+                  aiExplanation: (result.zyla && (result.zyla.explanation || result.zyla.analysis)) || (result.credibility && result.credibility.explanation) || '',
+                  sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
+                  factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
+                  analyzedText: contentForApi,
+                  contentHash: hashString(contentForApi),
+                  pageName: (result && result.page_name) || null,
+                  reviewedClaims: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
+                  zylaFactCheck: result.zyla || null,
+                  googleFactCheck: result.detailed_results || null,
+                  imageUrl: isValidImageUrl(result.image_url) ? result.image_url : null,
+                  userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
+                  userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
+                  analyzed_at: firebase.firestore.FieldValue.serverTimestamp()
                 });
             } catch (e) {
                 console.error('Error writing web analysis to facebook_verification_results:', e);
@@ -636,6 +642,7 @@ async function handleFacebookVerification() {
 
         // --- Poser Detection Integration ---
         let poserHtml = '';
+        let poserPayload = null;
         try {
             let poserSourceUrl = (url || '').trim();
             if (poserSourceUrl.includes('facebook.com/share/')) {
@@ -662,6 +669,29 @@ async function handleFacebookVerification() {
                 if (pdResp.ok) {
                     const pd = await pdResp.json();
                     poserHtml = buildPoserSummaryHtml(pd);
+                    try {
+                        const analysis = pd && pd.analysis ? pd.analysis : {};
+                        const meta = pd && pd.metadata ? pd.metadata : {};
+                        const trustScore = (typeof analysis.final_trust_score === 'number') ? analysis.final_trust_score : (pd && typeof pd.credi_score === 'number' ? pd.credi_score : ((pd && pd.trust && pd.trust.raw_score) || 0));
+                        const verdict = analysis.verdict || (pd && (pd.verdict || pd.classification)) || 'Unknown';
+                        poserPayload = {
+                            trustScore: Math.max(0, Math.min(100, Math.round(Number(trustScore || 0)))),
+                            verdict: String(verdict || 'Unknown'),
+                            name: meta.name || '',
+                            analyzedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            raw: pd
+                        };
+                        const cacheId = hashString(String(poserTarget || '').toLowerCase());
+                        await firebase.firestore().collection('analyzed_pages_cache').doc(cacheId).set({
+                          url: poserTarget,
+                          name: meta.name || '',
+                          raw: pd,
+                          trustScore: Math.max(0, Math.min(100, Math.round(Number(trustScore || 0)))) ,
+                          verdict: String(verdict || 'Unknown'),
+                          savedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                          userId: (firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous')
+                        }, { merge: true });
+                    } catch(_) {}
                 }
             }
         } catch (e) {
@@ -692,6 +722,15 @@ async function handleFacebookVerification() {
             resultId: resultId,
             poserHtml: poserHtml
         });
+
+        // persist poser detection summary back to the verification result
+        try {
+            if (resultId && poserPayload) {
+                await firebase.firestore().collection('facebook_verification_results').doc(resultId).set({ poserDetection: poserPayload }, { merge: true });
+            }
+        } catch(e) {
+            console.warn('Failed to save poserDetection to facebook_verification_results:', e);
+        }
     } catch (error) {
         console.error('Fact check API error:', error);
         showNotification('Error connecting to fact check service. Please try again later.', 'error');

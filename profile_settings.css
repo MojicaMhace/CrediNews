@@ -41,3 +41,8 @@ input:focus, textarea:focus, select:focus { border-color:var(--green); box-shado
 .profile-header { display:flex; align-items:center; gap:16px; margin-bottom:12px; }
 .profile-header img { width:60px; height:60px; border-radius:999px; border:2px solid var(--border); object-fit:cover; }
 .profile-header-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.input-note { font-size:12px; color:var(--muted); margin-top:4px; }
+.input-error { border-color:#ef4444 !important; box-shadow:0 0 0 2px rgba(239,68,68,.15) !important; }
+.error-text { font-size:12px; color:#fecaca; margin-top:4px; }
+.error-link { font-size:12px; color:#93c5fd; margin-left:8px; text-decoration:underline; cursor:pointer; }
+.error-link:hover { color:#bfdbfe; }

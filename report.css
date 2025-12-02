@@ -4,10 +4,23 @@
   padding: 32px 0;
 }
 
+.charts-section .chart-container {
+  border: 2px solid #3B82F6;
+  border-radius: 12px;
+  padding: 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.charts-section .chart-container:hover {
+  border-color: #F59E0B;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+.stat-card { border: 1px solid #3B82F6; border-radius: 16px; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.stat-card:hover { border-color: #F59E0B; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
   max-width: 1200px;
   margin: 0 auto;
 }
