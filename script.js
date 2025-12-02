@@ -609,7 +609,7 @@ async function updatePlatformStats() {
 
         animateValue("stat-verified", 0, totalVerified, 2000);
         animateValue("stat-accuracy", 0, avgAccuracy, 2000, "%");
-        animateValue("stat-users", 0, totalUsers, 2000, "+");
+        animateValue("stat-users", 0, totalUsers, 2000);
 
     } catch (e) {
         const vEl = document.getElementById("stat-verified");
