@@ -148,6 +148,13 @@ def _check_verified_registry(url: str) -> Optional[Dict[str, Any]]:
                         f"{scheme}://{host2}{path.rstrip('/')}",
                         f"{scheme}://{host2}{(path.rstrip('/') + '/') if path != '/' else '/'}"
                     ])
+                if host:
+                    mhost = ('m.' + host) if not host.startswith('m.') else host
+                    candidates.extend([
+                        f"{scheme}://{mhost}{path}",
+                        f"{scheme}://{mhost}{path.rstrip('/')}",
+                        f"{scheme}://{mhost}{(path.rstrip('/') + '/') if path != '/' else '/'}"
+                    ])
         except Exception:
             pass
         try:
@@ -756,8 +763,10 @@ def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
             import re as _re
             s = exp
             if verified_local:
-                for pat in [r"\bnot verified\b", r"\bunverified\b", r"lacks official verification", r"no verified"]:
+                for pat in [r"\bnot verified\b", r"\bunverified\b", r"lacks official verification", r"no verified", r"no verification"]:
                     s = _re.sub(pat, "official verification confirmed", s, flags=_re.I)
+                s = _re.sub(r"zero followers|no followers", "audience metrics unavailable", s, flags=_re.I)
+                
             if followers_local >= 100000:
                 s = _re.sub(r"(low|few|no) follower(s)?", "massive reach", s, flags=_re.I)
             if has_bio_local:

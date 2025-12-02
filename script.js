@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Immediately change the button to Sign Indropdown
     updateAuthButton();
     updatePlatformStats();
+    enforceAccessRules();
     
     console.log('✅ Initialization complete!');
 });

@@ -1613,6 +1613,23 @@ document.addEventListener('click', async function(e) {
     }
 });
 
+document.addEventListener('click', async function(e) {
+    const btn = e.target.closest('.request-verification-btn');
+    if (!btn) return;
+    try {
+        const u = btn.dataset.url || '';
+        if (!u) { showNotification('Missing page URL.', 'error'); return; }
+        if (typeof firebase === 'undefined' || !firebase.firestore) { showNotification('Database not initialized.', 'error'); return; }
+        const id = hashString(String(u).toLowerCase());
+        await firebase.firestore().collection('pending_verifications').doc(id).set({ url: u, status: 'pending', source: 'user_request', timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId: (firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous') }, { merge: true });
+        showNotification('Request submitted for verification review.', 'success');
+        btn.disabled = true;
+        btn.textContent = 'Requested';
+    } catch (_) {
+        showNotification('Failed to submit request.', 'error');
+    }
+});
+
 // Toggle controls
 const showUrlVerifyBtn = document.getElementById('show-url-verify');
 const showFacebookVerifyBtn = document.getElementById('show-facebook-verify');
@@ -1665,22 +1682,39 @@ function buildPoserSummaryHtml(pd) {
         let score = (typeof analysis.final_trust_score === 'number') ? analysis.final_trust_score : (pd && typeof pd.credi_score === 'number' ? pd.credi_score : ((pd && pd.trust && pd.trust.raw_score) || 0));
         const meta = pd && pd.metadata ? pd.metadata : {};
         const name = meta.name || 'Unknown';
-        const followersRaw = Number(meta.followers_count || 0);
-        const likesRaw = Number(meta.fan_count || 0);
-        const audienceCount = Math.max(followersRaw, likesRaw);
-        const audienceLabel = followersRaw >= likesRaw ? 'followers' : 'likes';
+        const followersRaw = (meta.followers_count !== undefined && meta.followers_count !== null) ? Number(meta.followers_count) : NaN;
+        const likesRaw = (meta.fan_count !== undefined && meta.fan_count !== null) ? Number(meta.fan_count) : NaN;
+        const hasFollowers = Number.isFinite(followersRaw) && followersRaw > 0;
+        const hasLikes = Number.isFinite(likesRaw) && likesRaw > 0;
+        const audienceCount = (hasFollowers || hasLikes) ? Math.max(hasFollowers ? followersRaw : 0, hasLikes ? likesRaw : 0) : null;
+        const audienceLabel = (hasFollowers && (!hasLikes || followersRaw >= likesRaw)) ? 'followers' : 'likes';
         const hasBadge = !!(meta.is_verified || String(meta.verification_status||'').toLowerCase().includes('verified'));
-        const badgeText = hasBadge ? 'Verified' : 'No Verified Badge';
-        const color = hasBadge ? '#16a34a' : (score >= 80 ? '#22c55e' : (score >= 55 ? '#f59e0b' : '#ef4444'));
+        const fromRegistry = String(meta.verification_source || '').toLowerCase() === 'verified_registry' || !!meta.is_verified_source;
+        const aiRisk = (analysis && analysis.breakdown && analysis.breakdown.scoring_layers && typeof analysis.breakdown.scoring_layers.ai_risk === 'number') ? analysis.breakdown.scoring_layers.ai_risk : null;
+        const isHighRisk = (typeof aiRisk === 'number' && aiRisk >= 70) || String(verdict || '').toLowerCase().includes('poser');
+        const isLowRisk = (typeof aiRisk === 'number' && aiRisk <= 30) || (score >= 80 && !isHighRisk);
+        const badgeText = (function(){
+            // Show "Verified" only when confirmed by the Verified Registry.
+            if (fromRegistry) return 'Verified';
+            // For non-registry badges, avoid showing the term to prevent confusion.
+            if (hasBadge) return '';
+            // Show explicit status only when not verified.
+            return 'Unverified';
+        })();
+        const color = (typeof aiRisk === 'number')
+            ? (aiRisk >= 70 ? '#ef4444' : (aiRisk >= 55 ? '#f59e0b' : '#22c55e'))
+            : (score >= 80 ? '#22c55e' : (score >= 55 ? '#f59e0b' : '#ef4444'));
         const note = pd && pd.note ? pd.note : '';
         let aiExplanation = (analysis && analysis.breakdown && analysis.breakdown.ai_explanation) ? analysis.breakdown.ai_explanation : (analysis.ai_explanation || '');
-        const aiRisk = (analysis && analysis.breakdown && analysis.breakdown.scoring_layers && typeof analysis.breakdown.scoring_layers.ai_risk === 'number') ? analysis.breakdown.scoring_layers.ai_risk : null;
         const aiVerdict = (analysis && analysis.breakdown && analysis.breakdown.ai_verdict) ? analysis.breakdown.ai_verdict : ((typeof aiRisk === 'number') ? (aiRisk >= 70 ? 'Likely Poser' : (aiRisk <= 30 ? 'Likely Authentic' : 'Mixed Signals')) : '');
         try {
             const t = String(aiExplanation || '').toLowerCase();
             const hasPic = !!(meta && meta.picture && meta.picture.data && meta.picture.data.url && !meta.picture.data.is_silhouette);
             const hasBio = !!(meta && (meta.about || meta.description));
-            if (hasBadge && (/not verified|unverified|no verified|lacks official verification/.test(t))) {
+            const contradictsVerification = (/not verified|unverified|no verified|no verification|lacks official verification|zero followers|no followers|lack of bio|no bio/).test(t);
+            if ((fromRegistry || hasBadge) && contradictsVerification) {
+                aiExplanation = isHighRisk ? 'Registry and badge confirmed. Risk signals detected.' : 'Verified account with official signals. Registry and badge confirmed.';
+            } else if (hasBadge && isLowRisk && (/not verified|unverified|no verified|lacks official verification/.test(t))) {
                 aiExplanation = 'Verified account with official signals.';
             } else if (audienceCount >= 100000 && (/low follower|few follower|no follower/.test(t))) {
                 aiExplanation = 'High audience and established presence.';
@@ -1690,6 +1724,7 @@ function buildPoserSummaryHtml(pd) {
                 aiExplanation = 'Custom profile image present.';
             }
         } catch (_) {}
+        const requestBtnHtml = (!fromRegistry && pd && pd.request && pd.request.url) ? `<div><button class="request-verification-btn" data-url="${pd.request.url}" style="margin-top:6px;background:#0b1626;color:#e5e7eb;border:1px solid rgba(148,163,184,0.24);border-radius:10px;padding:6px 10px;font-weight:700;">Request Verified Badge Review</button></div>` : '';
         return `
             <div class="result-summary" style="margin-top:1rem; border-left:4px solid ${color};">
                 <h4 style="margin:0 0 0.5rem 0;">Source Risk (Poser Detection)</h4>
@@ -1697,9 +1732,10 @@ function buildPoserSummaryHtml(pd) {
                     <div style="min-width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:${color}20; color:${color}; font-weight:700;">${Math.max(0, Math.min(100, Math.round(score)))}%</div>
                     <div>
                         <div><strong>${verdict}</strong></div>
-                        <div style="color:#6b7280; font-size:0.9rem;">${name} • ${audienceCount.toLocaleString()} ${audienceLabel} • ${badgeText}</div>
+                        <div style="color:#6b7280; font-size:0.9rem;">${name}${audienceCount !== null ? ` • ${audienceCount.toLocaleString()} ${audienceLabel}` : ''}${badgeText ? ` • ${badgeText}` : ''}</div>
                         ${note ? `<div style="color:#6b7280; font-size:0.85rem;">${note}</div>` : ''}
                         ${aiExplanation || typeof aiRisk === 'number' ? `<div style="color:#334155; font-size:0.85rem; margin-top:4px;">${aiExplanation || ''}${typeof aiRisk === 'number' ? ` • AI Risk: ${aiRisk}/100` : ''}${aiVerdict ? ` • AI Verdict: ${aiVerdict}` : ''}</div>` : ''}
+                        ${requestBtnHtml}
                     </div>
                 </div>
             </div>
