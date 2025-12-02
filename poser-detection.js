@@ -379,6 +379,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const scoreClass = getScoreClass(posterScore);
       const displayClassification = analysis.verdict || 'Unknown Risk';
       const explanationText = analysis.human_explanation || "Analysis completed.";
+      const availability = analysis.data_availability || null;
+      const availabilityNote = analysis.availability_note || '';
       const analyzedId = meta.name || meta.username || "Unknown ID";
       const dataSourceNote = analysis.data_source_note || "Hybrid Scan";
       
@@ -463,7 +465,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const escapedInput = input.replace(/'/g, "\\'");
 
       //result ui
-      const resultHtml = `
+        const availabilityBadgeHtml = availability === 'sparse' 
+            ? '<span class="availability-badge sparse">Data Unavailable</span>' 
+            : (availability === 'partial' 
+                ? '<span class="availability-badge partial">Some Data Missing</span>' 
+                : '');
+
+        const resultHtml = `
        <div class="poser-result-card">
          <div class="poser-result-header">
            <h2 class="poser-result-title">Poser Detection Result</h2>
@@ -480,9 +488,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="summary-text">
               <div class="classification-row">
                 <span class="risk-icon ${scoreClass}"><i class="fas fa-shield-alt"></i></span>
-                <h3 class="${scoreClass === 'high' ? 'hl-good' : (scoreClass === 'medium' ? 'hl-neutral' : 'hl-bad')}">${displayClassification}</h3>
+                <h3 class="${scoreClass === 'high' ? 'hl-good' : (scoreClass === 'medium' ? 'hl-neutral' : 'hl-bad')}">${displayClassification}</h3> ${availabilityBadgeHtml}
               </div>
               <div class="accent-bar ${scoreClass}"></div>
+              ${availabilityNote ? `<div style="color:#9fb3c8; font-size:0.9rem; margin:4px 0 6px;">${availabilityNote}</div>` : ''}
               <p class="explanation-text" style="font-size: 0.95rem; opacity: 0.85; font-style: italic;">"${explanationText}"</p>
            </div>
          </div>

@@ -1704,7 +1704,17 @@ function buildPoserSummaryHtml(pd) {
         const color = (typeof aiRisk === 'number')
             ? (aiRisk >= 70 ? '#ef4444' : (aiRisk >= 55 ? '#f59e0b' : '#22c55e'))
             : (score >= 80 ? '#22c55e' : (score >= 55 ? '#f59e0b' : '#ef4444'));
-        const note = pd && pd.note ? pd.note : '';
+        const availability = (analysis && analysis.data_availability) || null;
+        const note = availability === 'sparse'
+            ? 'Data unavailable for public signals; using AI + limited metadata.'
+            : (availability === 'partial'
+                ? 'Some signals are missing; verdict blends AI with available metadata.'
+                : (pd && pd.note ? pd.note : ''));
+        const availabilityBadgeHtml = availability === 'sparse' 
+            ? '<span class="availability-badge sparse">Data Unavailable</span>' 
+            : (availability === 'partial' 
+                ? '<span class="availability-badge partial">Some Data Missing</span>' 
+                : '');
         let aiExplanation = (analysis && analysis.breakdown && analysis.breakdown.ai_explanation) ? analysis.breakdown.ai_explanation : (analysis.ai_explanation || '');
         const aiVerdict = (analysis && analysis.breakdown && analysis.breakdown.ai_verdict) ? analysis.breakdown.ai_verdict : ((typeof aiRisk === 'number') ? (aiRisk >= 70 ? 'Likely Poser' : (aiRisk <= 30 ? 'Likely Authentic' : 'Mixed Signals')) : '');
         try {
@@ -1731,7 +1741,7 @@ function buildPoserSummaryHtml(pd) {
                 <div style="display:flex; align-items:center; gap:10px;">
                     <div style="min-width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:${color}20; color:${color}; font-weight:700;">${Math.max(0, Math.min(100, Math.round(score)))}%</div>
                     <div>
-                        <div><strong>${verdict}</strong></div>
+                        <div><strong>${verdict}</strong> ${availabilityBadgeHtml}</div>
                         <div style="color:#6b7280; font-size:0.9rem;">${name}${audienceCount !== null ? ` • ${audienceCount.toLocaleString()} ${audienceLabel}` : ''}${badgeText ? ` • ${badgeText}` : ''}</div>
                         ${note ? `<div style="color:#6b7280; font-size:0.85rem;">${note}</div>` : ''}
                         ${aiExplanation || typeof aiRisk === 'number' ? `<div style="color:#334155; font-size:0.85rem; margin-top:4px;">${aiExplanation || ''}${typeof aiRisk === 'number' ? ` • AI Risk: ${aiRisk}/100` : ''}${aiVerdict ? ` • AI Verdict: ${aiVerdict}` : ''}</div>` : ''}

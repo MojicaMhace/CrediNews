@@ -291,13 +291,23 @@ def _extract_first_link(text: str) -> Optional[str]:
 
 def _resolve_fb_share_url(share_url: str) -> Optional[str]:
     try:
-        if not share_url or "facebook.com/share/" in share_url:
+        if not share_url:
             return None
-        r = requests.get(share_url, timeout=8, headers={"User-Agent": "CrediNews-Bot/1.0"})
+        r = requests.get(share_url, timeout=10, headers={"User-Agent": "CrediNews-Bot/1.0"})
         if r.status_code != 200:
             return None
-        m = re.search(r'<meta\s+property=["\']og:url["\']\s+content=["\'](https?://[^"\']+)["\']', r.text, re.IGNORECASE)
-        return m.group(1) if m else None
+        html = r.text or ""
+        m = re.search(r'<meta\s+property=["\']og:url["\']\s+content=["\'](https?://[^"\']+)["\']', html, re.IGNORECASE)
+        if m:
+            return m.group(1)
+        m2 = re.search(r'"permalink_url"\s*:\s*"(https?://[^"]+)"', html, re.IGNORECASE)
+        if m2:
+            return m2.group(1)
+        m3 = re.search(r'"owner_id"\s*:\s*"?(\d+)"?', html, re.IGNORECASE)
+        if m3:
+            oid = m3.group(1)
+            return f"https://www.facebook.com/{oid}"
+        return None
     except Exception:
         return None
 
@@ -740,12 +750,28 @@ def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
         layer3 -= 2
     layer3 += meta.get("spam_score", 0)
 
+    # Data availability assessment
+    missing_fields = []
+    if not has_pic: missing_fields.append("profile_picture")
+    if not has_cover: missing_fields.append("cover_photo")
+    if not (meta.get("about") or meta.get("description")): missing_fields.append("bio")
+    if followers <= 0: missing_fields.append("followers_count")
+    if posts_count <= 0: missing_fields.append("recent_posts")
+    if not meta.get("link"): missing_fields.append("page_link")
+    sparse_env_flags = bool(meta.get("_permissions_restricted")) or bool(meta.get("_apify_failed"))
+    if len(missing_fields) >= 4 or sparse_env_flags:
+        data_availability = "sparse"
+    elif len(missing_fields) >= 2:
+        data_availability = "partial"
+    else:
+        data_availability = "complete"
+
     # 1. Calculate Rule-Based Score (Math)
     rule_score_raw = max(0, min(100, base + layer1 + layer2 + layer3))
     if has_pic and meta.get("name"):
         rule_score_raw = max(rule_score_raw, 55)
     if verified:
-        rule_score_raw = min(rule_score_raw + 25, 92)
+        rule_score_raw = min(rule_score_raw + 25, 100)
 
     # 2. RUN THE AI AGENT (New Layer)
     def _normalize_ai_explanation(m: Dict[str, Any], r: Dict[str, Any]) -> str:
@@ -817,11 +843,8 @@ def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
         weight_rules = 0.30
         final_score = (rule_score_raw * weight_rules) + (ai_trust_score * (1 - weight_rules))
 
-    if verified and ai_score >= 70:
-        final_score = min(final_score, 75)
-
-    if verified_from_registry:
-        final_score = max(final_score, 90)
+    if verified or verified_from_registry:
+        final_score = 100
 
     trust = final_score / 100.0
     
@@ -829,7 +852,7 @@ def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
         "raw_score": int(final_score),
         "trust_score": trust,
         "meets_safety_threshold": trust >= 0.60,
-        "layers": {"layer1": layer1, "layer2": layer2, "layer3": layer3, "ai_risk": ai_score},
+        "layers": {"layer1": layer1, "layer2": layer2, "layer3": layer3, "ai_risk": ai_score, "data_availability": data_availability, "missing_fields": missing_fields},
         "ai_analysis": ai_reason,
         "followers": followers
     }
@@ -837,7 +860,7 @@ def compute_poser_score(meta: Dict[str, Any]) -> Dict[str, Any]:
 # Labels
 def _score_to_verdict(raw: int) -> str:
     if raw >= 80: return "Low Risk - Likely Authentic / Trusted Source."
-    if raw >= 55: return "Moderate Risk - Suspicious. Mixed signals"
+    if raw >= 55: return "Moderate Risk - Suspicious / Mixed signals"
     return "High Risk - Likely Poser."
 
 def _get_human_explanation(score: int) -> str:
@@ -850,6 +873,15 @@ def build_response(url: str, meta: Dict[str, Any], score: Dict[str, Any], resolv
     ai_risk = score.get("layers", {}).get("ai_risk", 50)
     ai_reason = score.get("ai_analysis") or "AI Analysis Pending"
     ai_rationale = ""
+    availability = score.get("layers", {}).get("data_availability", "complete")
+    missing = score.get("layers", {}).get("missing_fields", [])
+    availability_note = (
+        "Data unavailable for public signals; verdict blends AI with limited metadata."
+        if availability == "sparse" else (
+            "Some signals are missing; verdict blends AI with available metadata."
+            if availability == "partial" else ""
+        )
+    )
     
     return {
         "request": {
@@ -887,6 +919,8 @@ def build_response(url: str, meta: Dict[str, Any], score: Dict[str, Any], resolv
             "verdict": _score_to_verdict(int(score.get("raw_score", 0))),
             "human_explanation": _get_human_explanation(int(score.get("raw_score", 0))),
             "safety_threshold_met": score.get("meets_safety_threshold"),
+            "data_availability": availability,
+            "availability_note": availability_note,
             
             #"Why - explain "
             "breakdown": {
@@ -895,7 +929,9 @@ def build_response(url: str, meta: Dict[str, Any], score: Dict[str, Any], resolv
                 "ai_explanation": ai_reason,
                 "ai_score": ai_risk,
                 "ai_verdict": ("Likely Poser" if isinstance(ai_risk, int) and ai_risk >= 70 else ("Likely Authentic" if isinstance(ai_risk, int) and ai_risk <= 30 else "Mixed Signals")),
-                "scoring_layers": score.get("layers")
+                "scoring_layers": score.get("layers"),
+                "missing_fields": missing,
+                "data_availability": availability
             },
             
             "data_source_note": (
@@ -1092,7 +1128,7 @@ def poser_analyze_full():
                                 raw_score = int((an.get("breakdown") or {}).get("rule_based_score") or 80)
                             except Exception:
                                 raw_score = 80
-                            final_score = max(90, raw_score)
+                            final_score = 100
                             an["final_trust_score"] = final_score
                             an["verdict"] = "Low Risk - Likely Authentic / Trusted Source."
                             an["human_explanation"] = "Verified Registry: Official page confirmed. Strong signals of authenticity."
@@ -1109,7 +1145,7 @@ def poser_analyze_full():
                                 bd["ai_explanation"] = "Verified account with official signals. Registry and badge confirmed."
                                 bd["ai_agent_trust_score"] = 100
                                 bd["ai_verdict"] = "Likely Authentic"
-                            bd["rule_based_score"] = max(int(bd.get("rule_based_score") or 80), 90)
+                            bd["rule_based_score"] = 100
                             an["breakdown"] = bd
                             resp["analysis"] = an
                             db.collection(VERDICT_COLLECTION).document(doc_id).set({**resp, "analysis": resp, "last_updated": firestore.SERVER_TIMESTAMP}, merge=True)

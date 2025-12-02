@@ -79,6 +79,25 @@
     color: #e5e7eb;
 }
 
+.availability-badge {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid;
+}
+.availability-badge.partial {
+    color: #f59e0b;
+    border-color: #f59e0b;
+    background: rgba(245,158,11,0.10);
+}
+.availability-badge.sparse {
+    color: #ef4444;
+    border-color: #ef4444;
+    background: rgba(239,68,68,0.12);
+}
+
 .toggle-buttons { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .toggle-btn { padding: 0.5rem 1rem; border: 1px solid #e5e7eb; background: #f9fafb; color: #374151; border-radius: 16px; cursor: pointer; font-weight: 600; }
 .toggle-btn.active { background: #3b82f6; color: #fff; border-color: #2563eb; }

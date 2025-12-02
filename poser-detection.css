@@ -572,6 +572,9 @@
 .summary-text h3 { font-size: 1.2rem; font-weight: 800; color: #e5e7eb; text-transform: none; letter-spacing: -0.01em; }
 .summary-text p { color: #9fb3c8; margin-top: 6px; }
 .classification-row { display: flex; align-items: center; gap: 12px; }
+.availability-badge { display:inline-block; margin-left:8px; font-size:0.75rem; padding:4px 8px; border-radius:999px; border:1px solid; }
+.availability-badge.partial { color:#f59e0b; border-color:#f59e0b; background:rgba(245,158,11,0.10); }
+.availability-badge.sparse { color:#ef4444; border-color:#ef4444; background:rgba(239,68,68,0.12); }
 .risk-icon { width: 26px; height: 26px; display:inline-flex; align-items:center; justify-content:center; border-radius:9999px; box-shadow: 0 6px 12px rgba(0,0,0,0.25); }
 .risk-icon.high { background: linear-gradient(135deg, #34d399, #22c55e); color:#052e1d; border:1px solid rgba(34,197,94,0.35); }
 .risk-icon.medium { background: linear-gradient(135deg, #fcd34d, #f59e0b); color:#2b1c06; border:1px solid rgba(245,158,11,0.35); }

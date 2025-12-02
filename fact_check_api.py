@@ -1552,5 +1552,41 @@ def fact_check_endpoint():
         'tone': ('Risk: Potential sarcasm may affect the meaning of the post.' if sarcasm_score >= 0.02 else 'Risk: Low – Not enough slang to indicate sarcasm.')
     })
 
+@app.route('/api/resolve-facebook-share', methods=['POST'])
+def resolve_facebook_share():
+    data = request.get_json(force=True) or {}
+    url = (data.get('url') or '').strip()
+    if not url:
+        return jsonify({"error": "Missing url"}), 400
+    try:
+        from urllib.parse import urlparse
+        import re
+        def _normalize_page(u: str) -> str:
+            try:
+                p = urlparse(u)
+                path = (p.path or '').lower()
+                stops = ['/posts/','/videos/','/photos/','/reel/','/story.php','/permalink.php']
+                for stop in stops:
+                    idx = path.find(stop)
+                    if idx > 1:
+                        return (p.scheme or 'https') + '://' + (p.netloc or '') + (p.path[:idx] or '/')
+                return (p.scheme or 'https') + '://' + (p.netloc or '') + (p.path or '/')
+            except Exception:
+                return u
+        r = requests.get(url, timeout=10, headers={'User-Agent': 'CrediNews-Bot/1.0'})
+        html = r.text if r.status_code == 200 else ''
+        resolved = None
+        m = re.search(r'<meta\s+property=["\']og:url["\']\s+content=["\'](https?://[^"\']+)["\']', html, re.I)
+        if m:
+            resolved = m.group(1)
+        if not resolved:
+            m2 = re.search(r'"permalink_url"\s*:\s*"(https?://[^"]+)"', html, re.I)
+            if m2:
+                resolved = m2.group(1)
+        page_url = _normalize_page(resolved or url)
+        return jsonify({"resolved_url": resolved, "page_url": page_url})
+    except Exception as e:
+        return jsonify({"resolved_url": None, "page_url": None, "error": str(e)}), 200
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

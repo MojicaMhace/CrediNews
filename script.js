@@ -794,7 +794,19 @@ function enforceAccessRules() {
         selectors.forEach(sel => { document.querySelectorAll(sel).forEach(el => { try { el.setAttribute('disabled','disabled'); el.setAttribute('aria-disabled','true'); el.setAttribute('readonly','readonly'); el.disabled = true; if ('readOnly' in el) el.readOnly = true; el.tabIndex = -1; el.classList.add('is-disabled'); el.title = 'Requires verified account'; } catch(_){} }); });
     };
     const enableInputs = () => {
-        ['#article-url','#verify-url-btn','#facebook-url','#facebook-content','#verify-facebook-btn','#poser-url','#run-poser-btn'].forEach(sel => { document.querySelectorAll(sel).forEach(el => { try { el.removeAttribute('disabled'); el.removeAttribute('aria-disabled'); el.classList.remove('is-disabled'); el.title = ''; } catch(_){} }); });
+        ['#article-url','#verify-url-btn','#facebook-url','#facebook-content','#verify-facebook-btn','#poser-url','#run-poser-btn'].forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                try {
+                    el.removeAttribute('disabled');
+                    el.removeAttribute('aria-disabled');
+                    el.removeAttribute('readonly');
+                    if ('readOnly' in el) el.readOnly = false;
+                    if (el.tabIndex === -1) el.tabIndex = 0;
+                    el.classList.remove('is-disabled');
+                    el.title = '';
+                } catch(_){}
+            });
+        });
     };
     const check = (u) => {
         const ok = isVerified(u);
@@ -813,9 +825,9 @@ function enforceAccessRules() {
             removeGuestView();
         }
     };
+    // Apply guest rules immediately while waiting for auth state
+    check(null);
     if (typeof firebase !== 'undefined' && firebase.auth) {
         firebase.auth().onAuthStateChanged(user => check(user));
-    } else {
-        check(null);
     }
 }
