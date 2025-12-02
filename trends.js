@@ -274,17 +274,17 @@ function openResultModal(data) {
       +'</div>'
     +'</div>'
     +'<div class="panels-row">'
-      +'<div class="panel trust"><div class="panel-title"><span class="label">Analyzed Content</span></div>'+(data.analyzedText ? '<p>'+safeText(decodeEntities(data.analyzedText))+'</p>' : '<p>No text provided.</p>')+'</div>'
+      +'<div class="panel trust"><div class="panel-title"><span class="label">Analyzed Text</span></div>'+(data.analyzedText ? '<p>'+safeText(decodeEntities(data.analyzedText))+'</p>' : '<p>No text provided.</p>')+'</div>'
       +'<div class="panel metrics"><div class="panel-title"><span class="label">Metrics</span></div>'
         +'<ul>'
-          +'<li><strong>Source:</strong> '+safeText(data.pageName || data.sourceName || getSourceName(data.url) || '')+'</li>'
+          +'<li><strong>FB Page:</strong> '+safeText(data.pageName || data.sourceName || getSourceName(data.url) || '')+'</li>'
+          +'<li><strong>Sources Found:</strong> '+Number(data.sourcesFound || data.sources || 0)+'</li>'
           +'<li><strong>Fact Checks:</strong> '+Number(data.factChecks || 0)+'</li>'
-          +(data.analyzed_at ? '<li><strong>Analyzed Date:</strong> '+formatTimestamp(data.analyzed_at)+'</li>' : '')
           +(data.url ? '<li><strong>URL:</strong> <span class="url-value">'+safeText(data.url)+'</span></li>' : '')
         +'</ul>'
       +'</div>'
     +'</div>'
-    +(data.explanation ? '<div class="panel trust"><div class="panel-title"><span class="label">AI Analysis Explanation</span></div><p>'+safeText(decodeEntities(data.explanation))+'</p></div>' : '')
+    +(data.explanation ? '<div class="panel trust"><div class="panel-title"><span class="label">Explanation</span></div><p>'+safeText(decodeEntities(data.explanation))+'</p></div>' : '')
     +(Array.isArray(data.reviewedClaims) && data.reviewedClaims.length ? ('<div class="panel trust"><div class="panel-title"><span class="label">Reviewed Claims</span></div><ul>'+data.reviewedClaims.slice(0,6).map(function(c){ return '<li><div><strong>Claim:</strong> '+safeText(c.claim || c.text || '')+'</div><div><strong>Reviewer:</strong> '+safeText(c.reviewer || (c.publisher && c.publisher.name) || 'Unknown')+'</div><div><strong>Rating:</strong> '+safeText(c.rating || c.textualRating || 'Unrated')+'</div>' + (c.url ? '<div><a href="'+safeText(c.url)+'" target="_blank" rel="noopener">View fact check</a></div>' : '') + '</li>'; }).join('') + '</ul></div>') : '')
   +'</div>';
   ensureModal('Verification Result', resultHtml);
