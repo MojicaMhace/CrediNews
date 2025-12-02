@@ -44,6 +44,23 @@ function statusClass(label) {
   return 'status-medium';
 }
 
+function getPoserStyleClass(score) {
+  const s = Number(score || 0);
+  if (s >= 75) return 'high';
+  if (s >= 50) return 'medium';
+  return 'low';
+}
+
+function styleClassByLabel(label){
+  const t = String(label || '').trim().toLowerCase();
+  if (!t) return 'neutral';
+  if (t.includes('credible') || t.includes('high')) return 'high';
+  if (t.includes('mixed') || t.includes('medium')) return 'medium';
+  if (t.includes('unverified') || t.includes('neutral')) return 'neutral';
+  if (t.includes('low')) return 'low';
+  return 'neutral';
+}
+
 function labelScore(label) {
   const t = String(label || '').toLowerCase();
   if (t.includes('credible')) return 3;
@@ -96,7 +113,7 @@ function applyFiltersAndRender(uid) {
     }
   }
   docs = Array.from(seen.values());
-  renderCards(docs, uid);
+  renderCards(docs);
 }
 
 function shorten(text, n) {
@@ -123,52 +140,72 @@ function ensureModal(title, html) {
   document.body.appendChild(overlay);
 }
 
-function renderCards(docs, userId) {
+function renderCards(data) {
+  const container = document.getElementById('trends-feed-container');
   if (!container) return;
-  const html = docs.map(d => {
-    const score = Number(d.credibilityScore || 0);
-    const label = d.label || '';
-    const agree = Number((d.feedback && d.feedback.agreeCount) || 0);
-    const disagree = Number((d.feedback && d.feedback.disagreeCount) || 0);
-    const votersMap = (d.voters && typeof d.voters === 'object') ? d.voters : ((d.feedback && typeof d.feedback.voters === 'object') ? d.feedback.voters : null);
-    const votersArr = (d.feedback && Array.isArray(d.feedback.voters)) ? d.feedback.voters : [];
-    const myVote = (userId && votersMap && votersMap[userId]) ? String(votersMap[userId]) : null;
-    const analyzed = decodeEntities(d.analyzedText || '');
-    const badge = '<span class="score-badge '+scoreClass(label)+'">'+score+'% • '+safeText(label)+'</span>';
-    const bodyText = shorten(analyzed, 100);
-    const sourceText = d.pageName || '';
-    const status = statusClass(label);
-    const labelBadge = (function(){
-      const l = String(label || '').toLowerCase();
-      if (l.includes('low credibility') || l === 'low') return '<span class="badge badge-danger">'+safeText(label || 'Low Credibility')+'</span>';
-      if (l.includes('credible')) return '<span class="badge badge-verified">'+safeText(label || 'Credible')+'</span>';
-      if (l.includes('mixed')) return '<span class="badge badge-warning">'+safeText(label || 'Mixed')+'</span>';
-      if (l.includes('unverified')) return '<span class="badge badge-neutral">'+safeText(label || 'Unverified')+'</span>';
-      return '<span class="badge badge-neutral">'+safeText(label || 'Unverified')+'</span>';
-    })();
-    const imageTag = d.imageUrl ? '<img class="card-image" src="'+safeText(d.imageUrl)+'" alt="Preview">' : '';
-    return (
-      '<div class="trend-card" data-id="'+d.id+'">'
-      +(imageTag || '<div class="card-media"><div class="fb-logo"><i class="fab fa-facebook-f"></i></div></div>')
-      +'<div class="card-body" data-action="open">'
-        +'<div class="card-text">'+safeText(bodyText)+'</div>'
-      +'</div>'
-      +'<div class="card-footer">'
-        +'<div class="source-row"><i class="fab fa-facebook"></i><span>'+safeText(sourceText)+'</span></div>'
-        +labelBadge
-      +'</div>'
-      +'<div class="card-actions">'
-        +'<button class="vote-btn agree'+(myVote==='agree'?' selected':'')+'" data-action="vote-agree" aria-label="Agree"><i class="fas fa-thumbs-up"></i><span>'+agree+'</span></button>'
-        +'<button class="vote-btn disagree'+(myVote==='disagree'?' selected':'')+'" data-action="vote-disagree" aria-label="Disagree"><i class="fas fa-thumbs-down"></i><span>'+disagree+'</span></button>'
-      +'</div>'
-      +'<div class="card-header" style="display:flex;justify-content:flex-end;border:none;padding:0.5rem 1rem 1rem 1rem">'
-        +'<a href="#" class="open-modal" data-action="open">View Details</a>'
-      +'</div>'
+  container.innerHTML = '';
+
+  if (data.length === 0) {
+    container.innerHTML = '<p class="no-results" style="color:#cbd5e1; text-align:center; padding:20px;">No verified trends found.</p>';
+    return;
+  }
+
+  const uid = getUserId();
+
+  data.forEach(function(item){
+    const dataStr = encodeURIComponent(JSON.stringify(item));
+    const score = Number(item.credibilityScore || 0);
+
+    const labelText = String(item.label || (score >= 75 ? 'CREDIBLE' : (score >= 50 ? 'MIXED' : 'UNVERIFIED'))).toUpperCase();
+    var labelClass = 'hl-neutral';
+    if (score >= 75) labelClass = 'hl-good';
+    else if (score >= 50) labelClass = 'hl-neutral';
+    else if (score > 0) labelClass = 'hl-bad';
+    if (labelText === 'UNVERIFIED') labelClass = 'hl-neutral';
+
+    const fb = item.feedback || {};
+    const agreeCount = fb.agreeCount || 0;
+    const disagreeCount = fb.disagreeCount || 0;
+    var userVote = null;
+    if (fb.voters && typeof fb.voters === 'object' && !Array.isArray(fb.voters)) {
+      userVote = fb.voters[uid];
+    } else if (Array.isArray(fb.voters) && fb.voters.includes(uid)) {
+      userVote = 'legacy';
+    }
+    const isVoted = !!userVote;
+    const agreeClass = (userVote === 'agree') ? 'vote-btn agree selected' : 'vote-btn agree';
+    const disagreeClass = (userVote === 'disagree') ? 'vote-btn disagree selected' : 'vote-btn disagree';
+    const disabledAttr = isVoted ? 'disabled' : '';
+
+    const card = document.createElement('div');
+    card.className = 'trend-card';
+    if (item.id) card.setAttribute('data-id', item.id);
+
+    const imageHtml = item.imageUrl ? '<div class="trend-image-container"><img src="'+safeText(item.imageUrl)+'" alt="Trend Image" loading="lazy"></div>' : '';
+
+    card.innerHTML = (
+      imageHtml+
+      '<div class="trend-content">'
+        +'<div>'
+            +'<div class="trend-label '+labelClass+'">'+safeText(labelText)+'</div>'
+            +'<p class="trend-text">"'+safeText(decodeEntities(item.analyzedText || item.claim || ''))+'"</p>'
+        +'</div>'
+        +'<div class="trend-footer">'
+          +'<button class="footer-view-link" onclick="openResultModal(JSON.parse(decodeURIComponent(\''+dataStr+'\')))">View details</button>'
+          +'<div class="trend-actions">'
+            +'<button class="'+agreeClass+'" data-action="vote-agree" '+disabledAttr+'><i class="fas fa-thumbs-up"></i><span>'+agreeCount+'</span></button>'
+            +'<button class="'+disagreeClass+'" data-action="vote-disagree" '+disabledAttr+'><i class="fas fa-thumbs-down"></i><span>'+disagreeCount+'</span></button>'
+          +'</div>'
+        +'</div>'
       +'</div>'
     );
-  }).join('');
-  container.innerHTML = html;
+    container.appendChild(card);
+  });
+
+  if (typeof attachVoteListeners === 'function') attachVoteListeners();
 }
+
+function attachVoteListeners(){}
 
 function getUserId() {
   const u = firebase.auth().currentUser;
@@ -189,26 +226,45 @@ function getUserId() {
 function openResultModal(data) {
   const score = Number(data.credibilityScore || 0);
   const label = data.label || '';
-  const level = (function(){
-    const l = String(label || '').toLowerCase();
-    if (l.includes('low')) return 'low';
-    if (l.includes('high') || l.includes('credible')) return 'high';
-    if (l.includes('mixed')) return 'medium';
-    if (l.includes('unverified')) return 'neutral';
-    return 'medium';
-  })();
-  const credibilityTop = '<div class="card-score"><span class="score-badge '+scoreClass(label)+'">'+score+'% • '+safeText(label)+'</span></div>';
-  const pageRow = '<div style="margin-bottom:8px"><strong>'+(String(data.url||'').toLowerCase().includes('facebook.com')?'FB Page':'Web Page')+':</strong> '+safeText(data.pageName || data.sourceName || getSourceName(data.url) || '')+'</div>';
-  const explanationBlock = (data.explanation ? ('<div class="analyzed-block"><div class="block-title">Explanation</div><div>'+safeText(decodeEntities(data.explanation))+'</div></div>') : '');
-  const slangBlock = (Array.isArray(data.slang_detected) && data.slang_detected.length ? ('<div style="margin-bottom:8px"><strong>Slang Detected:</strong><div class="slang-list">'+data.slang_detected.map(function(s){ return '<span class="slang-chip">'+safeText(s)+'</span>'; }).join('')+'</div></div>') : '');
-  const sourcesRow = '<div style="margin-bottom:8px"><strong>Sources:</strong> '+Number(data.sourcesFound || 0)+'</div>';
-  const factsRow = '<div style="margin-bottom:8px"><strong>Fact Checks:</strong> '+Number(data.factChecks || 0)+'</div>';
-  const urlRow = (data.url ? '<div style="margin-bottom:8px"><strong>URL:</strong> <a href="'+safeText(data.url)+'" target="_blank" rel="noopener">'+safeText(data.url)+'</a></div>' : '');
-  const analyzedBlock = (data.analyzedText ? ('<div class="analyzed-block '+level+'"><div class="block-title">Analyzed Text</div><div>'+safeText(decodeEntities(data.analyzedText))+'</div></div>') : '');
-  const reviewedBlock = (Array.isArray(data.reviewedClaims) && data.reviewedClaims.length ? ('<div class="reviewed-claims"><h4 class="reviewed-title">Reviewed Claims</h4><ul class="reviewed-claims-list">'+data.reviewedClaims.slice(0,6).map(function(c){ return '<li class="reviewed-claim-item">' + '<div><strong>Claim:</strong> '+safeText(c.claim || c.text || '')+'</div>' + '<div><strong>Reviewer:</strong> '+safeText(c.reviewer || (c.publisher && c.publisher.name) || 'Unknown')+'</div>' + '<div><strong>Rating:</strong> '+safeText(c.rating || c.textualRating || 'Unrated')+'</div>' + (c.url ? '<div><a href="'+safeText(c.url)+'" target="_blank" rel="noopener">View fact check</a></div>' : '') + '</li>'; }).join('') + '</ul></div>') : '');
-  const analyzedTime = (data.analyzed_at ? ('<div style="margin-top:8px"><strong>Analyzed Time:</strong> '+formatTimestamp(data.analyzed_at)+'</div>') : '');
-  const html = '<div>'+credibilityTop+pageRow+slangBlock+sourcesRow+factsRow+urlRow+analyzedBlock+explanationBlock+analyzedTime+reviewedBlock+'</div>';
-  ensureModal('Verification Result', html);
+  const ps = styleClassByLabel(label);
+  const hl = (function(l){
+    const t = String(l||'').toLowerCase();
+    if (t.includes('credible') || t.includes('high')) return 'hl-good';
+    if (t.includes('mixed') || t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
+    if (t.includes('low')) return 'hl-bad';
+    return 'hl-neutral';
+  })(label);
+  const summary = (function(s){ if (s>=75) return 'The content aligns with verified information.'; if (s>=55) return 'Contains both reliable and questionable information.'; if (s>=46) return 'Insufficient evidence to verify. Proceed with caution.'; return 'May contain misleading information.'; })(score);
+  const resultHtml = '<div class="verification-result">'
+    +'<div class="result-header">'
+      +'<div class="platform-badge"><i class="fab fa-facebook"></i><span>Facebook Analysis</span></div>'
+      +'<div class="content-type">Post</div>'
+    +'</div>'
+    +'<div class="summary-band '+ps+'">'
+      +'<div class="score-donut '+ps+'" style="--pct:'+score+'">'
+        +'<div class="inner"><div class="num">'+score+'</div><div class="pct">%</div></div>'
+      +'</div>'
+      +'<div class="summary-text">'
+        +'<div class="classification-row"><span class="risk-icon '+ps+'"><i class="fas fa-shield-alt"></i></span><h3 class="'+hl+'">'+safeText(label || '')+'</h3></div>'
+        +'<div class="accent-bar '+ps+'"></div>'
+        +'<p>'+summary+'</p>'
+      +'</div>'
+    +'</div>'
+    +'<div class="panels-row">'
+      +'<div class="panel trust"><div class="panel-title"><span class="label">Analyzed Content</span></div>'+(data.analyzedText ? '<p>'+safeText(decodeEntities(data.analyzedText))+'</p>' : '<p>No text provided.</p>')+'</div>'
+      +'<div class="panel metrics"><div class="panel-title"><span class="label">Metrics</span></div>'
+        +'<ul>'
+          +'<li><strong>Source:</strong> '+safeText(data.pageName || data.sourceName || getSourceName(data.url) || '')+'</li>'
+          +'<li><strong>Fact Checks:</strong> '+Number(data.factChecks || 0)+'</li>'
+          +(data.analyzed_at ? '<li><strong>Analyzed Date:</strong> '+formatTimestamp(data.analyzed_at)+'</li>' : '')
+          +(data.url ? '<li><strong>URL:</strong> <span class="url-value">'+safeText(data.url)+'</span></li>' : '')
+        +'</ul>'
+      +'</div>'
+    +'</div>'
+    +(data.explanation ? '<div class="panel trust"><div class="panel-title"><span class="label">AI Analysis Explanation</span></div><p>'+safeText(decodeEntities(data.explanation))+'</p></div>' : '')
+    +(Array.isArray(data.reviewedClaims) && data.reviewedClaims.length ? ('<div class="panel trust"><div class="panel-title"><span class="label">Reviewed Claims</span></div><ul>'+data.reviewedClaims.slice(0,6).map(function(c){ return '<li><div><strong>Claim:</strong> '+safeText(c.claim || c.text || '')+'</div><div><strong>Reviewer:</strong> '+safeText(c.reviewer || (c.publisher && c.publisher.name) || 'Unknown')+'</div><div><strong>Rating:</strong> '+safeText(c.rating || c.textualRating || 'Unrated')+'</div>' + (c.url ? '<div><a href="'+safeText(c.url)+'" target="_blank" rel="noopener">View fact check</a></div>' : '') + '</li>'; }).join('') + '</ul></div>') : '')
+  +'</div>';
+  ensureModal('Verification Result', resultHtml);
 }
 
 function formatTimestamp(ts) {
@@ -287,36 +343,67 @@ document.addEventListener('click', async function(e){
     e.preventDefault();
     return;
   }
-  if (action === 'vote-agree' || action === 'vote-disagree') {
+if (action === 'vote-agree' || action === 'vote-disagree') {
     const uid = getUserId();
     const voteType = action === 'vote-agree' ? 'agree' : 'disagree';
-    const snap = await docRef.get();
-    const data = snap.exists ? snap.data() : {};
-    const fb = data.feedback || {};
-    const voters = Array.isArray(fb.voters) ? fb.voters : [];
-    if (voters.includes(uid)) return;
-    const inc = firebase.firestore.FieldValue.increment(1);
-    const add = firebase.firestore.FieldValue.arrayUnion(uid);
-    if (voteType === 'agree') {
-      await docRef.update({ 'feedback.voters': add, 'feedback.agreeCount': inc });
-    } else {
-      await docRef.update({ 'feedback.voters': add, 'feedback.disagreeCount': inc });
+    
+    // Use a transaction to safely handle the Array-to-Map migration
+    try {
+        await firebase.firestore().runTransaction(async (tx) => {
+            const snap = await tx.get(docRef);
+            if (!snap.exists) return; // Document doesn't exist
+
+            const data = snap.data();
+            // Get existing feedback or initialize defaults
+            const fb = data.feedback || { agreeCount: 0, disagreeCount: 0, voters: {} };
+            
+            // MIGRATION FIX: If voters is an Array (old data) or missing, reset it to an empty Object
+            if (Array.isArray(fb.voters) || !fb.voters) {
+                fb.voters = {};
+            }
+
+            // Check if this user already voted in the new Map
+            if (fb.voters[uid]) return;
+
+            // Update the counts
+            if (voteType === 'agree') {
+                fb.agreeCount = Number(fb.agreeCount || 0) + 1;
+            } else {
+                fb.disagreeCount = Number(fb.disagreeCount || 0) + 1;
+            }
+
+            // Save the vote in the Map
+            fb.voters[uid] = voteType;
+
+            // Write back to Firestore
+            tx.update(docRef, { feedback: fb });
+        });
+
+        // --- Update UI Immediately (Optimistic Update) ---
+        const agreeBtn = card.querySelector('.vote-btn.agree');
+        const disagreeBtn = card.querySelector('.vote-btn.disagree');
+        
+        const agreeSpan = agreeBtn.querySelector('span');
+        const disagreeSpan = disagreeBtn.querySelector('span');
+
+        const currentAgree = Number(agreeSpan.textContent || 0);
+        const currentDisagree = Number(disagreeSpan.textContent || 0);
+
+        if (voteType === 'agree') {
+            agreeSpan.textContent = String(currentAgree + 1);
+            agreeBtn.classList.add('selected');
+        } else {
+            disagreeSpan.textContent = String(currentDisagree + 1);
+            disagreeBtn.classList.add('selected');
+        }
+
+        // Disable buttons to prevent spam
+        agreeBtn.disabled = true;
+        disagreeBtn.disabled = true;
+
+    } catch (e) {
+        console.error("Vote failed:", e);
     }
-    const agreeEl = card.querySelector('.vote-count[data-count="agree"]');
-    const disagreeEl = card.querySelector('.vote-count[data-count="disagree"]');
-    const agreeBtn = card.querySelector('.btn-agree');
-    const disagreeBtn = card.querySelector('.btn-disagree');
-    const a = Number(agreeEl.textContent || 0);
-    const d = Number(disagreeEl.textContent || 0);
-    if (voteType === 'agree') {
-      agreeEl.textContent = String(a + 1);
-    } else {
-      disagreeEl.textContent = String(d + 1);
-    }
-    agreeBtn.classList.add('voted');
-    disagreeBtn.classList.add('voted');
-    agreeBtn.setAttribute('disabled', 'true');
-    disagreeBtn.setAttribute('disabled', 'true');
   }
 });
 
