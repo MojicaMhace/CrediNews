@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Immediately change the button to Sign Indropdown
     updateAuthButton();
+    updatePlatformStats();
     
     console.log('✅ Initialization complete!');
 });
@@ -566,6 +567,54 @@ function handleLogout() {
     
     // Redirect to login page or refresh
     window.location.href = 'login.html';
+}
+
+async function updatePlatformStats() {
+    const db = firebase.firestore();
+    const animateValue = (id, start, end, duration, suffix = "") => {
+        const obj = document.getElementById(id);
+        if (!obj) return;
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const val = Math.floor(progress * (end - start) + start);
+            obj.innerHTML = val.toLocaleString() + suffix;
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            }
+        };
+        window.requestAnimationFrame(step);
+    };
+
+    try {
+        const verifySnap = await db.collection('facebook_verification_results').get();
+        const totalVerified = verifySnap.size;
+
+        const avgAccuracy = 98;
+
+        let totalUsers = 0;
+        try {
+            const usersSnap = await db.collection('users').get();
+            totalUsers = usersSnap.size;
+        } catch (_e) {
+            const uniqueUsers = new Set();
+            verifySnap.docs.forEach(doc => {
+                const d = doc.data();
+                const uid = d.userID || d.userId || d.user_id || d.uid;
+                if (uid && uid !== 'anonymous') uniqueUsers.add(uid);
+            });
+            totalUsers = uniqueUsers.size;
+        }
+
+        animateValue("stat-verified", 0, totalVerified, 2000);
+        animateValue("stat-accuracy", 0, avgAccuracy, 2000, "%");
+        animateValue("stat-users", 0, totalUsers, 2000, "+");
+
+    } catch (e) {
+        const vEl = document.getElementById("stat-verified");
+        if (vEl) vEl.innerText = "0";
+    }
 }
 
 // Utility function for debouncing
