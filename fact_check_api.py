@@ -52,7 +52,7 @@ ZYLA_ENABLED = True
 
 # Cache
 _ZYLA_CACHE: Dict[str, Dict[str, Any]] = {}
-_ZYLA_CACHE_TTL_SEC = 24 * 3600
+_ZYLA_CACHE_TTL_SEC =3600
 
 # Uncomment these lines to download NLTK resources first time
 # nltk.download('punkt')
@@ -450,6 +450,7 @@ def parse_zyla_response(data: Any) -> Dict[str, Any]:
     }
     verdict = verdict_map.get(verdict_raw, verdict_raw)
 
+
     # 3. Extract Confidence
     confidence = data_lower.get('confidence')
     if isinstance(confidence, (int, float)):
@@ -457,7 +458,8 @@ def parse_zyla_response(data: Any) -> Dict[str, Any]:
         if confidence > 1.0: confidence /= 100.0
         confidence = max(0.0, min(1.0, confidence))
     else:
-        confidence = 0.9 if verdict in ['true', 'false'] else 0.5
+        # CHANGED: Fallback to 1.0 (100%) for clear verdicts, 0.5 for others
+        confidence = 1.0 if verdict in ['true', 'false'] else 0.5
 
     # 4. Extract Explanation
     explanation = (
@@ -662,12 +664,16 @@ def html_unescape(s: str) -> str:
         return s
 
 def _html_to_text(html):
-    # Remove tags and decode entities minimally
+    if not html:
+        return ''
     text = re.sub(r"<[^>]+>", " ", html)
-    text = re.sub(r"&nbsp;", " ", text)
-    text = re.sub(r"&quot;", '"', text)
-    text = re.sub(r"&apos;", "'", text)
-    text = re.sub(r"&amp;", "&", text)
+    try:
+        text = html_unescape(text)
+    except Exception:
+        try:
+            text = html.unescape(text)
+        except Exception:
+            pass
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -904,13 +910,20 @@ def scrape_with_playwright(url: str) -> Dict[str, Optional[str]]:
             ))
             page = context.new_page()
             try:
+                page.route("**/*", lambda route: route.abort() if route.request.resource_type in ["image", "media", "font", "stylesheet"] else route.continue_())
+            except Exception:
+                pass
+            try:
                 page.goto(url, wait_until="domcontentloaded", timeout=15000)
             except Exception:
                 try:
                     page.goto(url, timeout=15000)
                 except Exception:
-                    browser.close()
-                    return {"text": "", "image_url": None}
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
+                    return {"text": "", "image_url": None, "page_name": None}
             try:
                 page.wait_for_selector("body", timeout=15000)
             except Exception:
@@ -925,33 +938,40 @@ def scrape_with_playwright(url: str) -> Dict[str, Optional[str]]:
                     page.locator(sel).first.click(timeout=1000)
                 except Exception:
                     pass
-            text_content = ""
+            texts: List[str] = []
+            try:
+                texts += [t for t in page.locator('div[data-ad-preview="message"]').all_inner_texts() if t and t.strip()]
+            except Exception:
+                pass
+            try:
+                texts += [t for t in page.locator('div[dir="auto"]').all_inner_texts() if t and t.strip()]
+            except Exception:
+                pass
+            if not texts:
+                for container_sel in ['[role="article"]', 'div[role="main"]', 'body']:
+                    try:
+                        container = page.locator(container_sel)
+                        if container.count() > 0:
+                            if container_sel == 'body':
+                                texts.append(container.inner_text())
+                                break
+                            inner = container.locator('p, span, div[dir="auto"]')
+                            try:
+                                parts = inner.all_inner_texts()
+                                parts = [t for t in parts if t and t.strip()]
+                                if parts:
+                                    texts.extend(parts)
+                                    break
+                            except Exception:
+                                joined = container.inner_text()
+                                if joined and joined.strip():
+                                    texts.append(joined)
+                                    break
+                    except Exception:
+                        continue
+            sep = "\n---\n"
+            text_content = sep.join([html_unescape(t.strip()) for t in texts]) if texts else ""
             image_url = None
-            for container_sel in [
-                '[role="article"]',
-                'div[role="main"]',
-                'body'
-            ]:
-                try:
-                    container = page.locator(container_sel)
-                    count = container.count()
-                    if count > 0:
-                        if container_sel == 'body':
-                            text_content = container.inner_text()
-                            break
-                        inner = container.locator('p, span, div[dir="auto"]')
-                        try:
-                            parts = inner.all_inner_texts()
-                            joined = " ".join([t.strip() for t in parts if t and t.strip()])
-                        except Exception:
-                            joined = container.inner_text()
-                        if joined and joined.strip():
-                            text_content = joined.strip()
-                            break
-                except Exception:
-                    continue
-
-            # Extract Open Graph image from DOM
             try:
                 for meta_sel in [
                     'meta[property="og:image"]',
@@ -965,21 +985,42 @@ def scrape_with_playwright(url: str) -> Dict[str, Optional[str]]:
                         if m and m.count() > 0:
                             raw = m.get_attribute('content')
                             if raw:
-                                image_url = html_unescape(raw)
+                                image_url = html_unescape(raw.strip())
                                 break
                     except Exception:
                         continue
+            except Exception:
+                pass
+            page_name = None
+            try:
+                for meta_sel in [
+                    'meta[property="og:site_name"]',
+                    'meta[name="og:site_name"]',
+                    'meta[property="og:title"]',
+                    'meta[name="og:title"]'
+                ]:
+                    m = page.locator(meta_sel).first
+                    if m and m.count() > 0:
+                        raw = m.get_attribute('content')
+                        if raw:
+                            page_name = html_unescape(raw.strip())
+                            break
+                if not page_name:
+                    try:
+                        page_name = html_unescape((page.title() or '').strip())
+                    except Exception:
+                        pass
             except Exception:
                 pass
             try:
                 browser.close()
             except Exception:
                 pass
-            text_content = re.sub(r"\s+", " ", (text_content or "")).strip()
-            return {"text": text_content, "image_url": image_url}
+            text_content = re.sub(r"\s+\n", "\n", (text_content or "")).strip()
+            return {"text": text_content, "image_url": image_url, "page_name": page_name}
     except Exception as e:
         print(f"Playwright scrape failed: {e}")
-        return {"text": "", "image_url": None}
+        return {"text": "", "image_url": None, "page_name": None}
 
 
 def extract_claims_from_url(url):
@@ -1160,6 +1201,7 @@ def fact_check_endpoint():
     url = data.get('url')
     final_image_url = None
     final_source_name = None
+    scraped_text_out: Optional[str] = None
     
     # ... [Keep your existing URL resolution and Claim Extraction logic] ...
     # (Lines 870 to 980 in your original file remain identical)
@@ -1222,10 +1264,23 @@ def fact_check_endpoint():
 
     if len(_c) >= 5:
         zyla_seed_text = _c
+        # Also attempt to scrape actual content for display if URL provided
+        if url and not scraped_text_out:
+            try:
+                _scr = scrape_with_playwright(url)
+                scraped_text_out = (_scr.get('text') or '').strip() if isinstance(_scr, dict) else (str(_scr or '').strip())
+                _img = _scr.get('image_url') if isinstance(_scr, dict) else None
+                if _img and not final_image_url:
+                    final_image_url = _img
+                if not final_source_name:
+                    final_source_name = _credible_source_name(url)
+            except Exception:
+                pass
     elif url:
         scraped = scrape_with_playwright(url)
         scraped_text = scraped.get('text') if isinstance(scraped, dict) else (scraped or '')
         scraped_img = scraped.get('image_url') if isinstance(scraped, dict) else None
+        scraped_text_out = (scraped_text or '').strip() or scraped_text_out
         if scraped_img and not final_image_url:
             final_image_url = scraped_img
         if not final_source_name:
@@ -1268,9 +1323,17 @@ def fact_check_endpoint():
     zyla_call_attempted = False
     
     if ZYLA_ENABLED and len(zyla_safe_input or "") > 5:
-        zyla_call_attempted = True
-        zyla_raw = query_zyla_fact_check(zyla_safe_input)
-        zyla = parse_zyla_response(zyla_raw)
+        lower_in = (zyla_safe_input or '').lower()
+        generic_markers = (
+            'needs verification',
+            'context from',
+            'facebook post'
+        )
+        skip_placeholder = any(m in lower_in for m in generic_markers)
+        if not skip_placeholder:
+            zyla_call_attempted = True
+            zyla_raw = query_zyla_fact_check(zyla_safe_input)
+            zyla = parse_zyla_response(zyla_raw)
 
     domain_boost = 0.0
     if url:
@@ -1307,7 +1370,7 @@ def fact_check_endpoint():
         if isinstance(conf_val, (int, float)):
             conf_val = float(conf_val)
         else:
-            conf_val = 0.9
+            conf_val = 1.0
 
         if zyla['verdict'] == 'true':
             real_claims.append(info)
@@ -1534,6 +1597,7 @@ def fact_check_endpoint():
         'page_name': _credible_master_name(url),
         'image_url': image_url,
         'source_name': final_source_name,
+        'scraped_text': scraped_text_out,
         'claims_checked': claims,
         'detailed_results': all_results,
         'claim_analysis': claim_analysis,

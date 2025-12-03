@@ -129,7 +129,7 @@ function createCleanDbPayload(result, url, contentText, platformLabel, analysisT
     const claims = Array.isArray(result && result.claim_analysis) ? result.claim_analysis : [];
     const pageName = (result && result.page_name) || null;
     const sourceName = (result && result.source_name) || null;
-    const cleanText = String(contentText || '').slice(0, 500);
+    const cleanText = String((result && result.scraped_text) ? result.scraped_text : (contentText || ''));
   const score = Math.min(Math.round((cred.score || 0) * 100), 100);
   return {
     platform: platformLabel,
@@ -267,6 +267,7 @@ async function handleUrlVerification() {
         const result = await fcResp.json();
 
         const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
+        const analyzedFromScrape = (result && typeof result.scraped_text === 'string' && result.scraped_text.trim()) ? result.scraped_text : contentForApi;
 
         if (window.firebase && firebase.firestore) {
             try {
@@ -283,8 +284,8 @@ async function handleUrlVerification() {
                   aiExplanation: (result.zyla && (result.zyla.explanation || result.zyla.analysis)) || (result.credibility && result.credibility.explanation) || '',
                   sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
                   factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
-                  analyzedText: contentForApi,
-                  contentHash: hashString(contentForApi),
+                  analyzedText: analyzedFromScrape,
+                  contentHash: hashString(analyzedFromScrape),
                   pageName: (result && result.page_name) || null,
                   reviewedClaims: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
                   zylaFactCheck: result.zyla || null,
@@ -305,8 +306,8 @@ async function handleUrlVerification() {
                 label: result.credibility && result.credibility.label,
                 sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
                 factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
-                analyzedText: contentForApi,
-                contentHash: hashString(contentForApi),
+                analyzedText: analyzedFromScrape,
+                contentHash: hashString(analyzedFromScrape),
                 pageName: (result && result.page_name) || null,
                 reviewedClaims: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
                 zylaFactCheck: result.zyla || null,
@@ -333,7 +334,8 @@ async function handleUrlVerification() {
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
             claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : [],
             hasGoogleClaims: !!result.has_google_claims,
-            pageName: (result && result.page_name) || null
+            pageName: (result && result.page_name) || null,
+            analyzedText: analyzedFromScrape
         });
     } catch (error) {
         console.error('Verification error:', error);
@@ -797,7 +799,14 @@ function showFacebookVerificationResult(type, data) {
         </div>
     ` : '';
 
-    const mlSection = '';
+    const panelStatus = (function(l, s) {
+        const t = String(l || '').toLowerCase();
+        if (t.includes('unverified') || t.includes('neutral')) return 'neutral';
+        if ((t.includes('credible') && !t.includes('low')) || s >= 75) return 'trust';
+        if (t.includes('low') || t.includes('fake') || s < 50) return 'risk';
+        if (t.includes('mixed') || (s >= 50 && s < 75)) return 'mixed';
+        return 'neutral';
+    })(data.credibilityLabel, Number(data.credibilityScore || 0));
 
     const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
         <div class="panel metrics">
@@ -913,16 +922,27 @@ function showFacebookVerificationResult(type, data) {
         ${(!realPanelHtml && !fakePanelHtml) ? reviewedClaimsPanel : ''}
     `;
 
-    const ps = getPoserStyleClass(data.credibilityScore);
+    let ps = getPoserStyleClass(data.credibilityScore);
+    const labelLower = String(data.credibilityLabel || '').toLowerCase();
+    if (labelLower.includes('unverified') || labelLower.includes('neutral')) {
+      ps = 'neutral';
+    }
     const hl = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-mixed'; return 'hl-bad'; })(Number(data.credibilityScore||0));
-    const textHL = (function(l,s){
-      const t = String(l||'').toLowerCase();
-      if (t.includes('credible') || s>=75) return 'hl-good';
-      if (t.includes('mixed') || s>=50) return 'hl-mixed';
-      if (t.includes('low')) return 'hl-bad';
-      if (t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
-      return 'hl-neutral';
-    })(data.credibilityLabel, Number(data.credibilityScore||0));
+    const textHL = (function(l, s) {
+        const t = String(l || '').toLowerCase();
+        if (t.includes('credible') && !t.includes('low')) return 'hl-good';
+        if (t.includes('mixed')) return 'hl-mixed';
+        if (t.includes('low')) return 'hl-bad';
+        if (t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
+        if (s >= 75) return 'hl-good';
+        if (s >= 50) return 'hl-mixed';
+        return 'hl-bad';
+    })(data.credibilityLabel, Number(data.credibilityScore || 0));
+    const disclaimerHtml = `
+      <div class="panel neutral">
+        <div class="panel-title"><span class="label">Disclaimer</span></div>
+        <p>This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.</p>
+      </div>`;
     const resultHtml = `
         <div class="verification-result facebook-result">
             <div class="result-header">
@@ -949,9 +969,9 @@ function showFacebookVerificationResult(type, data) {
                 </div>
             </div>
             <div class="panels-row">
-              <div class="panel trust">
+              <div class="panel ${panelStatus}">
                 <div class="panel-title"><span class="label">Analyzed Text</span></div>
-                ${data.analyzedText ? `<p class="${textHL}">${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
+                ${data.analyzedText ? `<div style="max-height: 150px; overflow-y: auto; white-space: pre-wrap;"><p class="${textHL}">${safeTextForHtml(data.analyzedText)}</p></div>` : `<p>No text provided.</p>`}
               </div>
               <div class="panel metrics">
                 <div class="panel-title"><span class="label">Metrics</span></div>
@@ -966,6 +986,7 @@ function showFacebookVerificationResult(type, data) {
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
+            ${disclaimerHtml}
             ${data.poserHtml || ''}
             <div class="feedback-section compact" 
                  data-analysis="${type}"
@@ -1208,16 +1229,35 @@ async function showVerificationResult(type, data) {
         ` : ''}
     `;
 
-    const ps2 = getPoserStyleClass(data.credibilityScore);
+    let ps2 = getPoserStyleClass(data.credibilityScore);
+    const labelLower2 = String(data.credibilityLabel || '').toLowerCase();
+    if (labelLower2.includes('unverified') || labelLower2.includes('neutral')) {
+      ps2 = 'neutral';
+    }
+    const panelStatus2 = (function(l, s) {
+      const t = String(l || '').toLowerCase();
+      if ((t.includes('credible') && !t.includes('low')) || s >= 75) return 'trust';
+      if (t.includes('low') || s < 50) return 'risk';
+      if (t.includes('mixed') || (s >= 50 && s < 75)) return 'mixed';
+      if (t.includes('unverified') || t.includes('neutral')) return 'neutral';
+      return 'neutral';
+    })(data.credibilityLabel, Number(data.credibilityScore || 0));
     const hl2 = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-mixed'; return 'hl-bad'; })(Number(data.credibilityScore||0));
-    const textHL2 = (function(l,s){
-      const t = String(l||'').toLowerCase();
-      if (t.includes('credible') || s>=75) return 'hl-good';
-      if (t.includes('mixed') || s>=50) return 'hl-mixed';
+    const textHL2 = (function(l, s) {
+      const t = String(l || '').toLowerCase();
+      if (t.includes('credible') && !t.includes('low')) return 'hl-good';
+      if (t.includes('mixed')) return 'hl-mixed';
       if (t.includes('low')) return 'hl-bad';
       if (t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
-      return 'hl-neutral';
-    })(data.credibilityLabel, Number(data.credibilityScore||0));
+      if (s >= 75) return 'hl-good';
+      if (s >= 50) return 'hl-mixed';
+      return 'hl-bad';
+    })(data.credibilityLabel, Number(data.credibilityScore || 0));
+    const disclaimerHtml2 = `
+        <div class="panel neutral">
+            <div class="panel-title"><span class="label">Disclaimer</span></div>
+            <p>This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.</p>
+        </div>`;
     const resultHtml = `
         <div class="verification-result url-result">
             <div class="result-header">
@@ -1244,9 +1284,9 @@ async function showVerificationResult(type, data) {
                 </div>
             </div>
             <div class="panels-row">
-              <div class="panel trust">
+              <div class="panel ${panelStatus2}">
                 <div class="panel-title"><span class="label">Analyzed Text</span></div>
-                ${data.analyzedText ? `<p class="${textHL2}">${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
+                ${data.analyzedText ? `<div style="max-height: 150px; overflow-y: auto; white-space: pre-wrap;"><p class="${textHL2}">${safeTextForHtml(data.analyzedText)}</p></div>` : `<p>No text provided.</p>`}
               </div>
               <div class="panel metrics">
                 <div class="panel-title"><span class="label">Metrics</span></div>
@@ -1261,6 +1301,7 @@ async function showVerificationResult(type, data) {
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
+            ${disclaimerHtml2}
             <div class="feedback-section compact" 
                  data-analysis="${type}"
                  data-platform="web"
@@ -1341,7 +1382,7 @@ function getHighlightClassByLabel(label) {
     if (!t) return 'highlight-neutral';
     if (t === 'credible') return 'highlight-high';
     if (t === 'mixed') return 'highlight-medium';
-    if (t.includes('unverified')) return 'highlight-neutral';
+    if (t.includes('unverified') || t.includes('neutral')) return 'highlight-neutral';
     if (t.includes('low credibility')) return 'highlight-low';
     return 'highlight-neutral';
 }

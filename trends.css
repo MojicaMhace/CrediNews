@@ -359,11 +359,6 @@
 .accent-bar.low { background: linear-gradient(90deg, #ef4444, rgba(239,68,68,0.15)); box-shadow: 0 2px 12px rgba(239,68,68,0.35); }
 .accent-bar.neutral { background: linear-gradient(90deg, #9ca3af, rgba(156,163,175,0.15)); box-shadow: 0 2px 12px rgba(156,163,175,0.35); }
 
-.hl-good { background: linear-gradient(135deg, #34d399 0%, #22c55e 50%, #a7f3d0 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hl-neutral { background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hl-bad { background: linear-gradient(135deg, #fca5a5 0%, #ef4444 50%, #fecaca 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hl-mixed { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 60%, #fde68a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-
 .url-value { 
     word-break: break-all; 
     white-space: normal; 
@@ -412,10 +407,39 @@
 
 /* --- NEW COMPONENT STYLES (Donut, Bands, Panels) --- */
 
-/* Text Gradients */
-.hl-good { background: linear-gradient(135deg, #34d399 0%, #22c55e 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.hl-neutral { background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.hl-bad { background: linear-gradient(135deg, #fca5a5 0%, #ef4444 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+/* Corrected Text Gradients */
+
+/* 1. Verified/High (Green) */
+.hl-good { 
+    background: linear-gradient(135deg, #34d399 0%, #22c55e 100%); 
+    -webkit-background-clip: text; 
+     background-clip: text;
+    -webkit-text-fill-color: transparent; 
+}
+
+/* 2. Unverified/Neutral (Gray) - FIXED */
+.hl-neutral { 
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); 
+    -webkit-background-clip: text; 
+    background-clip: text;
+    -webkit-text-fill-color: transparent; 
+}
+
+/* 3. Mixed (Orange/Yellow) - ADDED/ENSURED */
+.hl-mixed { 
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); 
+    -webkit-background-clip: text; 
+    background-clip: text;
+    -webkit-text-fill-color: transparent; 
+}
+
+/* 4. Low Credibility (Red) */
+.hl-bad { 
+    background: linear-gradient(135deg, #fca5a5 0%, #ef4444 100%); 
+    -webkit-background-clip: text; 
+    background-clip: text;
+    -webkit-text-fill-color: transparent; 
+}
 
 /* Result Header Info */
 .result-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
@@ -432,10 +456,28 @@
 }
 @keyframes bandSweep { 0% { background-position: 0% 0; } 100% { background-position: 100% 0; } }
 
-/* Color Variants for Band */
-.summary-band.high { background: linear-gradient(90deg, rgba(34,197,94,0.20) 0%, rgba(34,197,94,0.12) 50%, rgba(18,40,60,0.8) 50%, rgba(9,18,32,0.9) 100%); border-color: rgba(34,197,94,0.3); }
-.summary-band.medium { background: linear-gradient(90deg, rgba(245,158,11,0.20) 0%, rgba(245,158,11,0.12) 50%, rgba(18,40,60,0.8) 50%, rgba(9,18,32,0.9) 100%); border-color: rgba(245,158,11,0.3); }
-.summary-band.low { background: linear-gradient(90deg, rgba(239,68,68,0.20) 0%, rgba(239,68,68,0.12) 50%, rgba(18,40,60,0.8) 50%, rgba(9,18,32,0.9) 100%); border-color: rgba(239,68,68,0.3); }
+/* --- FIX: SMOOTH GRADIENTS FOR SUMMARY BAND --- */
+
+/* 1. Remove the '50%' hard stop to delete the vertical line */
+.summary-band.high { 
+    background: linear-gradient(90deg, rgba(34,197,94,0.25) 0%, rgba(34,197,94,0.02) 80%, rgba(9,18,32,0.9) 100%); 
+    border-color: rgba(34,197,94,0.3); 
+}
+
+.summary-band.medium { 
+    background: linear-gradient(90deg, rgba(245,158,11,0.25) 0%, rgba(245,158,11,0.02) 80%, rgba(9,18,32,0.9) 100%); 
+    border-color: rgba(245,158,11,0.3); 
+}
+
+.summary-band.low { 
+    background: linear-gradient(90deg, rgba(239,68,68,0.25) 0%, rgba(239,68,68,0.02) 80%, rgba(9,18,32,0.9) 100%); 
+    border-color: rgba(239,68,68,0.3); 
+}
+
+.summary-band.neutral { 
+    background: linear-gradient(90deg, rgba(156,163,175,0.25) 0%, rgba(156,163,175,0.02) 80%, rgba(9,18,32,0.9) 100%); 
+    border-color: rgba(156,163,175,0.3); 
+}
 
 /* Summary Text Area */
 .classification-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
@@ -445,10 +487,35 @@
 .risk-icon.low { background: rgba(239,68,68,0.2); color: #ef4444; }
 
 .summary-text h3 { margin: 0; font-size: 1.25rem; font-weight: 800; }
-.accent-bar { height: 4px; border-radius: 9999px; margin: 8px 0 10px; background: rgba(148,163,184,0.1); }
-.accent-bar.high { background: #22c55e; } 
-.accent-bar.medium { background: #f59e0b; } 
-.accent-bar.low { background: #ef4444; }
+/* --- FIX: SMOOTH ACCENT BAR --- */
+
+/* 2. Change solid colors to gradients so the line fades out */
+.accent-bar { 
+    height: 4px; 
+    border-radius: 9999px; 
+    margin: 8px 0 10px; 
+    background: rgba(148,163,184,0.1); 
+}
+
+.accent-bar.high { 
+    background: linear-gradient(90deg, #22c55e 0%, rgba(34,197,94,0.1) 100%); 
+    box-shadow: 0 2px 8px rgba(34,197,94,0.2);
+} 
+
+.accent-bar.medium { 
+    background: linear-gradient(90deg, #f59e0b 0%, rgba(245,158,11,0.1) 100%); 
+    box-shadow: 0 2px 8px rgba(245,158,11,0.2);
+} 
+
+.accent-bar.low { 
+    background: linear-gradient(90deg, #ef4444 0%, rgba(239,68,68,0.1) 100%); 
+    box-shadow: 0 2px 8px rgba(239,68,68,0.2);
+}
+
+.accent-bar.neutral { 
+    background: linear-gradient(90deg, #9ca3af 0%, rgba(156,163,175,0.1) 100%); 
+    box-shadow: 0 2px 8px rgba(156,163,175,0.2);
+}
 .explanation-text { font-size: 0.95rem; opacity: 0.9; margin: 0; color: #cbd5e1; }
 
 /* Score Donut Chart */
@@ -523,3 +590,75 @@
 /* Footer view details link */
 .footer-view-link { background: none; border: none; padding: 0; color: #60a5fa; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-decoration: none; }
 .footer-view-link:hover { text-decoration: underline; color: #93c5fd; }
+
+/* --- FIX FOR SLANG & EXPLANATION PANELS IN TRENDS MODAL --- */
+
+/* 1. Force ALL panels in the modal to stack content vertically */
+.verification-result .panel {
+    display: block !important;    
+    width: 100% !important;       
+    box-sizing: border-box;
+    margin-top: 16px;
+}
+
+/* 2. Reset the top row to still be side-by-side (Flexbox) */
+.panels-row {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 16px;
+    margin-top: 24px;
+}
+
+/* 3. Ensure the children of the top row fit properly */
+.panels-row .panel {
+    margin-top: 0; 
+    flex: 1; 
+    width: 0; 
+}
+
+/* 4. Formatting for Panel Titles (Line separator + spacing) */
+.verification-result .panel .panel-title {
+    width: 100%;
+    border-bottom: 1px solid rgba(148,163,184,0.18);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+}
+
+/* 5. Formatting for Lists (Slang/Sources) */
+.verification-result .panel ul {
+    width: 100%;
+    margin-top: 0;
+    padding-left: 4px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .panels-row {
+        flex-direction: column !important;
+    }
+    .panels-row .panel {
+        width: 100% !important;
+    }
+}
+
+/* --- DYNAMIC PANEL COLORS --- */
+
+/* Mixed / Medium Credibility (Orange) */
+.panel.mixed { border-left: 4px solid #f59e0b; }
+.panel.mixed .label { color: #f59e0b; }
+.panel.mixed li::before { background: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
+
+/* Neutral / Unverified (Gray) */
+.panel.neutral { border-left: 4px solid #9ca3af; }
+.panel.neutral .label { color: #9ca3af; }
+.panel.neutral li::before { background: #9ca3af; box-shadow: 0 0 0 2px rgba(156,163,175,0.2); }
+
+/* Ensure Trust/Risk/Metrics exist (Recap) */
+.panel.trust { border-left: 4px solid #22c55e; }
+.panel.trust .label { color: #22c55e; }
+
+.panel.risk { border-left: 4px solid #ef4444; }
+.panel.risk .label { color: #ef4444; }
+
+.panel.metrics { border-left: 4px solid #3b82f6; }
+.panel.metrics .label { color: #3b82f6; }

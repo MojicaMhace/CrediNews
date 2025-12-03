@@ -359,7 +359,8 @@
 .accent-bar.low { background: linear-gradient(90deg, #ef4444, rgba(239,68,68,0.15)); box-shadow: 0 2px 12px rgba(239,68,68,0.35); }
 
 .hl-good { background: linear-gradient(135deg, #34d399 0%, #22c55e 50%, #a7f3d0 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hl-neutral { background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 50%, #fde68a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hl-neutral { background: linear-gradient(135deg, #9ca3af 0%,#7a7f87 50%, #6b7280 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hl-mixed { background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 50%, #fde68a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hl-bad { background: linear-gradient(135deg, #fca5a5 0%, #ef4444 50%, #fecaca 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 .verify-news-page .verify-news-container #open-poser-detection.toggle-btn:hover { background: linear-gradient(135deg, #7e22ce 0%, #6d28d9 50%, #9333ea 100%) !important; color: #fff !important; border-color: #7e22ce !important; }
@@ -425,3 +426,60 @@
     width: 100%;
     margin-top: 0;
 }
+
+/* --- DYNAMIC PANEL COLORS --- */
+
+/* Mixed / Medium Credibility (Orange) */
+.panel.mixed { border-left: 4px solid #f59e0b; }
+.panel.mixed .label { color: #f59e0b; }
+.panel.mixed li::before { background: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
+
+/* Neutral / Unverified (Gray) */
+.panel.neutral { border-left: 4px solid #9ca3af; }
+.panel.neutral .label { color: #9ca3af; }
+.panel.neutral li::before { background: #9ca3af; box-shadow: 0 0 0 2px rgba(156,163,175,0.2); }
+
+/* Ensure Trust/Risk/Metrics exist (Recap) */
+.panel.trust { border-left: 4px solid #22c55e; }
+.panel.trust .label { color: #22c55e; }
+
+.panel.risk { border-left: 4px solid #ef4444; }
+.panel.risk .label { color: #ef4444; }
+
+.panel.metrics { border-left: 4px solid #3b82f6; }
+.panel.metrics .label { color: #3b82f6; }
+/* --- NEW: NEUTRAL / UNVERIFIED STYLES (GRAY) --- */
+
+/* Summary Band Neutral */
+.summary-band.neutral {
+    background: linear-gradient(90deg, rgba(148,163,184,0.25) 0%, rgba(148,163,184,0.05) 45%, rgba(9,18,32,0.9) 100%);
+    border-color: rgba(148,163,184,0.3);
+    animation: bandSweep 8s linear infinite;
+}
+
+/* Score Donut Neutral */
+.score-donut.neutral {
+    --ring: #9ca3af;
+    box-shadow: inset 0 0 0 8px rgba(255,255,255,0.08), 0 10px 20px rgba(156,163,175,0.25);
+    animation: donutPulse 3s infinite ease-in-out;
+}
+
+/* Risk Icon Neutral */
+.risk-icon.neutral {
+    background: linear-gradient(135deg, #e5e7eb, #9ca3af);
+    color: #1f2937;
+    border: 1px solid rgba(156,163,175,0.35);
+}
+
+/* Accent Bar Neutral */
+.accent-bar.neutral {
+    background: linear-gradient(90deg, #9ca3af, rgba(156,163,175,0.15));
+    box-shadow: 0 2px 12px rgba(156,163,175,0.35);
+}
+.panel.neutral { border-left: 4px solid #9ca3af; }
+.panel.neutral .label { color: #9ca3af; }
+.panel.neutral li::before { background: #9ca3af; box-shadow: 0 0 0 2px rgba(156,163,175,0.2); }
+
+.hl-neutral { background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+.analyzed-text.highlight-neutral { border-left-color: #9ca3af; background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); color: #374151; }
