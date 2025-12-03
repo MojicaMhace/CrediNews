@@ -787,7 +787,17 @@ function showFacebookVerificationResult(type, data) {
         </div>
     ` : '';
 
-    const mlSection = '';
+    const panelStatus = (function(l, s) {
+        const t = String(l || '').toLowerCase();
+        // High Trust
+        if (t.includes('credible') && !t.includes('low') || s >= 75) return 'trust';
+        // Low Trust / Risk
+        if (t.includes('low') || t.includes('fake') || s < 50) return 'risk';
+        // Mixed
+        if (t.includes('mixed') || (s >= 50 && s < 75)) return 'mixed';
+        // Default
+        return 'neutral';
+    })(data.credibilityLabel, Number(data.credibilityScore || 0));
 
     const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
         <div class="panel metrics">
@@ -937,7 +947,7 @@ function showFacebookVerificationResult(type, data) {
                 </div>
             </div>
             <div class="panels-row">
-              <div class="panel trust">
+              <div class="panel ${panelStatus}">
                 <div class="panel-title"><span class="label">Analyzed Text</span></div>
                 ${data.analyzedText ? `<p class="${textHL}">${safeTextForHtml(data.analyzedText)}</p>` : `<p>No text provided.</p>`}
               </div>
