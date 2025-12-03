@@ -441,3 +441,38 @@
 
 .panel.metrics { border-left: 4px solid #3b82f6; }
 .panel.metrics .label { color: #3b82f6; }
+/* --- NEW: NEUTRAL / UNVERIFIED STYLES (GRAY) --- */
+
+/* Summary Band Neutral */
+.summary-band.neutral {
+    background: linear-gradient(90deg, rgba(148,163,184,0.25) 0%, rgba(148,163,184,0.05) 45%, rgba(9,18,32,0.9) 100%);
+    border-color: rgba(148,163,184,0.3);
+    animation: bandSweep 8s linear infinite;
+}
+
+/* Score Donut Neutral */
+.score-donut.neutral {
+    --ring: #9ca3af;
+    box-shadow: inset 0 0 0 8px rgba(255,255,255,0.08), 0 10px 20px rgba(156,163,175,0.25);
+    animation: donutPulse 3s infinite ease-in-out;
+}
+
+/* Risk Icon Neutral */
+.risk-icon.neutral {
+    background: linear-gradient(135deg, #e5e7eb, #9ca3af);
+    color: #1f2937;
+    border: 1px solid rgba(156,163,175,0.35);
+}
+
+/* Accent Bar Neutral */
+.accent-bar.neutral {
+    background: linear-gradient(90deg, #9ca3af, rgba(156,163,175,0.15));
+    box-shadow: 0 2px 12px rgba(156,163,175,0.35);
+}
+.panel.neutral { border-left: 4px solid #9ca3af; }
+.panel.neutral .label { color: #9ca3af; }
+.panel.neutral li::before { background: #9ca3af; box-shadow: 0 0 0 2px rgba(156,163,175,0.2); }
+
+.hl-neutral { background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+.analyzed-text.highlight-neutral { border-left-color: #9ca3af; background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); color: #374151; }
