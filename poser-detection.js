@@ -385,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const dataSourceNote = analysis.data_source_note || "Hybrid Scan";
       
       const hasBadge = (meta.is_verified === true || meta.verification_status === 'blue_verified');
+      const fromRegistry = String(meta.verification_source || '').toLowerCase() === 'verified_registry' || !!meta.is_verified_source;
       const audience = Math.max(Number(meta.followers_count || 0), Number(meta.fan_count || 0));
       const postCount = meta.recent_posts_count || 0;
       const hasPic = meta.picture?.data?.url && !meta.picture.data.is_silhouette;
@@ -396,9 +397,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const riskTags = [];
 
       // 1. Verification
-      if (hasBadge) {
-        trustSignals.unshift("<strong>Verification:</strong> Verified Blue Badge detected.");
+      if (fromRegistry) {
+        trustSignals.unshift("<strong>Verification:</strong> Verified Registry confirmed.");
         boostTags.push("Verified Status");
+      } else if (hasBadge) {
+        trustSignals.unshift("<strong>Verification:</strong> Blue Badge detected (not registry).");
       } else {
         riskFactors.unshift("<strong>Verification:</strong> No verified badge found.");
         riskTags.unshift("No Verified Badge");
@@ -456,10 +459,10 @@ document.addEventListener('DOMContentLoaded', () => {
         detailText = `This page is rated <b>High Risk</b>. It failed multiple credibility checks, specifically: <b>${risksStr}</b>. Exercise extreme caution.`;
       }
 
-      const verifiedBanner = hasBadge ? `
+      const verifiedBanner = fromRegistry ? `
         <div style="background:linear-gradient(135deg,#0ea5e9 0%,#38bdf8 100%);color:#07283b;padding:0.75rem 1rem;border-radius:10px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
           <i class="fas fa-check-circle" style="font-size:1.25rem;"></i>
-          <div><strong>Verified</strong><div style="font-size:0.9rem;opacity:.9;">Official Blue Badge detected.</div></div>
+          <div><strong>Verified</strong><div style="font-size:0.9rem;opacity:.9;">Verified Registry: Official page confirmed.</div></div>
         </div>` : '';
 
       const escapedInput = input.replace(/'/g, "\\'");
@@ -513,7 +516,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div style="font-weight:700;">AI Agent Insight</div>
               </div>
               <div style="font-size:0.95rem; line-height:1.5;">
-                ${aiExplanation}
+                ${(function(){
+                   let txt = String(aiExplanation || '');
+                   const t = txt.toLowerCase();
+                   const contradicts = /not verified|unverified|no verified|no verification|lacks official verification|zero followers|no followers|lack of bio|no bio/.test(t);
+                   const isHigh = (typeof aiRiskScore === 'number' && aiRiskScore >= 70) || /poser/.test(t);
+                   const isLow = (typeof aiRiskScore === 'number' && aiRiskScore <= 30) || (posterScore >= 80 && !isHigh);
+                   if (fromRegistry && contradicts) {
+                     txt = isHigh ? 'Verified registry source. Risk signals detected.' : 'Verified registry source with official signals.';
+                   } else if (hasBadge && contradicts) {
+                     txt = isHigh ? 'Risk signals detected.' : '';
+                   } else if (hasBadge && isLow && /not verified|unverified|no verified|lacks official verification/.test(t)) {
+                     txt = '';
+                   }
+                   return txt;
+                 })()}
                 ${(() => { return (typeof aiRiskScore === 'number' || aiVerdictText) ? `<div style=\"margin-top:6px; opacity:.85;\">${typeof aiRiskScore === 'number' ? `AI Risk: ${aiRiskScore}/100` : ''}${aiVerdictText ? `${typeof aiRiskScore === 'number' ? ' • ' : ''}AI Verdict: ${aiVerdictText}` : ''}</div>` : ''; })()}
                 ${(() => {
                    const aiTrust = (typeof (breakdown.ai_agent_trust_score) === 'number') ? breakdown.ai_agent_trust_score : (typeof aiRiskScore === 'number' ? (100 - aiRiskScore) : null);
@@ -553,6 +570,13 @@ document.addEventListener('DOMContentLoaded', () => {
           <div>
              <span style="color:#64748b; font-weight:700; margin-right: 6px;">Source:</span>
              <span style="color: #cbd5e1;">${dataSourceNote}</span>
+             ${(() => {
+                const fromApify = !!meta._apify_fallback_used;
+                const restricted = !!meta._permissions_restricted;
+                const badgeOrigin = fromRegistry ? 'Registry' : (fromApify ? 'Apify' : (restricted ? 'Graph (restricted)' : 'Graph'));
+                const badgeLine = fromRegistry ? 'Badge: Verified (Registry)' : (hasBadge ? `Badge: Badged (${badgeOrigin})` : 'Badge: Unverified');
+                return `<span style=\"color:#64748b; font-weight:700; margin-left: 12px;\">${badgeLine.split(':')[0]}:</span><span style=\"color:#cbd5e1; margin-left:6px;\">${badgeLine.split(': ')[1]}</span>`;
+             })()}
           </div>
         </div>
 

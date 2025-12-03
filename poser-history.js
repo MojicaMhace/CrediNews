@@ -252,8 +252,23 @@ document.addEventListener('click', async (e)=>{
     try{
       if (typeof firebase === 'undefined' || !firebase.firestore){ alert('Database connection not ready.'); return; }
       const dbx = firebase.firestore();
-      await dbx.collection('pending_verifications').add({ url: urlToCheck, timestamp: firebase.firestore.FieldValue.serverTimestamp(), status: 'pending', source: 'user_report' });
-      alert('Request submitted! Our team will review this source.');
+      const user = (firebase.auth && firebase.auth().currentUser) ? firebase.auth().currentUser : null;
+      async function getNotifyOptInOnce(){
+        if (!user) { try { if (typeof showNotification === 'function') showNotification('Sign in to manage notifications in the Notifications page.', 'info'); } catch(_){} return false; }
+        const ref = dbx.collection('users').doc(user.uid);
+        const snap = await ref.get();
+        const data = snap.exists ? (snap.data() || {}) : {};
+        if (typeof data.notifyOptIn === 'boolean') return !!data.notifyOptIn;
+        const wants = window.confirm('Would you like to receive a notification when this verification request is processed?');
+        await ref.set({ notifyOptIn: !!wants }, { merge: true });
+        return !!wants;
+      }
+      const wants = await getNotifyOptInOnce();
+      await dbx.collection('pending_verifications').add({ url: urlToCheck, timestamp: firebase.firestore.FieldValue.serverTimestamp(), status: 'pending', source: 'user_report', notifyUser: !!wants, userId: user ? user.uid : null });
+      if (wants && user){
+        await dbx.collection('notifications').add({ userId: user.uid, type: 'info', title: 'Verification requested', message: 'We will notify you when your request is processed.', timestamp: firebase.firestore.FieldValue.serverTimestamp(), link: 'my-verifications.html' });
+      } else { try { if (typeof showNotification === 'function') showNotification('You can enable notifications in the Notifications page.', 'info'); } catch(_){} }
+      alert('Request submitted!');
     } catch(e){ alert('Error sending request.'); }
   };
 });

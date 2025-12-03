@@ -455,7 +455,7 @@ def run_apify_scraper(page_url: str) -> Optional[Dict[str, Any]]:
                 if link:
                     last_links.append(link.strip().lower())
             
-            if len(last_links) == 3 and (last_links[0] == last_links[1] == last_links[2]):
+            if len(last_links) == 3 and (last_links[0] == last_links[1] == last_links[2]):    
                 print(f"DETECTED REPEATED LINKS: {last_links[0]}")
                 repeated_link_penalty = -20
         

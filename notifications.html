@@ -8,17 +8,67 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
+
   <div class="activity-page">
+    
     <header class="activity-header">
-      <h2>Notifications</h2>
-      <a class="btn" href="profile_settings.html"><i class="fas fa-arrow-left"></i> Back to Profile</a>
+      <div class="header-left">
+        <h2>Notifications</h2>
+      </div>
+      <div class="header-actions">
+        <button id="markAllBtn" class="btn-ghost" style="display:none;">Mark all read</button>
+        <a class="btn" href="profile_settings.html">
+          <i class="fas fa-arrow-left"></i> Back to Profile
+        </a>
+      </div>
     </header>
-    <ul id="activityList" class="activity-list"></ul>
+
+    <div class="settings-panel">
+      <div class="panel-intro">
+        <h3>🔔 Control Center</h3>
+        <p>Decide what vibes you want in your feed.</p>
+      </div>
+      
+      <div class="toggles-container">
+        <label class="toggle-row">
+          <div class="toggle-info">
+            <span class="emoji">🚀</span>
+            <div class="text">
+              <strong>Verification Pings</strong>
+              <small>Get hyped when you get approved.</small>
+            </div>
+          </div>
+          <div class="toggle-switch">
+            <input type="checkbox" id="pref_verification" checked>
+            <span class="slider round"></span>
+          </div>
+        </label>
+
+        <label class="toggle-row">
+          <div class="toggle-info">
+            <span class="emoji">📣</span>
+            <div class="text">
+              <strong>The Party Line</strong>
+              <small>News, updates, and cool announcements.</small>
+            </div>
+          </div>
+          <div class="toggle-switch">
+            <input type="checkbox" id="pref_announcements" checked>
+            <span class="slider round"></span>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <ul id="activityList" class="activity-list">
+        </ul>
+
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  
   <script src="firebase-config.js"></script>
   <script src="notifications.js"></script>
 </body>
