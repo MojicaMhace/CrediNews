@@ -450,6 +450,7 @@ def parse_zyla_response(data: Any) -> Dict[str, Any]:
     }
     verdict = verdict_map.get(verdict_raw, verdict_raw)
 
+
     # 3. Extract Confidence
     confidence = data_lower.get('confidence')
     if isinstance(confidence, (int, float)):
@@ -457,7 +458,8 @@ def parse_zyla_response(data: Any) -> Dict[str, Any]:
         if confidence > 1.0: confidence /= 100.0
         confidence = max(0.0, min(1.0, confidence))
     else:
-        confidence = 0.9 if verdict in ['true', 'false'] else 0.5
+        # CHANGED: Fallback to 1.0 (100%) for clear verdicts, 0.5 for others
+        confidence = 1.0 if verdict in ['true', 'false'] else 0.5
 
     # 4. Extract Explanation
     explanation = (
@@ -1307,7 +1309,8 @@ def fact_check_endpoint():
         if isinstance(conf_val, (int, float)):
             conf_val = float(conf_val)
         else:
-            conf_val = 0.9
+            # CHANGED: Default to 1.0 instead of 0.9
+            conf_val = 1.0
 
         if zyla['verdict'] == 'true':
             real_claims.append(info)
@@ -1504,19 +1507,26 @@ def fact_check_endpoint():
     if _has_fact_data:
         if overall_score >= CREDIBILITY_THRESHOLDS["high"]:
             overall_label = "CREDIBLE"
-            overall_explanation = "This news appears to be factually accurate based on available fact checks."
+            overall_explanation = "Verified. This content aligns with available fact-checks."
         elif overall_score >= CREDIBILITY_THRESHOLDS["medium"]:
             overall_label = "MIXED"
-            overall_explanation = "This news contains some verified information but may also have inaccuracies."
+            overall_explanation = "This source is trusted, but our AI flagged potential issues with the content. Proceed with caution."
         elif overall_score >= CREDIBILITY_THRESHOLDS["unverified_lower"]:
             overall_label = "UNVERIFIED"
-            overall_explanation = "Insufficient evidence; credibility cannot be confirmed based on available data."
+            overall_explanation = "We found some data, but not enough to confirm if this is true."
         else:
             overall_label = "LOW CREDIBILITY"
-            overall_explanation = "This news contains disputed claims or inaccuracies according to fact checkers."
+            overall_explanation = "Warning: This content contains claims that have been disputed or debunked."
 
         if explanations:
             overall_explanation += " Details: " + " ".join(explanations[:2])
+
+        else:
+        # CHANGED: Concise "No Data" explanation
+            overall_label = "UNVERIFIED"
+            overall_explanation = "Unable to verify. Our system searched for fact-checks but found no results."
+
+        
 
     credibility = {
         "score": overall_score,
