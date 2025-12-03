@@ -32,6 +32,13 @@ function updateAuthButton() {
     const authButtons = navControls.querySelector('#authButtons') || navControls.querySelector('.auth-buttons');
     let userAccountBtn = document.getElementById('userAccountBtn') || navControls.querySelector('.user-account-btn');
 
+    const path = String(location.pathname.split('/').pop() || '').toLowerCase();
+    if (path === 'about.html') {
+        if (userAccountBtn) userAccountBtn.style.display = 'none';
+        if (authButtons) authButtons.style.display = 'none';
+        return;
+    }
+
     const showLoggedOutUI = () => {
         // Hide any user UI and show login/signup
         if (userAccountBtn) userAccountBtn.style.display = 'none';
@@ -423,14 +430,11 @@ function initializeFirebase() {
 // Check authentication state and update UI
 function checkAuthenticationState() {
     console.log('🔍 Checking authentication state...');
-    
-    // Check if user is logged in from session storage
-    const authData = sessionStorage.getItem('authData');
-    console.log('📦 Auth data from session storage:', authData);
-    
-    if (authData) {
+    const raw = sessionStorage.getItem('authData') || localStorage.getItem('authData');
+    console.log('📦 Auth data from storage:', raw);
+    if (raw) {
         try {
-            const userData = JSON.parse(authData);
+            const userData = JSON.parse(raw);
             console.log('👤 User data parsed:', userData);
             updateUIForLoggedInUser(userData);
         } catch (error) {

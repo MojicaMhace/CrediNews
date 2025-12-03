@@ -1,46 +1,156 @@
 const db = (window.db) || (firebase.firestore && firebase.firestore());
 
-function fmt(ts){
-  try { return new Date(ts).toLocaleString(); } catch(_) { return String(ts); }
+// --- Helper: Format Dates ---
+function fmt(ts) {
+  if (!ts) return '';
+  const date = (ts.seconds) ? new Date(ts.seconds * 1000) : new Date(ts);
+  return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function iconFor(action){
-  const a = (action||'').toLowerCase();
-  if (a.includes('update') || a.includes('save')) return { cls:'success', i:'fa-check' };
-  if (a.includes('delete') || a.includes('deactivate')) return { cls:'warn', i:'fa-exclamation' };
-  return { cls:'success', i:'fa-info' };
+// --- Helper: Choose Icons ---
+function iconFor(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('verified') || t.includes('approve') || t.includes('success')) {
+    return { cls: 'success', i: 'fa-check-circle' };
+  }
+  if (t.includes('reject') || t.includes('warn') || t.includes('alert')) {
+    return { cls: 'warn', i: 'fa-times-circle' };
+  }
+  return { cls: 'info', i: 'fa-bell' };
 }
 
-function renderItem(doc){
+// --- Helper: Empty State HTML ---
+function renderEmptyState() {
+  return `
+    <li class="empty-state">
+      <i class="fas fa-wind"></i>
+      <h3>All caught up!</h3>
+      <p>No new notifications at the moment.</p>
+    </li>`;
+}
+
+// --- Helper: Render List Item ---
+function renderItem(doc) {
   const data = doc.data();
-  const li = document.createElement('li');
-  const isNew = !data.readAt;
+  const isRead = !!data.readAt;
   const icon = iconFor(data.type || data.action);
-  li.className = `activity-item ${icon.cls}`;
-  if (isNew) li.style.boxShadow = '0 0 0 2px rgba(34,197,94,0.3) inset';
-  li.innerHTML = `<div class="icon"><i class="fas ${icon.i}"></i></div>
-    <div>
-      <div><strong>${data.title || data.action || 'Notification'}</strong></div>
-      <div class="meta">${fmt((data.timestamp && data.timestamp.seconds)? new Date(data.timestamp.seconds*1000): data.timestamp)} • ${data.message || ''}</div>
+  
+  const li = document.createElement('li');
+  li.className = `activity-item ${icon.cls} ${isRead ? 'read' : 'unread'}`;
+  
+  // Link logic: If DB has a link, click goes there. If not, click marks read.
+  const hasLink = !!data.link;
+  
+  li.innerHTML = `
+    <div class="icon"><i class="fas ${icon.i}"></i></div>
+    <div class="content" ${hasLink ? 'style="cursor:pointer;"' : ''}>
+      <strong>${data.title || 'Notification'}</strong>
+      <div class="meta">${data.message || ''}</div>
+      <div class="meta" style="margin-top:4px; font-size:0.75rem; opacity:0.7;">
+        ${fmt(data.timestamp)}
+      </div>
     </div>
-    <button class="btn" data-action="mark" data-id="${doc.id}">Mark as Read</button>`;
+    ${!isRead ? `<button class="btn" style="padding:4px 10px; font-size:0.75rem;" onclick="markOneRead(event, '${doc.id}')">Mark Read</button>` : ''}
+  `;
+
+  // Add click listener for navigation if link exists
+  if (hasLink) {
+    li.querySelector('.content').addEventListener('click', async () => {
+       if(!isRead) await markAsRead(doc.id);
+       window.location.href = data.link;
+    });
+  }
+
   return li;
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
-  firebase.auth().onAuthStateChanged(async user=>{
-    if (!user){ window.location.href = 'login.html'; return; }
+// --- Action: Mark Single Read ---
+async function markOneRead(e, id) {
+    e.stopPropagation(); // Prevent bubbling
+    await markAsRead(id);
+}
+
+async function markAsRead(id) {
+    await db.collection('notifications').doc(id).set({ 
+        readAt: firebase.firestore.FieldValue.serverTimestamp() 
+    }, { merge: true });
+}
+
+// --- MAIN LOGIC ---
+document.addEventListener('DOMContentLoaded', () => {
+  firebase.auth().onAuthStateChanged(async user => {
+    if (!user) { window.location.href = 'login.html'; return; }
+
     const list = document.getElementById('activityList');
-    const q = await db.collection('notifications').where('userId','==',user.uid).orderBy('timestamp','desc').get();
-    q.docs.forEach(d=> list.appendChild(renderItem(d)));
-    list.querySelectorAll('[data-action="mark"]').forEach(btn=>{
-      btn.addEventListener('click', async (e)=>{
-        const id = e.currentTarget.getAttribute('data-id');
-        await db.collection('notifications').doc(id).set({ readAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-        e.currentTarget.textContent = 'Read';
-        e.currentTarget.disabled = true;
-        e.currentTarget.closest('.activity-item').style.boxShadow = 'none';
+    const markAllBtn = document.getElementById('markAllBtn');
+    
+    // 1. SETUP TOGGLES (Load & Save)
+    const userDocRef = db.collection('users').doc(user.uid);
+    
+    // Load existing prefs
+    try {
+        const docSnap = await userDocRef.get();
+        if(docSnap.exists) {
+            const d = docSnap.data();
+            document.getElementById('pref_verification').checked = d.notify_verification !== false;
+            document.getElementById('pref_announcements').checked = d.notify_announcements !== false;
+        }
+    } catch(e) { console.log('Error loading prefs', e); }
+
+    // Save prefs on click
+    const handleToggle = async (key, checked) => {
+        await userDocRef.set({ [key]: checked }, { merge: true });
+        console.log(`Saved ${key}: ${checked}`);
+    };
+
+    document.getElementById('pref_verification').addEventListener('change', (e) => handleToggle('notify_verification', e.target.checked));
+    document.getElementById('pref_announcements').addEventListener('change', (e) => handleToggle('notify_announcements', e.target.checked));
+
+
+    // 2. SETUP NOTIFICATION FEED (Real-time)
+    db.collection('notifications')
+      .where('userId', '==', user.uid)
+      .orderBy('timestamp', 'desc')
+      .limit(50)
+      .onSnapshot(snapshot => {
+        list.innerHTML = ''; // Clear list
+        
+        if (snapshot.empty) {
+          list.innerHTML = renderEmptyState();
+          markAllBtn.style.display = 'none';
+          return;
+        }
+
+        markAllBtn.style.display = 'inline-flex';
+        let unreadCount = 0;
+
+        snapshot.docs.forEach(doc => {
+            list.appendChild(renderItem(doc));
+            if(!doc.data().readAt) unreadCount++;
+        });
+
+        // Update Mark All Button
+        markAllBtn.textContent = unreadCount > 0 ? `Mark all read (${unreadCount})` : 'Mark all read';
+        markAllBtn.style.opacity = unreadCount === 0 ? '0.5' : '1';
+        markAllBtn.disabled = unreadCount === 0;
       });
+
+    // 3. MARK ALL READ ACTION
+    markAllBtn.addEventListener('click', async () => {
+        const batch = db.batch();
+        const unread = await db.collection('notifications')
+            .where('userId', '==', user.uid)
+            .where('readAt', '==', null)
+            .get();
+            
+        if(unread.empty) return;
+        
+        unread.docs.forEach(doc => {
+            batch.update(doc.ref, { readAt: firebase.firestore.FieldValue.serverTimestamp() });
+        });
+        
+        await batch.commit();
     });
+
   });
 });

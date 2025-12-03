@@ -90,6 +90,15 @@ class AuthManager {
         if (loginForm) {
             console.log('✅ Login form found, binding event');
             loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+            try {
+                const savedEmail = localStorage.getItem('remember_email');
+                if (savedEmail) {
+                    const emailInput = document.getElementById('email');
+                    if (emailInput) emailInput.value = savedEmail;
+                    const rememberCb = loginForm.querySelector('input[name="remember"]');
+                    if (rememberCb) rememberCb.checked = true;
+                }
+            } catch(_e) {}
         } else {
             console.log('ℹ️ Login form not found (this is normal on register page)');
         }
@@ -213,8 +222,10 @@ class AuthManager {
             
             if (remember) {
                 localStorage.setItem('authData', JSON.stringify(authData));
+                try { localStorage.setItem('remember_email', email); } catch(_e) {}
             } else {
                 sessionStorage.setItem('authData', JSON.stringify(authData));
+                try { localStorage.removeItem('remember_email'); } catch(_e) {}
             }
 
             try {
@@ -278,7 +289,22 @@ class AuthManager {
             // Ensure supported environment (served over http/https and storage enabled)
             const protocolOk = ['http:', 'https:', 'chrome-extension:'].includes(window.location.protocol);
             if (!protocolOk) {
-                this.showError('Open the site via http://localhost or https and ensure cookies/storage are enabled.');
+                const q = window.location.search || '';
+                const origins = ['http://localhost', 'http://127.0.0.1', 'https://localhost'];
+                const path = '/capstone/CrediNews/login.html';
+                (async () => {
+                    for (const origin of origins) {
+                        try {
+                            await fetch(origin + '/favicon.ico', { mode: 'no-cors' });
+                            try { localStorage.setItem('auto_redirected_from_file', '1'); } catch(_e) {}
+                            window.location.href = origin + path + (q ? q : '');
+                            return;
+                        } catch (_e) {
+                            // try next origin
+                        }
+                    }
+                    this.showError('Start Apache in XAMPP, then open http://localhost/capstone/CrediNews/login.html');
+                })();
                 return;
             }
             // Attempt popup first, then fallback to redirect if blocked or unsupported

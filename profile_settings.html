@@ -3,114 +3,339 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Profile Settings</title>
-  <link rel="stylesheet" href="profile_settings.css" />
+  <title>Settings // CrediNews</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="profile_settings.css" />
 </head>
 <body>
-  <div class="settings-page">
-    <aside class="settings-sidebar">
-      <h2>Settings</h2>
-      <nav>
-        <button class="tab-btn" data-tab="profile">Public Profile</button>
-        <button class="tab-btn" data-tab="security">Account Security</button>
-        <button class="tab-btn danger" data-tab="danger">Danger Zone</button>
+
+  <div class="layout-wrapper">
+    <aside class="sidebar-panel">
+      <div class="brand">
+        <i class="fas fa-layer-group"></i> <span>Settings</span>
+      </div>
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="security">
+          <i class="fas fa-shield-halved"></i> Security
+        </button>
+        <div class="spacer" style="flex:1;"></div>
+        <button class="nav-btn danger" data-tab="danger">
+          <i class="fas fa-radiation"></i> Danger Zone
+        </button>
       </nav>
+      
+      <div class="sidebar-footer">
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Home</a>
+      </div>
     </aside>
 
-    <main class="settings-content">
-      <section class="tab" id="tab-profile">
-        <div class="ps-section-header">
-          <h3>Account Settings</h3>
-          <div class="ps-section-sub">Basic Info</div>
+    <main class="content-area">
+      
+      <section class="tab-content active" id="tab-security">
+        <div class="header-animate">
+          <h1>Security</h1>
+          <p class="subtitle">Protect your digital fortress.</p>
         </div>
 
-        <div class="ps-panel">
+        <div class="content-panel">
           <div class="form-grid">
-            <div class="form-group list-row">
-              <label>Name</label>
-              <input type="text" id="ps_displayName" placeholder="Your name" />
-              <i class="fas fa-chevron-right chevron"></i>
-            </div>
-            <div class="form-group list-row">
-              <label>Username</label>
-              <input type="text" id="ps_username" placeholder="username" />
-              <i class="fas fa-chevron-right chevron"></i>
-            </div>
-            <div class="form-group full list-row">
-              <label>Bio</label>
-              <textarea id="ps_bio" rows="4" placeholder="Tell people about you"></textarea>
-              <i class="fas fa-chevron-right chevron"></i>
+            <div class="input-group full">
+              <label>Update Email</label>
+              <div class="row-action">
+                <input type="email" id="ps_email" placeholder="New email address" />
+                <button id="changeEmailBtn" class="btn-secondary">Update</button>
+              </div>
             </div>
             
-          </div>
-        </div>
+            <div class="divider"></div>
 
-        <div class="ps-section-header" style="margin-top:16px;">
-          <div class="ps-section-sub">Account Info</div>
-        </div>
-        <div class="ps-panel">
-          <div class="form-grid">
-            <div class="form-group list-row full">
-              <label>Email</label>
-              <input type="email" id="ps_email_view" placeholder="Email" disabled />
-              <i class="fas fa-chevron-right chevron"></i>
+            <h3 style="margin-bottom:12px; font-size:16px;">Change Password</h3>
+            <div class="input-group">
+              <label>Current Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_current_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_current_password"><i class="fas fa-eye-slash"></i></button>
+              </div>
+            </div>
+            <div class="input-group">
+              <label>New Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_new_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_new_password"><i class="fas fa-eye-slash"></i></button>
+              </div>
+              <div class="input-note" style="color:#9ca3af; font-size:12px;">Must be at least 8 characters.</div>
+              <div id="strength-meter"><div id="strength-bar"></div></div>
+              <ul class="req-list">
+                <li id="req-len">At least 8 characters</li>
+                <li id="req-num">Contains a number</li>
+                <li id="req-sym">Contains a symbol</li>
+              </ul>
             </div>
           </div>
-        </div>
-
-        
-
-        <div class="actions">
-          <a class="btn ghost" href="index.html"><i class="fas fa-arrow-left"></i> Back</a>
-          <button id="saveProfileBtn" class="btn primary"><i class="fas fa-save"></i> Save Profile</button>
-          <a class="btn ghost" href="notifications.html"><i class="fas fa-bell"></i> Activity</a>
-        </div>
-      </section>
-
-      <section class="tab" id="tab-security">
-        <h3>Account Security</h3>
-        <div class="form-grid">
-          <div class="form-group full">
-            <label>Change Email</label>
-            <input type="email" id="ps_email" placeholder="New email" />
-          </div>
-          <div class="form-group">
-            <label>Current Password</label>
-            <input type="password" id="ps_current_password" placeholder="Current password" />
-          </div>
-          <div class="form-group">
-            <label>New Password</label>
-            <input type="password" id="ps_new_password" placeholder="New password" />
-            <div class="input-note">Use at least 8 characters with letters and numbers. You must know your current password to change it.</div>
-          </div>
-        </div>
-        <div class="actions">
-          <button id="changeEmailBtn" class="btn primary"><i class="fas fa-envelope"></i> Update Email</button>
-          <button id="changePasswordBtn" class="btn primary"><i class="fas fa-key"></i> Update Password</button>
-        </div>
-      </section>
-
-
-      <section class="tab" id="tab-danger">
-        <h3>Danger Zone</h3>
-        <div class="danger-card">
-          <p>Deactivate or permanently delete your account.</p>
-          <div class="actions">
-            <button id="deactivateBtn" class="btn danger-outline"><i class="fas fa-user-slash"></i> Deactivate Account</button>
-            <button id="deleteAccountBtn" class="btn danger"><i class="fas fa-trash"></i> Delete Account</button>
+          <div class="action-bar">
+             <button id="changePasswordBtn" class="btn-primary">Update Password</button>
           </div>
         </div>
       </section>
+
+      <section class="tab-content" id="tab-danger">
+        <div class="header-animate">
+          <h1 style="color:var(--danger);">Danger Zone</h1>
+          <p class="subtitle">Irreversible actions live here.</p>
+        </div>
+
+        <div class="content-panel danger-border">
+          
+          <div class="danger-item">
+            <div class="danger-info">
+              <h4>Delete Account</h4>
+              <p>Permanently remove your data. This cannot be undone.</p>
+            </div>
+            <button id="deleteAccountBtn" class="btn-danger-solid">Delete Account</button>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
-  <div id="ps_toast" class="toast" aria-live="polite"></div>
+  <div id="ps_toast" class="toast"></div>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  
   <script src="firebase-config.js"></script>
-  <script src="profile_settings.js"></script>
+  
+  <script>
+    /* --- JAVASCRIPT LOGIC --- */
+
+    // Tabs Logic
+    function setActiveTab(name){
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      
+      const btn = document.querySelector(`.nav-btn[data-tab="${name}"]`);
+      if(btn) btn.classList.add('active');
+
+      const content = document.getElementById(`tab-${name}`);
+      if (content) content.classList.add('active');
+    }
+
+    // Toast Logic
+    function toast(msg, type = 'normal'){
+      const t = document.getElementById('ps_toast');
+      if (!t) return;
+      t.textContent = msg;
+      
+      if(type === 'error') t.style.borderLeft = '4px solid #ef4444';
+      else t.style.borderLeft = '4px solid #10b981';
+
+      t.classList.add('show');
+      setTimeout(()=>{ 
+          t.classList.remove('show'); 
+          t.style.borderLeft = ''; 
+      }, 3500);
+    }
+
+    // Password Visibility Toggle
+    function togglePassword(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        const icon = btn.querySelector('i');
+        
+        if (input.type === "password") {
+            // Unhide
+            input.type = "text";
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        } else {
+            // Hide
+            input.type = "password";
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        }
+    }
+
+    // Password Strength Logic
+    function checkPasswordStrength(password) {
+        const bar = document.getElementById('strength-bar');
+        const reqLen = document.getElementById('req-len');
+        const reqNum = document.getElementById('req-num');
+        const reqSym = document.getElementById('req-sym');
+        
+        if(!bar) return;
+
+        const hasLength = password.length >= 8;
+        const hasNum = /\d/.test(password);
+        const hasSym = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+        
+        if(reqLen) hasLength ? reqLen.classList.add('valid') : reqLen.classList.remove('valid');
+        if(reqNum) hasNum ? reqNum.classList.add('valid') : reqNum.classList.remove('valid');
+        if(reqSym) hasSym ? reqSym.classList.add('valid') : reqSym.classList.remove('valid');
+
+        let strength = 0;
+        if (hasLength) strength++;
+        if (hasNum) strength++;
+        if (hasSym) strength++;
+
+        if (password.length === 0) {
+            bar.style.width = '0%';
+            bar.style.backgroundColor = '#ef4444';
+        } else if (strength === 1) {
+            bar.style.width = '33%';
+            bar.style.backgroundColor = '#ef4444';
+        } else if (strength === 2) {
+            bar.style.width = '66%';
+            bar.style.backgroundColor = '#f59e0b';
+        } else if (strength === 3) {
+            bar.style.width = '100%';
+            bar.style.backgroundColor = '#10b981';
+        }
+    }
+
+    // --- FIREBASE ACTIONS ---
+
+    async function handleChangePassword() {
+        const currentPassEl = document.getElementById('ps_current_password');
+        const newPassEl = document.getElementById('ps_new_password');
+        const btn = document.getElementById('changePasswordBtn');
+        
+        const currentPass = currentPassEl.value;
+        const newPass = newPassEl.value;
+
+        if (!currentPass) return toast('Please enter your current password.', 'error');
+        if (!newPass) return toast('Please enter a new password.', 'error');
+        if (newPass.length < 8) return toast('New password must be at least 8 chars.', 'error');
+        
+        const user = firebase.auth().currentUser;
+        if (!user) return toast('You are not signed in.', 'error');
+
+        const originalBtnText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+        btn.disabled = true;
+
+        try {
+            const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPass);
+            await user.reauthenticateWithCredential(credential);
+            await user.updatePassword(newPass);
+            toast('Password updated successfully!', 'success');
+            currentPassEl.value = '';
+            newPassEl.value = '';
+            checkPasswordStrength(''); 
+        } catch (error) {
+            console.error("Error updating password:", error);
+            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials') {
+                toast('Incorrect current password.', 'error');
+            } else if (error.code === 'auth/weak-password') {
+                toast('Password is too weak.', 'error');
+            } else if (error.code === 'auth/requires-recent-login') {
+                toast('Please log in again before changing password.', 'error');
+            } else {
+                toast(error.message || 'Failed to update password.', 'error');
+            }
+        } finally {
+            btn.innerHTML = originalBtnText;
+            btn.disabled = false;
+        }
+    }
+
+    // UPDATED: ROBUST DELETE FUNCTION
+    async function handleDeleteAccount() {
+        const user = firebase.auth().currentUser;
+        
+        if (!user) {
+            return toast('System not ready. Please refresh.', 'error');
+        }
+
+        // 1. Confirm Intent
+        if(!confirm('CRITICAL: This will permanently delete your account and all data. You will have to register again. Are you sure?')) return;
+
+        // 2. Force Re-authentication via Prompt (Fixes "Requires Recent Login")
+        const password = prompt("To confirm deletion, please type your password:");
+        if (!password) {
+            return toast("Deletion cancelled (Password required).", "normal");
+        }
+
+        const btn = document.getElementById('deleteAccountBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+        btn.disabled = true;
+
+        try {
+            // 3. Re-authenticate User
+            const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
+            await user.reauthenticateWithCredential(credential);
+
+            // 4. Delete Firestore Data (Try to find a user doc)
+            // Note: If you use a different collection name, change 'users' below
+            try {
+                const db = firebase.firestore();
+                await db.collection('users').doc(user.uid).delete();
+                console.log("Firestore data deleted.");
+            } catch (dbErr) {
+                console.warn("Firestore delete skipped or failed:", dbErr);
+            }
+
+            // 5. Delete Auth Account
+            await user.delete();
+            
+            // 6. Redirect to Register
+            alert("Your account has been successfully deleted.");
+            window.location.href = 'register.html'; 
+
+        } catch (error) {
+            console.error(error);
+            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials') {
+                alert("Incorrect password. Account was NOT deleted.");
+            } else {
+                alert("Error deleting account: " + error.message);
+            }
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // --- BIND CLICK EVENTS ---
+    document.addEventListener('DOMContentLoaded', () => {
+      // Check auth state
+      firebase.auth().onAuthStateChanged(user => {
+          if (user) {
+              const emailField = document.getElementById('ps_email');
+              if(emailField) emailField.value = user.email;
+          }
+      });
+
+      setActiveTab('security');
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+      });
+
+      const changePassBtn = document.getElementById('changePasswordBtn');
+      if(changePassBtn) changePassBtn.addEventListener('click', handleChangePassword);
+
+      const dangerBtn = document.getElementById('deleteAccountBtn');
+      if(dangerBtn) dangerBtn.addEventListener('click', handleDeleteAccount);
+
+      // Bind Password Toggles
+      document.querySelectorAll('.toggle-visibility').forEach((btn) => {
+        const targetId = btn.dataset.target;
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); 
+            togglePassword(targetId, btn);
+        });
+      });
+
+      // Bind Strength Meter
+      const newPassEl = document.getElementById('ps_new_password');
+      if (newPassEl) {
+        newPassEl.addEventListener('input', () => checkPasswordStrength(newPassEl.value));
+        checkPasswordStrength(newPassEl.value || '');
+      }
+    });
+  </script>
 </body>
 </html>

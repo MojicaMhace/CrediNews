@@ -661,13 +661,24 @@ async function handleFacebookVerification() {
             const pageUrl = extractFacebookPageUrl(poserSourceUrl);
             const poserTarget = pageUrl || poserSourceUrl;
             if (poserTarget && poserTarget.includes('facebook.com')) {
-                const pdResp = await fetch('http://127.0.0.1:5001/api/poser/analyze_full', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: poserTarget })
-                });
-                if (pdResp.ok) {
-                    const pd = await pdResp.json();
+                const cacheId = hashString(String(poserTarget || '').toLowerCase());
+                let pd = null;
+                try {
+                    const cacheSnap = await firebase.firestore().collection('analyzed_pages_cache').doc(cacheId).get();
+                    if (cacheSnap.exists) {
+                        const cd = cacheSnap.data() || {};
+                        if (cd && cd.raw) { pd = cd.raw; }
+                    }
+                } catch (_) {}
+                if (!pd) {
+                    const pdResp = await fetch('http://127.0.0.1:5001/api/poser/analyze_full', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: poserTarget })
+                    });
+                    if (pdResp.ok) { pd = await pdResp.json(); }
+                }
+                if (pd) {
                     poserHtml = buildPoserSummaryHtml(pd);
                     try {
                         const analysis = pd && pd.analysis ? pd.analysis : {};
@@ -675,13 +686,12 @@ async function handleFacebookVerification() {
                         const trustScore = (typeof analysis.final_trust_score === 'number') ? analysis.final_trust_score : (pd && typeof pd.credi_score === 'number' ? pd.credi_score : ((pd && pd.trust && pd.trust.raw_score) || 0));
                         const verdict = analysis.verdict || (pd && (pd.verdict || pd.classification)) || 'Unknown';
                         poserPayload = {
-                            trustScore: Math.max(0, Math.min(100, Math.round(Number(trustScore || 0)))),
+                            trustScore: Math.max(0, Math.min(100, Math.round(Number(trustScore || 0)))) ,
                             verdict: String(verdict || 'Unknown'),
                             name: meta.name || '',
                             analyzedAt: firebase.firestore.FieldValue.serverTimestamp(),
                             raw: pd
                         };
-                        const cacheId = hashString(String(poserTarget || '').toLowerCase());
                         await firebase.firestore().collection('analyzed_pages_cache').doc(cacheId).set({
                           url: poserTarget,
                           name: meta.name || '',
@@ -792,19 +802,21 @@ function showFacebookVerificationResult(type, data) {
     const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
         <div class="panel metrics">
             <div class="panel-title"><span class="label">Slang Detection</span></div>
+            <p style="color:#cbd5e1; margin:8px 0 12px;">Analysis of slang and informal language to gauge sarcasm and tone.</p>
             <ul>
-                <li><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</li>
                 ${(typeof data.sarcasmPercent === 'number') ? `<li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>` : ''}
                 ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
+                <li><em>Slang Words Detected:</em> ${data.slangDetected.join(', ')}</li>
             </ul>
         </div>
     ` : (typeof data.sarcasmPercent === 'number' ? `
         <div class="panel metrics">
             <div class="panel-title"><span class="label">Slang Detection</span></div>
+            <p style="color:#cbd5e1; margin:8px 0 12px;">Analysis of slang and informal language to gauge sarcasm and tone.</p>
             <ul>
-                <li><em>No slang words detected.</em></li>
                 <li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>
                 ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
+                <li><em>No slang words detected.</em></li>
             </ul>
         </div>
     ` : '');
@@ -1079,7 +1091,7 @@ async function showVerificationResult(type, data) {
     const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
         <div class="panel metrics">
             <div class="panel-title"><span class="label">Slang Detection</span></div>
-            <ul>
+            <ul class="two-col">
                 <li><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</li>
                 ${(typeof data.sarcasmPercent === 'number') ? `<li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>` : ''}
                 ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
@@ -1088,7 +1100,7 @@ async function showVerificationResult(type, data) {
     ` : (typeof data.sarcasmPercent === 'number' ? `
         <div class="panel metrics">
             <div class="panel-title"><span class="label">Slang Detection</span></div>
-            <ul>
+            <ul class="two-col">
                 <li><em>No slang words detected.</em></li>
                 <li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>
                 ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
@@ -1621,7 +1633,22 @@ document.addEventListener('click', async function(e) {
         if (!u) { showNotification('Missing page URL.', 'error'); return; }
         if (typeof firebase === 'undefined' || !firebase.firestore) { showNotification('Database not initialized.', 'error'); return; }
         const id = hashString(String(u).toLowerCase());
-        await firebase.firestore().collection('pending_verifications').doc(id).set({ url: u, status: 'pending', source: 'user_request', timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId: (firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous') }, { merge: true });
+        async function getNotifyOptInOnce(){
+            const user = firebase.auth().currentUser;
+            if (!user) { try { if (typeof showNotification === 'function') showNotification('Sign in to manage notifications in the Notifications page.', 'info'); } catch(_){} return false; }
+            const ref = firebase.firestore().collection('users').doc(user.uid);
+            const snap = await ref.get();
+            const data = snap.exists ? (snap.data() || {}) : {};
+            if (typeof data.notifyOptIn === 'boolean') return !!data.notifyOptIn;
+            const wants = window.confirm('Would you like to receive a notification when this verification request is processed?');
+            await ref.set({ notifyOptIn: !!wants }, { merge: true });
+            return !!wants;
+        }
+        const wantsNotify = await getNotifyOptInOnce();
+        await firebase.firestore().collection('pending_verifications').doc(id).set({ url: u, status: 'pending', source: 'user_request', timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId: (firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous'), notifyUser: !!wantsNotify }, { merge: true });
+        if (wantsNotify && firebase.auth().currentUser){
+            await firebase.firestore().collection('notifications').add({ userId: firebase.auth().currentUser.uid, type: 'info', title: 'Verification requested', message: 'You will receive a notification when processed.', timestamp: firebase.firestore.FieldValue.serverTimestamp(), link: 'my-verifications.html' });
+        } else { try { if (typeof showNotification === 'function') showNotification('You can enable notifications in the Notifications page.', 'info'); } catch(_){} }
         showNotification('Request submitted for verification review.', 'success');
         btn.disabled = true;
         btn.textContent = 'Requested';
@@ -1693,14 +1720,12 @@ function buildPoserSummaryHtml(pd) {
         const aiRisk = (analysis && analysis.breakdown && analysis.breakdown.scoring_layers && typeof analysis.breakdown.scoring_layers.ai_risk === 'number') ? analysis.breakdown.scoring_layers.ai_risk : null;
         const isHighRisk = (typeof aiRisk === 'number' && aiRisk >= 70) || String(verdict || '').toLowerCase().includes('poser');
         const isLowRisk = (typeof aiRisk === 'number' && aiRisk <= 30) || (score >= 80 && !isHighRisk);
-        const badgeText = (function(){
-            // Show "Verified" only when confirmed by the Verified Registry.
-            if (fromRegistry) return 'Verified';
-            // For non-registry badges, avoid showing the term to prevent confusion.
-            if (hasBadge) return '';
-            // Show explicit status only when not verified.
-            return 'Unverified';
-        })();
+        const fromApify = !!meta._apify_fallback_used;
+        const restricted = !!meta._permissions_restricted;
+        const badgeOrigin = fromRegistry ? 'Registry' : (fromApify ? 'Apify' : (restricted ? 'Graph (restricted)' : 'Graph'));
+        const badgeLine = fromRegistry
+            ? 'Badge: Verified (Registry)'
+            : (hasBadge ? `Badge: Badged (${badgeOrigin})` : 'Badge: Unverified');
         const color = (typeof aiRisk === 'number')
             ? (aiRisk >= 70 ? '#ef4444' : (aiRisk >= 55 ? '#f59e0b' : '#22c55e'))
             : (score >= 80 ? '#22c55e' : (score >= 55 ? '#f59e0b' : '#ef4444'));
@@ -1722,10 +1747,12 @@ function buildPoserSummaryHtml(pd) {
             const hasPic = !!(meta && meta.picture && meta.picture.data && meta.picture.data.url && !meta.picture.data.is_silhouette);
             const hasBio = !!(meta && (meta.about || meta.description));
             const contradictsVerification = (/not verified|unverified|no verified|no verification|lacks official verification|zero followers|no followers|lack of bio|no bio/).test(t);
-            if ((fromRegistry || hasBadge) && contradictsVerification) {
-                aiExplanation = isHighRisk ? 'Registry and badge confirmed. Risk signals detected.' : 'Verified account with official signals. Registry and badge confirmed.';
+            if (fromRegistry && contradictsVerification) {
+                aiExplanation = isHighRisk ? 'Verified registry source. Risk signals detected.' : 'Verified registry source with official signals.';
+            } else if (hasBadge && contradictsVerification) {
+                aiExplanation = isHighRisk ? 'Risk signals detected.' : '';
             } else if (hasBadge && isLowRisk && (/not verified|unverified|no verified|lacks official verification/.test(t))) {
-                aiExplanation = 'Verified account with official signals.';
+                aiExplanation = '';
             } else if (audienceCount >= 100000 && (/low follower|few follower|no follower/.test(t))) {
                 aiExplanation = 'High audience and established presence.';
             } else if (hasBio && (/no bio|missing bio|no description/.test(t))) {
@@ -1742,7 +1769,7 @@ function buildPoserSummaryHtml(pd) {
                     <div style="min-width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:${color}20; color:${color}; font-weight:700;">${Math.max(0, Math.min(100, Math.round(score)))}%</div>
                     <div>
                         <div><strong>${verdict}</strong> ${availabilityBadgeHtml}</div>
-                        <div style="color:#6b7280; font-size:0.9rem;">${name}${audienceCount !== null ? ` • ${audienceCount.toLocaleString()} ${audienceLabel}` : ''}${badgeText ? ` • ${badgeText}` : ''}</div>
+                        <div style="color:#6b7280; font-size:0.9rem;">${name}${audienceCount !== null ? ` • ${audienceCount.toLocaleString()} ${audienceLabel}` : ''} • ${badgeLine}</div>
                         ${note ? `<div style="color:#6b7280; font-size:0.85rem;">${note}</div>` : ''}
                         ${aiExplanation || typeof aiRisk === 'number' ? `<div style="color:#334155; font-size:0.85rem; margin-top:4px;">${aiExplanation || ''}${typeof aiRisk === 'number' ? ` • AI Risk: ${aiRisk}/100` : ''}${aiVerdict ? ` • AI Verdict: ${aiVerdict}` : ''}</div>` : ''}
                         ${requestBtnHtml}
