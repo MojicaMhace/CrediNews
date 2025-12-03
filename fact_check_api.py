@@ -40,12 +40,12 @@ def index():
     })
 
 # Google Fact Check API key
-FACT_CHECK_API_KEY = os.environ.get("FACT_CHECK_API_KEY", "AIzaSyDOrHTLNuEZEiIA-ba9_LrEz9s2Zw6TDFM")
+FACT_CHECK_API_KEY = os.environ.get("FACT_CHECK_API_KEY")
 FACT_CHECK_API_URL = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
 
 # Zyla Labs Configuration
-ZYLA_API_URL = os.environ.get("ZYLA_API_URL", "https://zylalabs.com/api/2753/fact+checking+api/2860/check+facts")
-ZYLA_API_KEY = os.environ.get("ZYLA_API_KEY", "11018|hgGq1lMPYDpnVFB7YHAPcVpxgtjvWP9zlSFUJ5YS")
+ZYLA_API_URL = os.environ.get("ZYLA_API_URL")
+ZYLA_API_KEY = os.environ.get("ZYLA_API_KEY")
 
 # FORCE ENABLED FOR PRESENTATION
 ZYLA_ENABLED = True

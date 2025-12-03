@@ -231,6 +231,20 @@ async function handleUrlVerification() {
     try {
         const existing = await checkExistingVerification(url, '');
         if (existing) {
+            let scrapedText = '';
+            try {
+                if (url) {
+                    const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: '', content: '', url })
+                    });
+                    if (fcResp.ok) {
+                        const fcJson = await fcResp.json();
+                        scrapedText = (typeof fcJson.scraped_text === 'string' && fcJson.scraped_text.trim()) ? fcJson.scraped_text : '';
+                    }
+                }
+            } catch (_) {}
             showVerificationResult('url', {
                 credibilityScore: Number(existing.credibilityScore || 0),
                 sources: Number(existing.sourcesFound || 0),
@@ -238,6 +252,7 @@ async function handleUrlVerification() {
                 domain: extractDomain(existing.url || url),
                 credibilityExplanation: (existing.zylaFactCheck && (existing.zylaFactCheck.explanation || existing.zylaFactCheck.analysis)) || '',
                 credibilityLabel: existing.label || '',
+                analyzedText: scrapedText || (existing.analyzedText || ''),
                 mlDetails: null,
                 slangDetected: [],
                 sarcasmPercent: null,
@@ -528,6 +543,21 @@ async function handleFacebookVerification() {
     try {
         const existing = await checkExistingVerification(url || null, content || null);
         if (existing) {
+            let scrapedText = '';
+            try {
+                const exUrl = existing.url || url || null;
+                if (exUrl) {
+                    const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: '', content: '', url: exUrl })
+                    });
+                    if (fcResp.ok) {
+                        const fcJson = await fcResp.json();
+                        scrapedText = (typeof fcJson.scraped_text === 'string' && fcJson.scraped_text.trim()) ? fcJson.scraped_text : '';
+                    }
+                }
+            } catch (_) {}
             const analysisType = url ? 'facebook-url' : 'facebook-content';
             showFacebookVerificationResult(analysisType, {
                 credibilityScore: Number(existing.credibilityScore || 0),
@@ -539,7 +569,7 @@ async function handleFacebookVerification() {
                 pageName: existing.pageName || null,
                 credibilityExplanation: existing.explanation || ((existing.zylaFactCheck && (existing.zylaFactCheck.explanation || existing.zylaFactCheck.analysis)) || ''),
                 credibilityLabel: existing.label || '',
-                analyzedText: existing.analyzedText || content || '',
+                analyzedText: scrapedText || (existing.analyzedText || content || ''),
                 mlDetails: null,
                 slangDetected: Array.isArray(existing.slang_detected) ? existing.slang_detected : [],
                 sarcasmPercent: null,
