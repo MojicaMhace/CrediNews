@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>IncrediNews Modular DFD</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body { background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; }
+    /* Ensure diagram is wide enough to prevent bunching */
+    .mermaid { display: flex; justify-content: center; min-width: 1600px; } 
+  </style>
+</head>
+<body>
+
+  <div class="mermaid">
+    flowchart LR
+      %% --- STYLING ---
+      classDef process fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,rx:5,ry:5,color:#0d47a1;
+      classDef tool fill:#f5f5f5,stroke:#616161,stroke-width:1px,shape:rect,color:#000;
+      classDef store fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,shape:cylinder,color:#000;
+      classDef user fill:#212121,stroke:#000,stroke-width:2px,color:#fff;
+
+      %% --- USER (Far Left) ---
+      User["USER<br/>(Journalist/Reader)"]:::user
+
+      %% ==========================================
+      %% MODULE 1: VERIFICATION ECOSYSTEM (TOP)
+      %% ==========================================
+      subgraph VerifyModule ["MODULE A: VERIFICATION ECOSYSTEM"]
+        direction TB
+        
+        %% The Process
+        P1("<b>1.0</b> Verify Facebook News"):::process
+
+        %% The Tools (Specific to Verify)
+        subgraph V_Tools ["Verification Tools"]
+            direction LR
+            PLY[Playwright]:::tool
+            GFC[Google Fact Check]:::tool
+            ZYL[Zyla API]:::tool
+        end
+
+        %% The Data Stores (Specific to Verify)
+        subgraph V_DB ["Verification DBs"]
+            direction LR
+            DS1[("DS1<br/>Results")]:::store
+            DS2[("DS2<br/>FB Results")]:::store
+            DS3[("DS3<br/>Requests")]:::store
+            DS4[("DS4<br/>Pending")]:::store
+        end
+      end
+
+      %% ==========================================
+      %% MODULE 2: POSER ECOSYSTEM (MIDDLE)
+      %% ==========================================
+      subgraph PoserModule ["MODULE B: POSER ECOSYSTEM"]
+        direction TB
+        
+        %% The Process
+        P2("<b>2.0</b> Poser Detection"):::process
+
+        %% The Tools (Specific to Poser)
+        subgraph P_Tools ["Poser Tools"]
+            direction LR
+            META[Meta Graph]:::tool
+            API[Apify Scraper]:::tool
+            GROQ[Groq AI]:::tool
+        end
+
+        %% The Data Stores (Specific to Poser)
+        subgraph P_DB ["Poser DBs"]
+            direction LR
+            DS8[("DS8<br/>Page Cache")]:::store
+            DS9[("DS9<br/>Detections")]:::store
+            DS10[("DS10<br/>Registry")]:::store
+        end
+      end
+
+      %% ==========================================
+      %% MODULE 3: DASHBOARDS & USER MGMT (BOTTOM)
+      %% ==========================================
+      subgraph DashModule ["MODULE C: DASHBOARDS & MANAGEMENT"]
+        direction TB
+        
+        %% The Processes
+        subgraph DashProcs ["Viewer Processes"]
+            direction LR
+            P3("<b>3.0</b> Trends"):::process
+            P4("<b>4.0</b> Reports"):::process
+            P5("<b>5.0</b> My Verifications"):::process
+            P6("<b>6.0</b> Poser History"):::process
+        end
+
+        %% The Data Stores (User & Feedback)
+        subgraph U_DB ["User Activity DBs"]
+            direction LR
+            DS5[("DS5<br/>Feedback")]:::store
+            DS11[("DS11<br/>Activity")]:::store
+            DS12[("DS12<br/>Votes")]:::store
+        end
+      end
+
+      %% ==========================================
+      %% CONNECTIONS & DATA FLOW DESCRIPTIONS
+      %% ==========================================
+
+      %% --- User Triggers ---
+      User -->|Submit URL/Text| P1
+      User -->|Submit Page Link| P2
+      User -->|View Dashboard| P3
+      User -->|View Dashboard| P4
+      User -->|Manage History| P5
+      User -->|Manage History| P6
+
+      %% --- Module A Flows (Verify) ---
+      P1 -->|Fetch Page| PLY
+      PLY -->|Return HTML| P1
+      P1 -->|Query Claim| GFC
+      GFC -->|Fact Checks| P1
+      P1 -->|Query Analysis| ZYL
+      ZYL -->|Trust Data| P1
+      
+      P1 -->|Store Verdict| DS1
+      P1 -->|Store FB Data| DS2
+      P1 -->|Log Request| DS3
+      P1 -->|Queue Manual| DS4
+
+      %% --- Module B Flows (Poser) ---
+      P2 -->|Fetch Metadata| META
+      META -->|Page Info| P2
+      P2 -->|Fallback Data| API
+      API -->|Public Signals| P2
+      P2 -->|Send JSON| GROQ
+      GROQ -->|AI Analysis| P2
+
+      P2 -->|Cache Page| DS8
+      P2 -->|Store Result| DS9
+      P2 <-->|Check Verified| DS10
+
+      %% --- Module C Flows (Dashboards) ---
+      %% Note: Dashboards often read from the main Results DBs too
+      DS2 -.->|Read Verified Data| P3
+      DS2 -.->|Read Verified Data| P4
+      DS2 -.->|Read History| P5
+      DS9 -.->|Read History| P6
+
+      P5 -->|Update Feedback| DS5
+      P5 -->|Cast Vote| DS12
+      P6 -->|Log Deletion| DS11
+      P6 -->|Delete Entry| DS9
+
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</body>
+</html>
