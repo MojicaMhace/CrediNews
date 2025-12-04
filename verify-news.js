@@ -212,7 +212,7 @@ async function handleUrlVerification() {
     let effectiveContent = '';
     // Try to extract key claim from URL first
     try {
-        const kcResp = await fetch('${FACTCHECK_BASE}/api/fact-check', {
+        const kcResp = await fetch(`${FACTCHECK_BASE}/api/fact-check`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
@@ -236,7 +236,7 @@ async function handleUrlVerification() {
             let scrapedText = '';
             try {
                 if (url) {
-                    const fcResp = await fetch('${FACTCHECK_BASE}/api/fact-check', {
+                    const fcResp = await fetch(`${FACTCHECK_BASE}/api/fact-check`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title: '', content: '', url })
@@ -275,7 +275,7 @@ async function handleUrlVerification() {
             return;
         }
         const contentForApi = effectiveContent || (url ? buildNonEmptyContentFromUrl(url) : '') || '';
-        const fcResp = await fetch('${FACTCHECK_BASE}/api/fact-check', {
+        const fcResp = await fetch(`${FACTCHECK_BASE}/api/fact-check`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: '', content: contentForApi, url })
@@ -549,7 +549,7 @@ async function handleFacebookVerification() {
             try {
                 const exUrl = existing.url || url || null;
                 if (exUrl) {
-                    const fcResp = await fetch('${FACTCHECK_BASE}/api/fact-check', {
+                    const fcResp = await fetch(`${FACTCHECK_BASE}/api/fact-check`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title: '', content: '', url: exUrl })
@@ -619,7 +619,7 @@ async function handleFacebookVerification() {
     let effectiveContent = content ? content.trim() : '';
     if (url && !effectiveContent) {
         try {
-            const resp = await fetch('${FACTCHECK_BASE}/api/fact-check', {
+            const resp = await fetch(`${FACTCHECK_BASE}/api/fact-check`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url })
