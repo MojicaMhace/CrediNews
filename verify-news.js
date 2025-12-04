@@ -1,4 +1,6 @@
 // Verify News Page JavaScript
+const FACTCHECK_BASE = (typeof window !== 'undefined' && window.FACTCHECK_BASE_URL) ? window.FACTCHECK_BASE_URL : 'https://credinews-factcheck.onrender.com';
+const POSER_BASE = (typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'http://127.0.0.1:5001';
 
 // Firebase will be available globally after firebase-config.js loads
 
@@ -210,7 +212,7 @@ async function handleUrlVerification() {
     let effectiveContent = '';
     // Try to extract key claim from URL first
     try {
-        const kcResp = await fetch('http://127.0.0.1:5000/api/extract-key-claim', {
+        const kcResp = await fetch(FACTCHECK_BASE, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
@@ -234,7 +236,7 @@ async function handleUrlVerification() {
             let scrapedText = '';
             try {
                 if (url) {
-                    const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
+                    const fcResp = await fetch(FACTCHECK_BASE, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title: '', content: '', url })
@@ -273,7 +275,7 @@ async function handleUrlVerification() {
             return;
         }
         const contentForApi = effectiveContent || (url ? buildNonEmptyContentFromUrl(url) : '') || '';
-        const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
+        const fcResp = await fetch(FACTCHECK_BASE, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: '', content: contentForApi, url })
@@ -547,7 +549,7 @@ async function handleFacebookVerification() {
             try {
                 const exUrl = existing.url || url || null;
                 if (exUrl) {
-                    const fcResp = await fetch('http://127.0.0.1:5000/api/fact-check', {
+                    const fcResp = await fetch('https://credinews-factcheck.onrender.com', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title: '', content: '', url: exUrl })
@@ -617,7 +619,7 @@ async function handleFacebookVerification() {
     let effectiveContent = content ? content.trim() : '';
     if (url && !effectiveContent) {
         try {
-            const resp = await fetch('http://127.0.0.1:5000/api/extract-key-claim', {
+            const resp = await fetch(FACTCHECK_BASE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url })
@@ -640,7 +642,7 @@ async function handleFacebookVerification() {
 
     // Call the fact check API with the best available content
     try {
-        const response = await fetch('http://127.0.0.1:5000/api/fact-check', { // Replace with your actual API endpoint
+        const response = await fetch('https://credinews-factcheck.onrender.com', { // Replace with your actual API endpoint
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -679,7 +681,7 @@ async function handleFacebookVerification() {
             let poserSourceUrl = (url || '').trim();
             if (poserSourceUrl.includes('facebook.com/share/')) {
                 try {
-                    const r = await fetch('http://127.0.0.1:5000/api/resolve-facebook-share', {
+                    const r = await fetch('https://credinews-factcheck.onrender.com', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: poserSourceUrl })
@@ -703,7 +705,7 @@ async function handleFacebookVerification() {
                     }
                 } catch (_) {}
                 if (!pd) {
-                    const pdResp = await fetch('http://127.0.0.1:5001/api/poser/analyze_full', {
+                    const pdResp = await fetch(`${POSER_BASE}/api/poser/analyze_full`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: poserTarget })

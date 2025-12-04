@@ -24,7 +24,16 @@ except ImportError:
     Groq = None
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
+_allowed_raw = os.environ.get("ALLOWED_ORIGINS", "*")
+_allowed = [o.strip() for o in _allowed_raw.split(",") if o.strip()] or ["*"]
+try:
+    CORS(app, resources={r"/api/*": {"origins": _allowed}}, supports_credentials=False)
+except Exception:
+    CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
+
+@app.route('/api/health')
+def _health():
+    return jsonify({"status": "ok"})
 
 def _load_env_var(key: str, default: str = "") -> str:
     v = os.getenv(key)
@@ -83,10 +92,27 @@ else:
 
 if not firebase_admin._apps:
     try:
-        import os
-        cred = credentials.Certificate("serviceAccountKey.json")
-        firebase_admin.initialize_app(cred)
-        print("Connected to CrediNews Firebase!")
+        # --- START FIX: Reading JSON from Environment Variable ---
+        
+        # 1. Get the entire JSON file contents as a string from the environment
+        service_account_json_string = os.environ.get('FIREBASE_CONFIG_JSON')
+        
+        if service_account_json_string:
+            # 2. Convert the string back into a Python dictionary/JSON object
+            service_account_info = json.loads(service_account_json_string)
+            
+            # 3. Initialize the credentials using the dictionary
+            cred = credentials.Certificate(service_account_info)
+            firebase_admin.initialize_app(cred)
+            print("Connected to CrediNews Firebase via Environment Variable!")
+        else:
+            # Fallback for local development if the file is present
+            cred = credentials.Certificate("serviceAccountKey.json")
+            firebase_admin.initialize_app(cred)
+            print("Connected to CrediNews Firebase via Local File!")
+
+        # --- END FIX ---
+        
     except Exception as e:
         print(f"Firebase Connection Error: {e}")
 

@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
   //api
   async function analyzePosterViaGraph(idOrUrl) {
     try {
-      let endpoint = 'http://127.0.0.1:5001/api/poser/analyze_full';
+      let endpoint = 'https://credinews-poser-detection.onrender.com/api/poser/analyze_full';
       let payload = { id_or_url: idOrUrl };
       const resp = await fetch(endpoint, {
         method: 'POST',
