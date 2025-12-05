@@ -12,6 +12,39 @@ const facebookUrl = document.getElementById('facebook-url');
 const facebookContent = document.getElementById('facebook-content');
 const facebookCharCount = document.getElementById('facebook-char-count');
 
+function updateVerifyButtons() {
+  try {
+    const hasFiveWords = (() => {
+      const txt = String(facebookContent && facebookContent.value || '').trim();
+      const words = txt.split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w));
+      return words.length >= 5;
+    })();
+    const fbUrlValid = (() => {
+      const u = String(facebookUrl && facebookUrl.value || '').trim();
+      if (!u) return false;
+      if (!isValidUrl(u)) return false;
+      if (!isFacebookUrl(u)) return false;
+      if (!isSupportedFacebookPostUrl(u)) return false;
+      return true;
+    })();
+    const articleUrlValid = (() => {
+      const u = String(articleUrl && articleUrl.value || '').trim();
+      if (!u) return false;
+      return isValidUrl(u);
+    })();
+    if (facebookVerifyBtn) {
+      const enableFb = hasFiveWords || fbUrlValid;
+      facebookVerifyBtn.disabled = !enableFb;
+      facebookVerifyBtn.classList.toggle('is-disabled', !enableFb);
+    }
+    if (urlVerifyBtn) {
+      const enableUrl = articleUrlValid;
+      urlVerifyBtn.disabled = !enableUrl;
+      urlVerifyBtn.classList.toggle('is-disabled', !enableUrl);
+    }
+  } catch (_) {}
+}
+
 function setButtonLoading(btn, loading, labelWhile = 'Analyzing...') {
     if (!btn) return;
     if (loading) {
@@ -153,6 +186,9 @@ function createCleanDbPayload(result, url, contentText, platformLabel, analysisT
     reviewedClaims: claims,
     explanation: explanation,
     slang_detected: slang,
+    sarcasmScore: (typeof result.sarcasm_score === 'number') ? result.sarcasm_score : 0,
+    sarcasmPercent: (typeof result.sarcasm_percent === 'number') ? result.sarcasm_percent : 0,
+    sarcasmRisk: result.sarcasm_risk || null,
     imageUrl: isValidImageUrl(result && result.image_url) ? result.image_url : null,
     userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
     userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
@@ -233,20 +269,6 @@ async function handleUrlVerification() {
     try {
         const existing = await checkExistingVerification(url, '');
         if (existing) {
-            let scrapedText = '';
-            try {
-                if (url) {
-                    const fcResp = await fetch(`https://credinews-factcheck.onrender.com/api/fact-check`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title: '', content: '', url })
-                    });
-                    if (fcResp.ok) {
-                        const fcJson = await fcResp.json();
-                        scrapedText = (typeof fcJson.scraped_text === 'string' && fcJson.scraped_text.trim()) ? fcJson.scraped_text : '';
-                    }
-                }
-            } catch (_) {}
             showVerificationResult('url', {
                 credibilityScore: Number(existing.credibilityScore || 0),
                 sources: Number(existing.sourcesFound || 0),
@@ -254,11 +276,10 @@ async function handleUrlVerification() {
                 domain: extractDomain(existing.url || url),
                 credibilityExplanation: (existing.zylaFactCheck && (existing.zylaFactCheck.explanation || existing.zylaFactCheck.analysis)) || '',
                 credibilityLabel: existing.label || '',
-                analyzedText: scrapedText || (existing.analyzedText || ''),
                 mlDetails: null,
                 slangDetected: [],
-                sarcasmPercent: null,
-                sarcasmRisk: null,
+                sarcasmPercent: (typeof existing.sarcasmPercent === 'number') ? existing.sarcasmPercent : null,
+                sarcasmRisk: existing.sarcasmRisk || null,
                 tone: null,
                 fakeClaims: [],
                 realClaims: [],
@@ -284,7 +305,6 @@ async function handleUrlVerification() {
         const result = await fcResp.json();
 
         const adjustedScore = Math.min(Math.round(result.credibility.score * 100), 100);
-        const analyzedFromScrape = (result && typeof result.scraped_text === 'string' && result.scraped_text.trim()) ? result.scraped_text : contentForApi;
 
         if (window.firebase && firebase.firestore) {
             try {
@@ -301,8 +321,8 @@ async function handleUrlVerification() {
                   aiExplanation: (result.zyla && (result.zyla.explanation || result.zyla.analysis)) || (result.credibility && result.credibility.explanation) || '',
                   sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
                   factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
-                  analyzedText: analyzedFromScrape,
-                  contentHash: hashString(analyzedFromScrape),
+                  analyzedText: contentForApi,
+                  contentHash: hashString(contentForApi),
                   pageName: (result && result.page_name) || null,
                   reviewedClaims: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
                   zylaFactCheck: result.zyla || null,
@@ -323,8 +343,8 @@ async function handleUrlVerification() {
                 label: result.credibility && result.credibility.label,
                 sourcesFound: (result.credibility && result.credibility.sources) ?? 0,
                 factChecks: (result.credibility && result.credibility.factChecks) ?? 0,
-                analyzedText: analyzedFromScrape,
-                contentHash: hashString(analyzedFromScrape),
+                analyzedText: contentForApi,
+                contentHash: hashString(contentForApi),
                 pageName: (result && result.page_name) || null,
                 reviewedClaims: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
                 zylaFactCheck: result.zyla || null,
@@ -351,8 +371,7 @@ async function handleUrlVerification() {
             claimAnalysis: Array.isArray(result.claim_analysis) ? result.claim_analysis : [],
             claimsChecked: Array.isArray(result.claims_checked) ? result.claims_checked : [],
             hasGoogleClaims: !!result.has_google_claims,
-            pageName: (result && result.page_name) || null,
-            analyzedText: analyzedFromScrape
+            pageName: (result && result.page_name) || null
         });
     } catch (error) {
         console.error('Verification error:', error);
@@ -545,22 +564,14 @@ async function handleFacebookVerification() {
     try {
         const existing = await checkExistingVerification(url || null, content || null);
         if (existing) {
-            let scrapedText = '';
-            try {
-                const exUrl = existing.url || url || null;
-                if (exUrl) {
-                    const fcResp = await fetch(`https://credinews-factcheck.onrender.com/api/fact-check`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title: '', content: '', url: exUrl })
-                    });
-                    if (fcResp.ok) {
-                        const fcJson = await fcResp.json();
-                        scrapedText = (typeof fcJson.scraped_text === 'string' && fcJson.scraped_text.trim()) ? fcJson.scraped_text : '';
-                    }
-                }
-            } catch (_) {}
             const analysisType = url ? 'facebook-url' : 'facebook-content';
+
+            // --- FIX: Rebuild Poser HTML from cached data ---
+            let cachedPoserHtml = '';
+            if (existing.poserDetection && existing.poserDetection.raw) {
+                // Use the helper function to rebuild the HTML from the raw saved data
+                cachedPoserHtml = buildPoserSummaryHtml(existing.poserDetection.raw);
+            }
             showFacebookVerificationResult(analysisType, {
                 credibilityScore: Number(existing.credibilityScore || 0),
                 sources: Number(existing.sourcesFound || 0),
@@ -571,11 +582,11 @@ async function handleFacebookVerification() {
                 pageName: existing.pageName || null,
                 credibilityExplanation: existing.explanation || ((existing.zylaFactCheck && (existing.zylaFactCheck.explanation || existing.zylaFactCheck.analysis)) || ''),
                 credibilityLabel: existing.label || '',
-                analyzedText: scrapedText || (existing.analyzedText || content || ''),
+                analyzedText: existing.analyzedText || content || '',
                 mlDetails: null,
                 slangDetected: Array.isArray(existing.slang_detected) ? existing.slang_detected : [],
-                sarcasmPercent: null,
-                sarcasmRisk: null,
+                sarcasmPercent: (typeof existing.sarcasmPercent === 'number') ? existing.sarcasmPercent : null,
+                sarcasmRisk: existing.sarcasmRisk || null,
                 tone: null,
                 fakeClaims: [],
                 realClaims: [],
@@ -585,9 +596,10 @@ async function handleFacebookVerification() {
                     (Array.isArray(existing.reviewedClaims) && existing.reviewedClaims.some(x => String(x.source||'').toLowerCase()==='google')) ||
                     (Array.isArray(existing.googleFactCheck) && existing.googleFactCheck.some(r => r && r.fact_check_result && Array.isArray(r.fact_check_result.claims) && r.fact_check_result.claims.length>0))
                 ),
-                resultId: existing.id || ''
+                resultId: existing.id || '',
+                poserHtml: cachedPoserHtml // Pass the rebuilt HTML here
             });
-            showNotification('Loaded from existing verification.', 'success');
+            // showNotification('Loaded from existing verification.', 'success');
             return;
         }
     } catch (_) {}
@@ -646,7 +658,7 @@ async function handleFacebookVerification() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }, 
+            },
             body: JSON.stringify({
                 title: 'Facebook Content',
                 content: contentForApi,
@@ -681,7 +693,7 @@ async function handleFacebookVerification() {
             let poserSourceUrl = (url || '').trim();
             if (poserSourceUrl.includes('facebook.com/share/')) {
                 try {
-                    const r = await fetch('https://credinews-factcheck.onrender.com', {
+                    const r = await fetch('https://credinews-factcheck.onrender.com/api/fact-check', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: poserSourceUrl })
@@ -831,33 +843,24 @@ function showFacebookVerificationResult(type, data) {
         </div>
     ` : '';
 
-    const panelStatus = (function(l, s) {
-        const t = String(l || '').toLowerCase();
-        if (t.includes('unverified') || t.includes('neutral')) return 'neutral';
-        if ((t.includes('credible') && !t.includes('low')) || s >= 75) return 'trust';
-        if (t.includes('low') || t.includes('fake') || s < 50) return 'risk';
-        if (t.includes('mixed') || (s >= 50 && s < 75)) return 'mixed';
-        return 'neutral';
-    })(data.credibilityLabel, Number(data.credibilityScore || 0));
+    const mlSection = '';
 
     const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
         <div class="panel metrics">
             <div class="panel-title"><span class="label">Slang Detection</span></div>
-            <p style="color:#cbd5e1; margin:8px 0 12px;">Analysis of slang and informal language to gauge sarcasm and tone.</p>
             <ul>
+                <li><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</li>
                 ${(typeof data.sarcasmPercent === 'number') ? `<li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>` : ''}
                 ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
-                <li><em>Slang Words Detected:</em> ${data.slangDetected.join(', ')}</li>
             </ul>
         </div>
     ` : (typeof data.sarcasmPercent === 'number' ? `
         <div class="panel metrics">
             <div class="panel-title"><span class="label">Slang Detection</span></div>
-            <p style="color:#cbd5e1; margin:8px 0 12px;">Analysis of slang and informal language to gauge sarcasm and tone.</p>
             <ul>
+                <li><em>No slang words detected.</em></li>
                 <li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>
                 ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
-                <li><em>No slang words detected.</em></li>
             </ul>
         </div>
     ` : '');
@@ -970,13 +973,32 @@ function showFacebookVerificationResult(type, data) {
         if (s >= 50) return 'hl-mixed';
         return 'hl-bad';
     })(data.credibilityLabel, Number(data.credibilityScore || 0));
+
+    const panelStatus = (function(l, s) {
+      const t = String(l || '').toLowerCase();
+     // 1. Check for Neutral/Unverified labels FIRST
+      if (t.includes('unverified') || t.includes('neutral')) return 'neutral';
+      
+      // 2. Then check Trust/Risk/Mixed based on labels or score
+      if ((t.includes('credible') && !t.includes('low')) || s >= 75) return 'trust';
+      if (t.includes('low') || s < 50) return 'risk';
+      
+      // 3. Fallback for mixed score range (50-74)
+      if (t.includes('mixed') || (s >= 50 && s < 75)) return 'mixed';
+      return 'neutral';
+    })(data.credibilityLabel, Number(data.credibilityScore || 0));
+
+    // ... inside showFacebookVerificationResult ...
+
+    // --- UPDATED DISCLAIMER: Matches Cached "Panel" Style ---
     const disclaimerHtml = `
-      <div class="panel neutral">
-        <div class="panel-title"><span class="label">Disclaimer</span></div>
-        <p>This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.</p>
-      </div>`;
+        <div class="disclaimer-box">
+            <strong>Disclaimer:</strong> 
+            This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.
+        </div>`;
+
     const resultHtml = `
-        <div class="verification-result facebook-result">
+        <div class="verify-result-card ${ps} verification-result facebook-result">
             <div class="result-header">
                 <div class="platform-badge">
                     <i class="fab fa-facebook"></i>
@@ -984,6 +1006,7 @@ function showFacebookVerificationResult(type, data) {
                 </div>
                 <div class="content-type">${data.contentType || 'Post'}</div>
             </div>
+            
             <div class="summary-band ${ps}">
                 <div class="score-donut ${ps}" style="--pct:${data.credibilityScore}">
                   <div class="inner">
@@ -1000,6 +1023,7 @@ function showFacebookVerificationResult(type, data) {
                   <p>${getFacebookScoreSummary(data.credibilityScore)}</p>
                 </div>
             </div>
+
             <div class="panels-row">
               <div class="panel ${panelStatus}">
                 <div class="panel-title"><span class="label">Analyzed Text</span></div>
@@ -1015,11 +1039,15 @@ function showFacebookVerificationResult(type, data) {
                 </ul>
               </div>
             </div>
+
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
+            
+            ${data.poserHtml || ''} 
+            
             ${disclaimerHtml}
-            ${data.poserHtml || ''}
+
             <div class="feedback-section compact" 
                  data-analysis="${type}"
                  data-platform="facebook"
@@ -1042,7 +1070,6 @@ function showFacebookVerificationResult(type, data) {
         </div>
     `;
     
-    // Create and show modal
     showModal('Credibility Analysis Complete', resultHtml);
 }
 
@@ -1268,10 +1295,15 @@ async function showVerificationResult(type, data) {
     }
     const panelStatus2 = (function(l, s) {
       const t = String(l || '').toLowerCase();
+      // 1. Check for Neutral/Unverified labels FIRST
+      if (t.includes('unverified') || t.includes('neutral')) return 'neutral';
+      
+      // 2. Then check Trust/Risk/Mixed based on labels or score
       if ((t.includes('credible') && !t.includes('low')) || s >= 75) return 'trust';
       if (t.includes('low') || s < 50) return 'risk';
+      
+      // 3. Fallback for mixed score range (50-74)
       if (t.includes('mixed') || (s >= 50 && s < 75)) return 'mixed';
-      if (t.includes('unverified') || t.includes('neutral')) return 'neutral';
       return 'neutral';
     })(data.credibilityLabel, Number(data.credibilityScore || 0));
     const hl2 = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-mixed'; return 'hl-bad'; })(Number(data.credibilityScore||0));
@@ -1285,13 +1317,17 @@ async function showVerificationResult(type, data) {
       if (s >= 50) return 'hl-mixed';
       return 'hl-bad';
     })(data.credibilityLabel, Number(data.credibilityScore || 0));
+    // ... inside showVerificationResult ...
+
+    // --- UPDATED DISCLAIMER: Matches Cached "Panel" Style ---
     const disclaimerHtml2 = `
-        <div class="panel neutral">
-            <div class="panel-title"><span class="label">Disclaimer</span></div>
-            <p>This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.</p>
+        <div class="disclaimer-box">
+            <strong>Disclaimer:</strong> 
+            This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.
         </div>`;
+
     const resultHtml = `
-        <div class="verification-result url-result">
+        <div class="verify-result-card ${ps2} verification-result url-result">
             <div class="result-header">
                 <div class="platform-badge">
                     <i class="fas fa-globe"></i>
@@ -1299,6 +1335,7 @@ async function showVerificationResult(type, data) {
                 </div>
                 <div class="content-type">${data.domain || 'Article'}</div>
             </div>
+            
             <div class="summary-band ${ps2}">
                 <div class="score-donut ${ps2}" style="--pct:${data.credibilityScore}">
                   <div class="inner">
@@ -1315,8 +1352,9 @@ async function showVerificationResult(type, data) {
                   <p>${getScoreSummary(data.credibilityScore)}</p>
                 </div>
             </div>
+
             <div class="panels-row">
-              <div class="panel ${panelStatus2}">
+               <div class="panel ${panelStatus2}">
                 <div class="panel-title"><span class="label">Analyzed Text</span></div>
                 ${data.analyzedText ? `<div style="max-height: 150px; overflow-y: auto; white-space: pre-wrap;"><p class="${textHL2}">${safeTextForHtml(data.analyzedText)}</p></div>` : `<p>No text provided.</p>`}
               </div>
@@ -1330,11 +1368,12 @@ async function showVerificationResult(type, data) {
                 </ul>
               </div>
             </div>
+
             ${explanationSection}
             ${slangSection}
             ${factCheckDetailsSection}
-            ${disclaimerHtml2}
-            <div class="feedback-section compact" 
+            
+            ${disclaimerHtml2} <div class="feedback-section compact" 
                  data-analysis="${type}"
                  data-platform="web"
                  data-url="${type === 'url' && articleUrl && articleUrl.value ? articleUrl.value : (data.url || '')}"
@@ -1353,9 +1392,8 @@ async function showVerificationResult(type, data) {
                 </div>
             </div>
         </div>
-`;
+    `;
     
-    // Create and show modal
     showModal('Credibility Analysis Complete', resultHtml);
 }
 
@@ -1502,27 +1540,27 @@ function closeModal() {
   }
 }
 
-// Facebook word counter (max 2000 words)
+// Facebook word counter (max 300 words)
 function updateFacebookCharacterCount() {
     if (facebookContent && facebookCharCount) {
         // Split by whitespace and filter out empty entries
         let words = facebookContent.value.trim().split(/\s+/).filter(Boolean);
         let currentWords = words.length;
 
-        // Enforce 2000-word maximum by truncating excess words
-        if (currentWords > 2000) {
-            words = words.slice(0, 2000);
+        // Enforce 300-word maximum by truncating excess words
+        if (currentWords > 300) {
+            words = words.slice(0, 300);
             facebookContent.value = words.join(' ');
-            currentWords = 2000;
+            currentWords = 300;
         }
 
         // Update counter text with current word count
         facebookCharCount.textContent = currentWords;
 
         // Change color based on word count (soft warnings near the limit)
-        if (currentWords > 1900) {
+        if (currentWords > 280) {
             facebookCharCount.style.color = '#ef4444'; // danger near limit
-        } else if (currentWords > 1800) {
+        } else if (currentWords > 250) {
             facebookCharCount.style.color = '#f59e0b'; // warning approaching limit
         } else {
             facebookCharCount.style.color = '#6b7280'; // neutral
@@ -1574,6 +1612,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Word counter for Facebook content
     if (facebookContent) {
         facebookContent.addEventListener('input', updateFacebookCharacterCount);
+        facebookContent.addEventListener('input', updateVerifyButtons);
     }
 
     // Press Enter to start verification
@@ -1584,6 +1623,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 handleUrlVerification();
             }
         });
+        articleUrl.addEventListener('input', updateVerifyButtons);
     }
     if (facebookUrl) {
         facebookUrl.addEventListener('keydown', function(e) {
@@ -1592,6 +1632,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 handleFacebookVerification();
             }
         });
+        facebookUrl.addEventListener('input', updateVerifyButtons);
     }
     if (facebookContent) {
         facebookContent.addEventListener('keydown', function(e) {
@@ -1623,6 +1664,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Default to Facebook section visible on load
     switchVerifySection('facebook');
+    updateVerifyButtons();
     
     // Close modal when clicking outside
     document.addEventListener('click', function(e) {
@@ -1819,13 +1861,8 @@ function buildPoserSummaryHtml(pd) {
             const t = String(aiExplanation || '').toLowerCase();
             const hasPic = !!(meta && meta.picture && meta.picture.data && meta.picture.data.url && !meta.picture.data.is_silhouette);
             const hasBio = !!(meta && (meta.about || meta.description));
-            const contradictsVerification = (/not verified|unverified|no verified|no verification|lacks official verification|zero followers|no followers|lack of bio|no bio/).test(t);
-            if (fromRegistry && contradictsVerification) {
-                aiExplanation = isHighRisk ? 'Verified registry source. Risk signals detected.' : 'Verified registry source with official signals.';
-            } else if (hasBadge && contradictsVerification) {
-                aiExplanation = isHighRisk ? 'Risk signals detected.' : '';
-            } else if (hasBadge && isLowRisk && (/not verified|unverified|no verified|lacks official verification/.test(t))) {
-                aiExplanation = '';
+            if (hasBadge && (/not verified|unverified|no verified|lacks official verification/.test(t))) {
+                aiExplanation = 'Verified account with official signals.';
             } else if (audienceCount >= 100000 && (/low follower|few follower|no follower/.test(t))) {
                 aiExplanation = 'High audience and established presence.';
             } else if (hasBio && (/no bio|missing bio|no description/.test(t))) {
@@ -1854,3 +1891,5 @@ function buildPoserSummaryHtml(pd) {
         return '';
     }
 }
+
+

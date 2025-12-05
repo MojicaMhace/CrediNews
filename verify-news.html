@@ -47,6 +47,7 @@
     </div>
     </div>
 
+
     <!-- Main Content -->
     <main class="main-content">
         <div class="container">
@@ -55,7 +56,9 @@
                 <div class="title-underline"></div>
             </div>
 
+
             <div class="verify-news-container">
+
 
                 <!-- Toggle Buttons -->
                 <div class="toggle-buttons">
@@ -63,7 +66,9 @@
                     <button id="open-poser-detection" class="toggle-btn">Poser Detection</button>
                 </div>
 
-                
+
+               
+
 
                 <!-- Verify Facebook News Section -->
                 <div id="facebook-verify-section">
@@ -73,15 +78,15 @@
                             <h2 class="card-title">Verify Facebook News</h2>
                         </div>
                         <p class="card-description">Analyze Facebook posts, and shared content for credibility and misinformation.</p>
-                        
+                       
                         <div class="form-group">
                             <label for="facebook-url" class="form-label">Facebook Post URL</label>
-                            
-                            <input 
-                                type="url" 
-                                id="facebook-url" 
-                                class="form-input" 
-                                placeholder="Paste the Facebook post URL here."
+                           
+                            <input
+                                type="url"
+                                id="facebook-url"
+                                class="form-input"
+                                placeholder="Enter Facebook post URL here."
                             >
                             <div class="input-help">
                                 <i class="fas fa-info-circle"></i>
@@ -89,12 +94,13 @@
                             </div>
                         </div>
 
+
                         <div class="form-group">
                             <label for="facebook-content" class="form-label">Or Facebook Content</label>
-                            <textarea 
-                                id="facebook-content" 
-                                class="form-textarea" 
-                                placeholder="Paste the Facebook post content (at least 14 words)."
+                            <textarea
+                                id="facebook-content"
+                                class="form-textarea"
+                                placeholder="Enter Facebook post content (at least 5 words)."
                                 rows="6"
                             ></textarea>
                             <div class="character-count">
@@ -102,8 +108,9 @@
                             </div>
                         </div>
 
+
                         <!-- Removed Facebook options for shared links and source credibility -->
-                        
+                       
                         <button type="button" class="verify-btn facebook-verify-btn" id="verify-facebook-btn">
                             <i class="fab fa-facebook"></i>
                             Analyze Facebook Content
@@ -112,9 +119,12 @@
                 </div>
 
 
+
+
         </div>
 <br>
-        
+       
+
 
         <!-- Results Section (Initially Hidden) -->
         <div class="results-section" id="results-section" style="display: none;">
@@ -127,7 +137,7 @@
                         <span class="score-max">/100</span>
                     </div>
                 </div>
-                
+               
                 <div class="results-content">
                     <div class="analysis-details" id="analysis-details">
                         <!-- Analysis results will be populated here -->
@@ -138,18 +148,16 @@
         </div>
     </main>
 
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    
+   
     <!-- Firebase Configuration -->
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>
-    <script>
-      window.FACTCHECK_BASE_URL = 'https://credinews-factcheck.onrender.com';
-    </script>
-    
+   
     <!-- JavaScript -->
     <link rel="stylesheet" href="feedback.css">
     <script src="feedback.js"></script>
