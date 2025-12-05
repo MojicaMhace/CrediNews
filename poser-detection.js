@@ -1,3 +1,6 @@
+//Poser Detection Script
+const POSER_BASE = (typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-poser-detection.onrender.com';
+
 document.addEventListener('DOMContentLoaded', () => {
   const goFacebookBtn = document.getElementById('show-facebook-verify');
   if (goFacebookBtn) goFacebookBtn.addEventListener('click', () => window.location.href = 'verify-news.html?section=facebook');
