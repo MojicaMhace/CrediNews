@@ -354,3 +354,14 @@ input, textarea {
   .sidebar-footer { display: none; }
   .content-area { padding: 20px; }
 }
+
+/* Additional mobile refinements */
+@media (max-width: 900px) {
+  body { height: auto; overflow: auto; }
+  .sidebar-panel { position: sticky; top: 0; z-index: 10; }
+  .nav-menu { flex-wrap: wrap; gap: 8px; }
+  .nav-btn { flex: 1 1 160px; justify-content: center; }
+  .req-list { grid-template-columns: 1fr; }
+  .danger-item { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .btn-danger-outline, .btn-danger-solid { width: 100%; }
+}

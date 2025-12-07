@@ -114,6 +114,10 @@
 /* Mobile Devices User Interface Compatability */
 @media screen and (max-width: 768px) {
 
+    /* Clear the absolute nav on mobile */
+    .statistics-section { margin-top: 140px !important; }
+    .charts-section { padding-top: 10px !important; }
+
     .charts-section .stats-grid,
     .stats-grid {
         display: grid !important;
@@ -129,20 +133,32 @@
         align-items: center !important;
         justify-content: flex-start !important;
         text-align: left !important;
-        padding: 20px !important;
+        padding: 16px !important;
         min-height: auto !important; /* Remove fixed height */
         height: auto !important;
-        gap: 20px;
+        gap: 14px;
     }
 
 
-    .stat-card i, 
+    /* Icon container: perfect circle */
     .stat-icon {
-        font-size: 32px !important;
-        margin-bottom: 0 !important; /* Remove bottom margin */
-        width: 50px; /* Fixed width for alignment */
-        text-align: center;
+        width: 56px !important;
+        height: 56px !important;
+        border-radius: 50% !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
+
+    /* Icon glyph size */
+    .stat-card i { font-size: 22px !important; }
+
+    /* Variant colors for circles */
+    .stat-card--credible .stat-icon { background: linear-gradient(135deg, #dcfce7, #86efac); }
+    .stat-card--low .stat-icon { background: linear-gradient(135deg, #fee2e2, #fca5a5); }
+    .stat-card--mixed .stat-icon { background: linear-gradient(135deg, #fef3c7, #fcd34d); }
 
 
     .stat-content,
@@ -153,19 +169,19 @@
     }
 
     .stat-number {
-        font-size: 32px !important;
+        font-size: 28px !important;
         line-height: 1.1 !important;
         order: 2;
     }
 
     .stat-label {
-        font-size: 14px !important;
+        font-size: 13px !important;
         margin-top: 4px;
     }
 
 
     .chart-container {
-        padding: 15px !important;
+        padding: 12px !important;
         overflow-x: hidden;
     }
     

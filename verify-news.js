@@ -988,14 +988,14 @@ function showFacebookVerificationResult(type, data) {
       return 'neutral';
     })(data.credibilityLabel, Number(data.credibilityScore || 0));
 
-    // ... inside showFacebookVerificationResult ...
-
     // --- UPDATED DISCLAIMER: Matches Cached "Panel" Style ---
     const disclaimerHtml = `
         <div class="disclaimer-box">
             <strong>Disclaimer:</strong> 
             This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.
         </div>`;
+
+    const manualRequestHtml = getManualRequestButtonHtml(data, 'facebook');
 
     const resultHtml = `
         <div class="verify-result-card ${ps} verification-result facebook-result">
@@ -1045,6 +1045,7 @@ function showFacebookVerificationResult(type, data) {
             ${factCheckDetailsSection}
             
             ${data.poserHtml || ''} 
+            ${manualRequestHtml}
             
             ${disclaimerHtml}
 
@@ -1560,7 +1561,7 @@ function updateFacebookCharacterCount() {
         // Change color based on word count (soft warnings near the limit)
         if (currentWords > 280) {
             facebookCharCount.style.color = '#ef4444'; // danger near limit
-        } else if (currentWords > 250) {
+        } else if (currentWords > 260) {
             facebookCharCount.style.color = '#f59e0b'; // warning approaching limit
         } else {
             facebookCharCount.style.color = '#6b7280'; // neutral
@@ -1892,4 +1893,73 @@ function buildPoserSummaryHtml(pd) {
     }
 }
 
+/* --- REQUEST MANUAL NEWS VERIFICATION --- */
+window.submitNewsVerificationRequest = async function(resultId, url, type, score) {
+    if (!resultId) {
+        showNotification("Cannot verify: Result ID missing.", "error");
+        return;
+    }
 
+    const btn = document.getElementById(`news-req-btn-${resultId}`);
+    if (btn) {
+        btn.innerHTML = '<span class="btn-spinner" style="width:14px;height:14px;border-width:2px;"></span> Sending...';
+        btn.disabled = true;
+    }
+
+    try {
+        if (typeof firebase === 'undefined' || !firebase.firestore) {
+            throw new Error("Database not connected");
+        }
+
+        const user = firebase.auth().currentUser;
+        const db = firebase.firestore();
+        
+        
+        await db.collection('pending_news_verification').add({
+            resultId: resultId,
+            url: url || null,
+            type: type || 'text',
+            currentScore: score || 0,
+            contentSnippet: url ? null : "Text Content Analysis",
+            userId: user ? user.uid : 'anonymous',
+            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'pending'
+        });
+
+        showNotification("Request submitted to Admin for manual review.", "success");
+        if (btn) {
+            btn.innerHTML = 'Request Sent <i class="fas fa-check"></i>';
+            btn.style.borderColor = '#16a34a';
+            btn.style.color = '#16a34a';
+            btn.style.background = 'rgba(22, 163, 74, 0.1)';
+        }
+
+    } catch (e) {
+        console.error("Submission error:", e);
+        showNotification("Failed to submit request.", "error");
+        if (btn) {
+            btn.innerText = "Request Manual Verification";
+            btn.disabled = false;
+        }
+    }
+}
+
+function getManualRequestButtonHtml(data, type) {
+    const safeId = data.resultId || 'temp_' + Math.floor(Math.random() * 10000);
+    const safeUrl = (data.url || '').replace(/'/g, "\\'");
+    const safeType = type || 'facebook';
+    const safeScore = data.credibilityScore || 0;
+
+    return `
+    <div style="margin-top: 20px; padding: 16px; border-top: 1px solid rgba(148,163,184,0.15); text-align: center; background: rgba(15, 23, 42, 0.3); border-radius: 12px;">
+        <p style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px 0;">
+            Is this analysis incorrect? You can request a human review.
+        </p>
+        <button id="news-req-btn-${safeId}" 
+                onclick="window.submitNewsVerificationRequest('${safeId}', '${safeUrl}', '${safeType}', ${safeScore})" 
+                style="background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #60a5fa; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9rem; transition: all 0.2s;">
+            Request Manual Verification
+        </button>
+    </div>
+    `;
+}
