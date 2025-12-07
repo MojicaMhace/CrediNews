@@ -4,6 +4,9 @@ const sortSelect = document.getElementById('trends-sort');
 const prevBtn = document.getElementById('prev-page');
 const nextBtn = document.getElementById('next-page');
 const pageInfo = document.getElementById('page-info');
+const prevBtnTop = document.getElementById('prev-page-top');
+const nextBtnTop = document.getElementById('next-page-top');
+const pageInfoTop = document.getElementById('page-info-top');
 let allDocs = [];
 let currentQuery = '';
 let currentSort = 'date_desc';
@@ -557,8 +560,13 @@ async function appendPoserDetectionIfAvailable(data) {
 
 function updatePaginationUI(){
   if (pageInfo) pageInfo.textContent = 'Page ' + currentPage;
-  if (prevBtn) prevBtn.disabled = currentPage <= 1;
-  if (nextBtn) nextBtn.disabled = !hasMore;
+  if (pageInfoTop) pageInfoTop.textContent = 'Page ' + currentPage;
+  const prevDisabled = currentPage <= 1;
+  const nextDisabled = !hasMore;
+  if (prevBtn) prevBtn.disabled = prevDisabled;
+  if (nextBtn) nextBtn.disabled = nextDisabled;
+  if (prevBtnTop) prevBtnTop.disabled = prevDisabled;
+  if (nextBtnTop) nextBtnTop.disabled = nextDisabled;
 }
 
 
@@ -604,6 +612,16 @@ async function start() {
   }
   if (nextBtn) {
     nextBtn.addEventListener('click', function(){
+      if (hasMore) fetchPage(currentPage + 1);
+    });
+  }
+    if (prevBtnTop) {
+    prevBtnTop.addEventListener('click', function(){
+      if (currentPage > 1) fetchPage(currentPage - 1);
+    });
+  }
+  if (nextBtnTop) {
+    nextBtnTop.addEventListener('click', function(){
       if (hasMore) fetchPage(currentPage + 1);
     });
   }

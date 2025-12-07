@@ -580,3 +580,70 @@
     font-weight: 700;
 }
 
+@media screen and (max-width: 900px) {
+    /* --- 1. Fix Navbar Overlapping --- */
+    .verify-news-page .navbar {
+        height: auto; /* Allow height to grow */
+        padding: 15px !important;
+    }
+
+    .verify-news-page .nav-container {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 15px;
+        position: static !important; /* Stop absolute positioning issues */
+    }
+
+    /* Reset the absolute centering that causes overlap */
+    .verify-news-page .nav-links {
+        position: static !important;
+        transform: none !important;
+        display: flex !important;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px !important;
+        width: 100%;
+    }
+
+    .verify-news-page .nav-brand {
+        justify-self: center;
+        margin-bottom: 5px;
+    }
+
+    .verify-news-page .nav-controls {
+        justify-content: center;
+        width: 100%;
+        margin-top: 5px;
+    }
+
+    /* --- 2. Fix Dead Space (Title Area) --- */
+    /* Reduce the huge padding that creates the gap */
+    .page-title-section {
+        padding: 10px 0 10px 0 !important; /* Reduced from 60px */
+        margin-top: 140px !important; /* Push down just enough to clear the stacked navbar */
+        margin-bottom: 10px !important;
+    }
+
+    .verify-news-page .page-title,
+    .page-title {
+        font-size: 2rem !important; /* Smaller title */
+        margin-bottom: 5px !important;
+        line-height: 1.1;
+    }
+
+    .title-underline {
+        margin-bottom: 15px !important;
+    }
+
+    /* Pull the content container up closer to the title */
+    .verify-news-container {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        gap: 15px !important;
+    }
+    
+    /* Ensure the toggle buttons have breathing room but not too much */
+    .toggle-buttons {
+        margin-bottom: 15px !important;
+    }
+}

@@ -110,3 +110,67 @@
   }
   .chart-container canvas { }
 }
+
+/* Mobile Devices User Interface Compatability */
+@media screen and (max-width: 768px) {
+
+    .charts-section .stats-grid,
+    .stats-grid {
+        display: grid !important;
+        grid-template-columns: 1fr !important; /* 1 Column */
+        gap: 16px !important;
+        margin-bottom: 30px !important;
+    }
+
+
+    .stat-card {
+        display: flex !important;
+        flex-direction: row !important; /* Icon Left, Text Right */
+        align-items: center !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        padding: 20px !important;
+        min-height: auto !important; /* Remove fixed height */
+        height: auto !important;
+        gap: 20px;
+    }
+
+
+    .stat-card i, 
+    .stat-icon {
+        font-size: 32px !important;
+        margin-bottom: 0 !important; /* Remove bottom margin */
+        width: 50px; /* Fixed width for alignment */
+        text-align: center;
+    }
+
+
+    .stat-content,
+    .stat-item {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+
+    .stat-number {
+        font-size: 32px !important;
+        line-height: 1.1 !important;
+        order: 2;
+    }
+
+    .stat-label {
+        font-size: 14px !important;
+        margin-top: 4px;
+    }
+
+
+    .chart-container {
+        padding: 15px !important;
+        overflow-x: hidden;
+    }
+    
+    .chart-container canvas {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+}
