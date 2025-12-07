@@ -100,7 +100,7 @@ body {
   background: rgba(15, 15, 35, 0.9);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-color);
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -114,7 +114,7 @@ body {
 /* About-style simple nav for index hero */
 body[data-page='index-hero'] { padding-top: 0; }
 .index-about-nav nav {
-  position: fixed;
+  position: absolute;
   top: 0;
   width: 100%;
   padding: 1.5rem 3rem;
@@ -3914,7 +3914,7 @@ body[data-page='index-hero'] { --shadow: none; }
   background: rgba(15, 15, 35, 0.9);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-color);
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -4433,7 +4433,7 @@ body[data-page='index-hero'] { --shadow: none; }
   background: rgba(15, 15, 35, 0.9);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-color);
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -5202,7 +5202,7 @@ input[style*="--placeholder-color"]::placeholder {
 /* --- CENTERED NAVIGATION --- */
 
 .site-simple-nav nav {
-  position: fixed;
+  position: absolute;
   top: 0;
   width: 100%;
   padding: 1.5rem 3rem;
@@ -5259,25 +5259,35 @@ input[style*="--placeholder-color"]::placeholder {
   border-bottom: 2px solid #22c55e;
   padding-bottom: 5px;
 }
-.navbar { position: fixed; top: 0; width: 100%; padding: 1.5rem 3rem; display: flex; align-items: center; justify-content: center; background: transparent; z-index: 1000; }
+.navbar { position: absolute; top: 0; width: 100%; padding: 1.5rem 3rem; display: flex; align-items: center; justify-content: center; background: transparent; z-index: 1000; }
 .navbar .nav-container { width: 100%; display: flex; align-items: center; justify-content: space-between; }
 
 /* Mobile Devices User Interface compatibility */
-@media screen and (max-width: 900px) {
+.navbar,
+.site-simple-nav nav {
+    background: rgba(15, 23, 42, 0.95) !important; /* Dark opaque background */
+    backdrop-filter: blur(12px) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    position: absolute !important; /* Scrolls away with page */
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+}
 
-    /* ---Fix Navigation Overlap --- */
+/* 2. Mobile Navigation & Homepage Layout */
+@media screen and (max-width: 900px) {
     .site-simple-nav nav {
-        padding: 10px 15px; /* Smaller padding */
-        flex-direction: column; /* Stack items vertically */
+        padding: 10px 15px;
+        flex-direction: column;
         height: auto;
     }
 
     .site-simple-nav .logo {
         margin-right: 0;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }
 
-    /* Stop the links from floating in the middle and crushing everything */
     .site-simple-nav nav .nav-links {
         position: static; 
         transform: none;
@@ -5289,31 +5299,30 @@ input[style*="--placeholder-color"]::placeholder {
     }
 
     .site-simple-nav nav .nav-links a {
-        font-size: 12px; /* Smaller text for links */
+        font-size: 12px;
     }
 
-    /* Center the login buttons */
     .nav-controls {
         margin: 0 auto;
         width: 100%;
         justify-content: center;
     }
 
-    /* --- Fix Homepage Giant Text (Image 1) --- */
+    /* Homepage Text Fixes */
     .hero-container {
-        grid-template-columns: 1fr; /* Stack text on top of image */
-        padding-top: 120px; /* Make room for the stacked nav */
+        grid-template-columns: 1fr;
+        padding-top: 140px; /* More space for the stacked nav */
         text-align: center;
     }
 
     .hero-left {
         grid-column: auto;
-        align-items: center; /* Center align text */
+        align-items: center;
         margin-top: 20px;
     }
 
     .hero-title {
-        font-size: 2.5rem; /* Shrink from 4rem to fit phone */
+        font-size: 2.5rem;
         line-height: 1.2;
     }
 
@@ -5322,47 +5331,68 @@ input[style*="--placeholder-color"]::placeholder {
     }
 
     .cta-group {
-        justify-content: center; /* Center buttons */
-        flex-direction: column; /* Stack buttons vertically */
+        justify-content: center;
+        flex-direction: column;
         width: 100%;
     }
 
     .hero-section .btn-primary, 
     .hero-section .btn-secondary {
-        width: 100%; /* Full width buttons */
+        width: 100%;
         justify-content: center;
     }
 }
 
-/* --- Fix Verify & Poser Page Buttons --- */
+/* 3. Verify News & Poser Detection Page Fixes */
 @media screen and (max-width: 768px) {
-    
-    /* Force grids to be 1 column */
-    .verify-news-page .verification-grid,
-    .verify-news-page .features-grid,
-    .verify-news-page .toggle-buttons {
-        grid-template-columns: 1fr !important; /* Stack vertically */
-        gap: 15px;
-    }
-
-    /* Fix the squished toggle buttons */
-    .verify-news-page .toggle-btn {
-        width: 100%;
-        margin-bottom: 10px;
-    }
-
-    /* Adjust main container padding */
-    .verify-news-page .verify-news-container {
+    .verify-news-page .verify-news-container,
+    .poser-detection-page .verify-news-container {
         padding: 10px;
-        margin-top: 100px; /* Push down below fixed nav */
+        margin-top: 140px; /* Push down to clear the absolute nav */
     }
 
-    .verify-news-page .page-title {
-        font-size: 2.5rem; /* Smaller title */
+    .verify-news-page .page-title,
+    .poser-detection-page .page-title {
+        font-size: 2.2rem !important;
         padding: 0 10px;
     }
 
-    .verify-news-page .verify-card {
-        padding: 20px; /* Less padding inside cards */
+    .verify-news-page .verify-card,
+    .poser-detection-page .verify-card {
+        padding: 20px;
+    }
+
+    /* --- FORCE HORIZONTAL TOGGLES --- */
+    .verify-news-page .toggle-buttons,
+    .poser-detection-page .toggle-buttons,
+    .verify-news-container .toggle-buttons {
+        display: flex !important;
+        flex-direction: row !important; /* Force Side-by-Side */
+        gap: 8px !important;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .toggle-btn {
+        flex: 1; /* Equal width */
+        padding: 12px 4px !important;
+        font-size: 12px !important; /* Smaller text to fit */
+        white-space: nowrap;
+        width: auto !important;
+        margin: 0 !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Strict removal of any 3rd button to prevent layout break */
+    .toggle-buttons button:nth-child(n+3),
+    .toggle-buttons .toggle-btn:nth-child(n+3) {
+        display: none !important;
+    }
+    
+    /* Input Field Fixes */
+    .form-input, .form-textarea {
+        font-size: 16px !important; /* Prevents zoom on iOS */
     }
 }
