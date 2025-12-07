@@ -5261,3 +5261,108 @@ input[style*="--placeholder-color"]::placeholder {
 }
 .navbar { position: fixed; top: 0; width: 100%; padding: 1.5rem 3rem; display: flex; align-items: center; justify-content: center; background: transparent; z-index: 1000; }
 .navbar .nav-container { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+
+/* Mobile Devices User Interface compatibility */
+@media screen and (max-width: 900px) {
+
+    /* ---Fix Navigation Overlap --- */
+    .site-simple-nav nav {
+        padding: 10px 15px; /* Smaller padding */
+        flex-direction: column; /* Stack items vertically */
+        height: auto;
+    }
+
+    .site-simple-nav .logo {
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+
+    /* Stop the links from floating in the middle and crushing everything */
+    .site-simple-nav nav .nav-links {
+        position: static; 
+        transform: none;
+        gap: 15px !important;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 15px;
+        width: 100%;
+    }
+
+    .site-simple-nav nav .nav-links a {
+        font-size: 12px; /* Smaller text for links */
+    }
+
+    /* Center the login buttons */
+    .nav-controls {
+        margin: 0 auto;
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* --- Fix Homepage Giant Text (Image 1) --- */
+    .hero-container {
+        grid-template-columns: 1fr; /* Stack text on top of image */
+        padding-top: 120px; /* Make room for the stacked nav */
+        text-align: center;
+    }
+
+    .hero-left {
+        grid-column: auto;
+        align-items: center; /* Center align text */
+        margin-top: 20px;
+    }
+
+    .hero-title {
+        font-size: 2.5rem; /* Shrink from 4rem to fit phone */
+        line-height: 1.2;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .cta-group {
+        justify-content: center; /* Center buttons */
+        flex-direction: column; /* Stack buttons vertically */
+        width: 100%;
+    }
+
+    .hero-section .btn-primary, 
+    .hero-section .btn-secondary {
+        width: 100%; /* Full width buttons */
+        justify-content: center;
+    }
+}
+
+/* --- Fix Verify & Poser Page Buttons --- */
+@media screen and (max-width: 768px) {
+    
+    /* Force grids to be 1 column */
+    .verify-news-page .verification-grid,
+    .verify-news-page .features-grid,
+    .verify-news-page .toggle-buttons {
+        grid-template-columns: 1fr !important; /* Stack vertically */
+        gap: 15px;
+    }
+
+    /* Fix the squished toggle buttons */
+    .verify-news-page .toggle-btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    /* Adjust main container padding */
+    .verify-news-page .verify-news-container {
+        padding: 10px;
+        margin-top: 100px; /* Push down below fixed nav */
+    }
+
+    .verify-news-page .page-title {
+        font-size: 2.5rem; /* Smaller title */
+        padding: 0 10px;
+    }
+
+    .verify-news-page .verify-card {
+        padding: 20px; /* Less padding inside cards */
+    }
+}
