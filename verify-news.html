@@ -13,7 +13,6 @@
     <link rel="apple-touch-icon" href="images/logo2.png">
 </head>
 <body class="verify-news-page">
-    <!-- Navigation (match Index/Home) -->
     <div class="site-simple-nav">
       <nav>
         <div class="logo">
@@ -45,7 +44,6 @@
     </div>
 
 
-    <!-- Main Content -->
     <main class="main-content">
         <div class="container">
             <div class="page-title-section">
@@ -57,17 +55,15 @@
             <div class="verify-news-container">
 
 
-                <!-- Toggle Buttons -->
                 <div class="toggle-buttons">
                     <button id="show-facebook-verify" class="toggle-btn active">Verify Facebook News</button>
                     <button id="open-poser-detection" class="toggle-btn">Poser Detection</button>
                 </div>
 
 
-               
+                
 
 
-                <!-- Verify Facebook News Section -->
                 <div id="facebook-verify-section">
                     <div class="verify-card facebook-card">
                         <div class="card-header">
@@ -75,10 +71,10 @@
                             <h2 class="card-title">Verify Facebook News</h2>
                         </div>
                         <p class="card-description">Analyze Facebook posts, and shared content for credibility and misinformation.</p>
-                       
+                        
                         <div class="form-group">
                             <label for="facebook-url" class="form-label">Facebook Post URL</label>
-                           
+                            
                             <input
                                 type="url"
                                 id="facebook-url"
@@ -106,8 +102,6 @@
                         </div>
 
 
-                        <!-- Removed Facebook options for shared links and source credibility -->
-                       
                         <button type="button" class="verify-btn facebook-verify-btn" id="verify-facebook-btn">
                             <i class="fab fa-facebook"></i>
                             Analyze Facebook Content
@@ -116,14 +110,39 @@
                 </div>
 
 
+                <div id="poser-detection-section" style="display:none;">
+                    <div class="verify-card poser-card">
+                        <div class="card-header">
+                            <i class="fas fa-user-secret card-icon"></i>
+                            <h2 class="card-title">Poser Detection</h2>
+                        </div>
+                        <p class="card-description">Check Facebook Page/Profile URLs for signs of imposter accounts or poseurs.</p>
+                        <div class="form-group">
+                            <label for="poser-url" class="form-label">Facebook Page/Profile URL</label>
+                            <input
+                                type="url"
+                                id="poser-url"
+                                class="form-input"
+                                placeholder="Enter Facebook Page/Profile URL here."
+                            >
+                            <div class="input-help">
+                                <i class="fas fa-info-circle"></i>
+                                Only supports Facebook Page/Profile URLs.
+                            </div>
+                        </div>
+                        <button type="button" class="verify-btn poser-detection-btn" id="run-poser-btn">
+                            <i class="fas fa-user-secret"></i>
+                            Run Poser Detection
+                        </button>
+                    </div>
+                </div>
 
 
         </div>
 <br>
-       
+        
 
 
-        <!-- Results Section (Initially Hidden) -->
         <div class="results-section" id="results-section" style="display: none;">
             <div class="results-card">
                 <div class="results-header">
@@ -134,11 +153,10 @@
                         <span class="score-max">/100</span>
                     </div>
                 </div>
-               
+                
                 <div class="results-content">
                     <div class="analysis-details" id="analysis-details">
-                        <!-- Analysis results will be populated here -->
-                    </div>
+                        </div>
                 </div>
             </div>
         </div>
@@ -146,18 +164,278 @@
     </main>
 
 
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-   
-    <!-- Firebase Configuration -->
+    
     <script src="firebase-config.js"></script>
     <script src="script.js"></script>
-   
-    <!-- JavaScript -->
+    
     <link rel="stylesheet" href="feedback.css">
     <script src="feedback.js"></script>
     <script src="verify-news.js"></script>
+    
+    
+    <script>
+// verify-auth.js (Embedded Secure Fetch Utility)
+
+const BASE_API_URL = 'https://credinews-poser-api.onrender.com';
+
+/**
+ * Executes a protected API call to the Python backend.
+ * @param {string} endpoint - The specific API path (e.g., '/api/poser/analyze_full').
+ */
+function fetchProtected(endpoint, options = {}) {
+    // 1. Retrieve the saved token (saved by auth.js)
+    const authData = JSON.parse(sessionStorage.getItem('authData') || localStorage.getItem('authData') || '{}');
+    const token = authData.idToken;
+
+    if (!token) {
+        // If token is missing, redirect immediately to clear session and re-login
+        console.error("TOKEN FAILURE: Authentication token not found. Redirecting.");
+        window.location.href = 'login.html?clearAuth=1'; 
+        return Promise.reject(new Error("Authentication required."));
+    }
+
+    // 2. Prepare the Authorization Header
+    const headers = {
+        'Authorization': `Bearer ${token}`, // <-- CRITICAL: Sends the Firebase ID Token
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+    };
+
+    // 3. Send the request
+    console.log(`📤 Sending secure request to: ${BASE_API_URL + endpoint}`);
+    return fetch(BASE_API_URL + endpoint, {
+        ...options,
+        headers: headers
+    })
+    .then(response => {
+        // Handle rejection from the Python backend (401 or 403 from @firebase_auth_required)
+        if (response.status === 401 || response.status === 403) {
+            console.error(`BACKEND REJECTED TOKEN: Status ${response.status}. Forcing logout.`);
+            // Force logout and redirect
+            sessionStorage.removeItem('authData');
+            localStorage.removeItem('authData');
+            window.location.href = 'login.html?clearAuth=1';
+            throw new Error("Session expired.");
+        }
+        return response.json();
+    });
+}
+
+// Make the function available globally
+window.fetchProtected = fetchProtected;
+    </script> 
+    
+    <script>
+// verify-news.js (Embedded Page Logic using fetchProtected)
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Ensure the protected fetch utility is available globally
+    if (typeof fetchProtected !== 'function') {
+        console.error("CRITICAL ERROR: fetchProtected utility is missing.");
+        return;
+    }
+    
+    // Note: The user's original script.js likely handles initial access rules.
+
+    initializeToggleButtons();
+    initializeInputListeners();
+    bindAnalysisButton();
+    bindPoserDetectionButton();
+});
+
+function initializeToggleButtons() {
+    const fbBtn = document.getElementById('show-facebook-verify');
+    const poserBtn = document.getElementById('open-poser-detection');
+    const fbSection = document.getElementById('facebook-verify-section');
+    const poserSection = document.getElementById('poser-detection-section'); 
+    
+    if (fbBtn) fbBtn.addEventListener('click', () => {
+        fbBtn.classList.add('active');
+        if (poserBtn) poserBtn.classList.remove('active');
+        if (fbSection) fbSection.style.display = 'block';
+        if (poserSection) poserSection.style.display = 'none';
+        hideResults();
+    });
+    
+    if (poserBtn) poserBtn.addEventListener('click', () => {
+        poserBtn.classList.add('active');
+        if (fbBtn) fbBtn.classList.remove('active');
+        if (fbSection) fbSection.style.display = 'none';
+        if (poserSection) poserSection.style.display = 'block';
+        hideResults();
+    });
+
+    // Default state
+    if (fbBtn && fbSection) fbBtn.click();
+}
+
+function initializeInputListeners() {
+    const contentInput = document.getElementById('facebook-content');
+    const charCount = document.getElementById('facebook-char-count');
+    const MAX_WORDS = 2000; 
+    const isAuthManagerAvailable = window.authManager && typeof window.authManager.setButtonLoading === 'function';
+
+    if (contentInput && charCount) {
+        contentInput.addEventListener('input', function() {
+            const words = this.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+            charCount.textContent = words;
+            
+            if (words > MAX_WORDS) {
+                charCount.classList.add('limit-exceeded');
+            } else {
+                charCount.classList.remove('limit-exceeded');
+            }
+        });
+    }
+}
+
+function bindAnalysisButton() {
+    const verifyFacebookBtn = document.getElementById('verify-facebook-btn');
+    if (verifyFacebookBtn) {
+        verifyFacebookBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+
+            const urlInput = document.getElementById('facebook-url');
+            const contentInput = document.getElementById('facebook-content');
+            const url = urlInput.value.trim();
+            const content = contentInput.value.trim();
+            
+            const isAuthManagerAvailable = window.authManager && typeof window.authManager.setButtonLoading === 'function';
+
+            if (!url && content.length < 5) {
+                const showError = isAuthManagerAvailable ? window.authManager.showError : alert;
+                showError('Please enter a valid Facebook URL or at least 5 words of content.');
+                return;
+            }
+
+            const originalContent = this.innerHTML;
+            if (isAuthManagerAvailable) window.authManager.setButtonLoading(this, true);
+
+            const requestBody = {
+                url: url,
+                content: content
+            };
+
+            try {
+                // *** CRITICAL INTEGRATION: Use the fetchProtected utility ***
+                const result = await fetchProtected('/api/poser/analyze_full', {
+                    method: 'POST',
+                    body: JSON.stringify(requestBody)
+                });
+                // ************************************************************
+
+                displayResults(result, 'Facebook Post Analysis');
+
+            } catch (error) {
+                console.error("Verification failed:", error);
+                if (isAuthManagerAvailable) window.authManager.showError('Analysis failed. Check console for details or try again.');
+            } finally {
+                if (isAuthManagerAvailable) window.authManager.setButtonLoading(this, false);
+            }
+        });
+    }
+}
+
+function bindPoserDetectionButton() {
+    const poserBtn = document.getElementById('run-poser-btn');
+    if (poserBtn) {
+        poserBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+
+            const urlInput = document.getElementById('poser-url');
+            const url = urlInput.value.trim();
+            
+            const isAuthManagerAvailable = window.authManager && typeof window.authManager.setButtonLoading === 'function';
+
+            if (!url) {
+                const showError = isAuthManagerAvailable ? window.authManager.showError : alert;
+                showError('Please enter a Facebook Page or Profile URL.');
+                return;
+            }
+
+            const originalContent = this.innerHTML;
+            if (isAuthManagerAvailable) window.authManager.setButtonLoading(this, true);
+
+            const requestBody = {
+                url: url
+            };
+
+            try {
+                // *** CRITICAL INTEGRATION: Use the fetchProtected utility ***
+                const result = await fetchProtected('/api/poser/analyze_full', {
+                    method: 'POST',
+                    body: JSON.stringify(requestBody)
+                });
+                // ************************************************************
+
+                displayResults(result, 'Poser Detection Analysis');
+
+            } catch (error) {
+                console.error("Poser Detection failed:", error);
+                if (isAuthManagerAvailable) window.authManager.showError('Poser analysis failed. Check console for details or try again.');
+            } finally {
+                if (isAuthManagerAvailable) window.authManager.setButtonLoading(this, false);
+            }
+        });
+    }
+}
+
+function displayResults(data, title) {
+    const resultsSection = document.getElementById('results-section');
+    const scoreValue = document.getElementById('score-value');
+    const analysisDetails = document.getElementById('analysis-details');
+
+    if (data && data.analysis) {
+        const score = data.analysis.final_trust_score;
+        const verdict = data.analysis.verdict;
+        const explanation = data.analysis.human_explanation;
+        const sourceNote = data.analysis.data_source_note;
+        const scorePrefix = (data.metadata.verification_source === 'verified_registry') ? 'Verified' : 'Credibility';
+
+        scoreValue.textContent = score;
+        
+        // Update score color and verdict
+        if (score >= 80) {
+            scoreValue.className = 'score-value score-high';
+        } else if (score >= 50) {
+            scoreValue.className = 'score-value score-medium';
+        } else {
+            scoreValue.className = 'score-value score-low';
+        }
+
+        // Update results header title
+        const resultsTitle = document.querySelector('.results-title');
+        if (resultsTitle) resultsTitle.textContent = `${title} Results`;
+
+        const scoreLabel = document.querySelector('.score-label');
+        if (scoreLabel) scoreLabel.textContent = `${scorePrefix} Score:`;
+        
+        // Build details content
+        analysisDetails.innerHTML = `
+            <p class="verdict-message"><strong>Verdict:</strong> ${verdict}</p>
+            <p><strong>Status:</strong> ${explanation}</p>
+            <p><strong>Data Source:</strong> ${sourceNote}</p>
+            <div class="divider"></div>
+            <p><strong>AI Insight:</strong> ${data.analysis.breakdown.ai_explanation || 'No detailed AI insight available.'}</p>
+            <div class="divider"></div>
+            <p class="disclaimer">Disclaimer: This score is calculated based on publicly available data, historical posting behavior, and AI analysis. Use this as a guide, not definitive proof.</p>
+        `;
+
+        resultsSection.style.display = 'block';
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        if (window.authManager) window.authManager.showError('Could not process the analysis results.');
+    }
+}
+
+function hideResults() {
+    const resultsSection = document.getElementById('results-section');
+    if (resultsSection) resultsSection.style.display = 'none';
+}
+    </script>
+    <script src="script.js"></script>
 </body>
 </html>

@@ -80,20 +80,6 @@ function updateAuthButton() {
         }
         ensureDropdown.style.zIndex = '9999';
         ensureDropdown.style.minWidth = ensureDropdown.style.minWidth || '140px';
-        // If the header/menu hasn't been rendered yet, inject the full dropdown.
-        // What this block does:
-        // - Defines the user account dropdown HTML.
-        // - Adds a profile header (avatar, display name, email) and the menu list.
-        // - Each `.dropdown-item` is a clickable action you can wire to pages.
-        // Menu items explained:
-        // * Verify a Post — go to the verification page.
-        // * My Verifications — show the user's verification history.
-        // * Saved Posts — open the saved posts list.
-        // * Credibility Score — show score/overview related to content.
-        // * Profile Settings — open user profile/settings.
-        // * Notifications — open alerts/updates.
-        // * FAQ — open help/guide.
-        // * About CrediNews — app information page.
         if (!ensureDropdown.querySelector('.dropdown-header')) {
             const avatarContent = photoURL
                 ? `<img src="${photoURL}" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
@@ -373,28 +359,9 @@ function initializeButtonRedirects() {
         });
         console.log('✅ Verify News button redirect initialized');
     }
-    
-    // Demo button - scroll to verify news section for demo
-    const demoBtn = document.getElementById('demoBtn');
-    if (demoBtn) {
-        console.log('✅ Found demoBtn, adding event listener...');
-        demoBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('🎬 Demo button clicked - scrolling to verify news section');
-            const verifySection = document.getElementById('verify-news');
-            if (verifySection) {
-                verifySection.scrollIntoView({ 
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
-        });
-        console.log('✅ Demo button functionality initialized');
-    }
+
     
     console.log('🎉 All button redirects initialized successfully');
-    
-    // Fallback: Add onclick handlers directly to test if buttons are responsive
     const verifyBtnFallback = document.getElementById('verifyBtn');
     const analyzeBtnFallback = document.getElementById('analyzeBtn');
     
@@ -418,8 +385,6 @@ function initializeButtonRedirects() {
 
 // Firebase initialization
 function initializeFirebase() {
-    // Firebase is already initialized in firebase-config.js
-    // This function can be used for any additional setup if needed
 }
 
 // Check authentication state and update UI
@@ -508,7 +473,7 @@ function setupUserDropdown() {
 
     // Outside click closer: bind only if not already bound globally
     if (!window.__userDropdownOutsideBound) {
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', (e) => {
             if (userDropdown && !userAccountBtn.contains(e.target) && !userDropdown.contains(e.target)) {
                 userDropdown.classList.remove('show');
                 userDropdown.style.visibility = 'hidden';
@@ -830,3 +795,51 @@ function enforceAccessRules() {
         firebase.auth().onAuthStateChanged(user => check(user));
     }
 }
+
+// --- NEW CODE ADDED HERE ---
+
+// verify-auth.js utility definition
+const BASE_API_URL = 'https://credinews-poser-api.onrender.com';
+
+/**
+ * Executes a protected API call to the Python backend.
+ * @param {string} endpoint - The specific API path.
+ */
+function fetchProtected(endpoint, options = {}) {
+    const authData = JSON.parse(sessionStorage.getItem('authData') || localStorage.getItem('authData') || '{}');
+    const token = authData.idToken;
+
+    if (!token) {
+        // Redirect if token is missing
+        console.error("TOKEN FAILURE: Authentication token not found. Redirecting.");
+        window.location.href = 'login.html?clearAuth=1'; 
+        return Promise.reject(new Error("Authentication required."));
+    }
+
+    const headers = {
+        'Authorization': `Bearer ${token}`, // Attaches the Firebase ID Token
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+    };
+
+    console.log(`📤 Sending secure request to: ${BASE_API_URL + endpoint}`);
+    
+    return fetch(BASE_API_URL + endpoint, {
+        ...options,
+        headers: headers
+    })
+    .then(response => {
+        // Handle rejection from the Python backend (401 or 403 from @firebase_auth_required)
+        if (response.status === 401 || response.status === 403) {
+            console.error(`BACKEND REJECTED TOKEN: Status ${response.status}. Forcing logout.`);
+            sessionStorage.removeItem('authData');
+            localStorage.removeItem('authData');
+            window.location.href = 'login.html?clearAuth=1';
+            throw new Error("Session expired.");
+        }
+        return response.json();
+    });
+}
+
+// Make the function available globally
+window.fetchProtected = fetchProtected;
