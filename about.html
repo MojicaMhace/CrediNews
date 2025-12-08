@@ -6,7 +6,7 @@
     <title>CrediNews - About</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <link rel="stylesheet" href="styles.css">
     <style>
         :root {
             --bg-navy: #0B1120;
@@ -79,7 +79,7 @@
 
         /* --- Navigation --- */
         nav {
-            position: fixed;
+            position: absolute;
             top: 0;
             width: 100%;
             padding: 1.5rem 3rem;
@@ -289,6 +289,50 @@
         .user-account-btn { background: transparent; color: var(--brand-green); border: 2px solid var(--brand-green); padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; display:flex; align-items:center; gap:6px; }
         .user-dropdown { position:absolute; top:100%; right:0; background:#0e1726; border:1px solid rgba(55,65,81,0.6); border-radius:14px; box-shadow:0 10px 24px rgba(0,0,0,0.4); min-width:240px; padding:10px; visibility:hidden; opacity:0; pointer-events:none; transform: translateY(-10px); transition: all .2s ease; }
 
+        
+/* --- About Page: Mobile UI Compatibility --- */
+@media screen and (max-width: 900px) {
+    /* Smooth scrolling without rigid 100vh sections */
+    .scroll-container { height: auto; overflow-y: auto; }
+    .page-section { height: auto !important; min-height: auto !important; padding: 30px 15px; }
+
+    /* Add breathing space between Tech and Impact sections */
+    #tech .hero-content { margin-bottom: 40px; }
+    #impact { padding-top: 60px; }
+    #impact .hero-content { margin-top: 10px; }
+    /* Prevent scroll hint from overlapping following section on mobile */
+    .scroll-hint { position: static; margin: 16px 0; transform: none; }
+
+    /* Ensure hero clears stacked nav and centers background */
+    #hero { padding-top: 140px; background-position: center; }
+
+    /* Stack hero grid, center text, remove left padding */
+    .hero-content { 
+        display: grid; 
+        grid-template-columns: 1fr !important; 
+        gap: 20px; 
+        padding-left: 0 !important; 
+        text-align: center; 
+    }
+    #hero .text-side { grid-column: auto; }
+
+    /* Type scale adjustments */
+    h1.hero-title { font-size: 2.4rem !important; line-height: 1.2; }
+    .subtitle { font-size: 1rem !important; }
+    .description { font-size: 0.95rem !important; margin: 0 auto 1.5rem; }
+
+    /* Buttons stack nicely */
+    .cta-group { flex-direction: column; justify-content: center; }
+
+    /* Grids collapse to single column */
+    .tech-grid { grid-template-columns: 1fr !important; }
+
+    /* Stats become vertical cards */
+    .stat-container { flex-direction: column; gap: 18px; padding: 20px; }
+    .stat-number { font-size: 2.2rem; }
+}
+
+
     </style>
 </head>
 <body>
@@ -381,6 +425,9 @@
             <div class="scroll-hint">See the Impact <i class="fas fa-chevron-down"></i></div>
         </section>
 
+
+
+        
         <section class="page-section" id="impact">
             <div class="hero-content" style="grid-template-columns: 1fr; text-align: center;">
                 <div>
