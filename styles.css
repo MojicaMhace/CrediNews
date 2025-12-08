@@ -2361,17 +2361,15 @@ body[data-page='index-hero'] { --shadow: none; }
 
 @media (max-width: 768px) {
   .register-page .auth-container.auth-split {
-    max-width: 480px;          /* compact on mobile */
-    height: auto;              /* allow natural height */
-    min-height: 360px;         /* baseline height */
+    max-width: 460px;          /* compact on mobile */
+    height: 360px;             /* unified mobile height */
   }
   .register-page .auth-hero {
-    min-height: 160px;
+    min-height: 200px;
   }
   .register-page .auth-card {
-    min-height: 360px;
-    height: auto;              /* no forced stretch */
-    overflow-y: auto;          /* ensure form remains usable */
+    min-height: 320px;
+    height: 100%;              /* stretch to container height on mobile */
   }
 }
 
@@ -3994,9 +3992,6 @@ body[data-page='index-hero'] { --shadow: none; }
   gap: 2rem;
   margin-bottom: 4rem;
 }
-@media (max-width: 900px) {
-  .verify-news-page .verification-grid { grid-template-columns: 1fr; gap: 16px; }
-}
 
 .verify-news-page .verify-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
@@ -5284,27 +5279,32 @@ input[style*="--placeholder-color"]::placeholder {
 }
 
 @media screen and (max-width: 900px) {
-    .site-simple-nav nav,
-    .navbar {
+    .site-simple-nav nav {
         padding: 10px 15px;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+        align-items: center;
         height: auto;
     }
 
     .site-simple-nav .logo {
         margin-right: 0;
-        margin-bottom: 10px;
+        margin-bottom: 0;
+        grid-column: 1;
+        grid-row: 1;
     }
 
-    .site-simple-nav nav .nav-links,
-    .navbar .nav-links {
+    .site-simple-nav nav .nav-links {
         position: static; 
         transform: none;
         gap: 15px !important;
         flex-wrap: wrap;
         justify-content: center;
-        margin-bottom: 15px;
+        margin: 10px 0 15px;
         width: 100%;
+        grid-column: 1 / span 2;
+        grid-row: 2;
     }
 
     .site-simple-nav nav .nav-links a {
@@ -5312,10 +5312,15 @@ input[style*="--placeholder-color"]::placeholder {
     }
 
     .nav-controls {
-        margin: 0 auto;
-        width: 100%;
-        justify-content: center;
+        margin: 0;
+        width: auto;
+        justify-content: flex-end;
+        grid-column: 2;
+        grid-row: 1;
     }
+
+    .user-account-btn { padding: 8px 12px; min-width: 0; }
+}
 
     /* Homepage Text Fixes */
     .hero-container {
@@ -5350,7 +5355,7 @@ input[style*="--placeholder-color"]::placeholder {
         width: 100%;
         justify-content: center;
     }
-}
+
 
 
 @media screen and (max-width: 768px) {

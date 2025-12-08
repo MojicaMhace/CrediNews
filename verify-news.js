@@ -248,7 +248,7 @@ async function handleUrlVerification() {
     let effectiveContent = '';
     // Try to extract key claim from URL first
     try {
-        const kcResp = await fetch(`${FACTCHECK_BASE}/api/extract-key-claim`, {
+        const kcResp = await fetch('https://credinews-factcheck.onrender.com/api/extract-key-claim', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
@@ -296,7 +296,7 @@ async function handleUrlVerification() {
             return;
         }
         const contentForApi = effectiveContent || (url ? buildNonEmptyContentFromUrl(url) : '') || '';
-        const fcResp = await fetch(`${FACTCHECK_BASE}/api/fact-check`, {
+        const fcResp = await fetch('https://credinews-factcheck.onrender.com/api/fact-check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: '', content: contentForApi, url })
@@ -631,7 +631,7 @@ async function handleFacebookVerification() {
     let effectiveContent = content ? content.trim() : '';
     if (url && !effectiveContent) {
         try {
-            const resp = await fetch(`${FACTCHECK_BASE}/api/extract-key-claim`, {
+            const resp = await fetch('https://credinews-factcheck.onrender.com/api/extract-key-claim', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url })
@@ -654,7 +654,7 @@ async function handleFacebookVerification() {
 
     // Call the fact check API with the best available content
     try {
-        const response = await fetch(`${FACTCHECK_BASE}/api/fact-check`, { // Replace with your actual API endpoint
+        const response = await fetch('https://credinews-factcheck.onrender.com/api/fact-check', { // Replace with your actual API endpoint
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -693,7 +693,7 @@ async function handleFacebookVerification() {
             let poserSourceUrl = (url || '').trim();
             if (poserSourceUrl.includes('facebook.com/share/')) {
                 try {
-                    const r = await fetch(`${FACTCHECK_BASE}/api/resolve-facebook-share`, {
+                    const r = await fetch('https://credinews-poser-detection.onrender.com/api/resolve-facebook-share', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: poserSourceUrl })
@@ -717,7 +717,7 @@ async function handleFacebookVerification() {
                     }
                 } catch (_) {}
                 if (!pd) {
-                    const pdResp = await fetch(`${POSER_BASE}/api/poser/analyze_full`, {
+                    const pdResp = await fetch('https://credinews-poser-detection.onrender.com/api/poser/analyze_full', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: poserTarget })

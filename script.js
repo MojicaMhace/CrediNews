@@ -33,11 +33,6 @@ function updateAuthButton() {
     let userAccountBtn = document.getElementById('userAccountBtn') || navControls.querySelector('.user-account-btn');
 
     const path = String(location.pathname.split('/').pop() || '').toLowerCase();
-    if (path === 'about.html') {
-        if (userAccountBtn) userAccountBtn.style.display = 'none';
-        if (authButtons) authButtons.style.display = 'none';
-        return;
-    }
 
     const showLoggedOutUI = () => {
         // Hide any user UI and show login/signup
