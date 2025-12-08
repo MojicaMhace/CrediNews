@@ -942,6 +942,10 @@ body[data-page='index-hero'] .hero-section::before {
     margin-top: -20px; 
 }
 
+.hero-section {
+    padding-top: 80px; /* Adjust this value to match your navbar's height */
+}
+
 /* 4. Typography (No Text Shadow) */
 .hero-title {
     text-transform: uppercase;
@@ -2361,17 +2365,15 @@ body[data-page='index-hero'] { --shadow: none; }
 
 @media (max-width: 768px) {
   .register-page .auth-container.auth-split {
-    max-width: 480px;          /* compact on mobile */
-    height: auto;              /* allow natural height */
-    min-height: 360px;         /* baseline height */
+    max-width: 460px;          /* compact on mobile */
+    height: 360px;             /* unified mobile height */
   }
   .register-page .auth-hero {
-    min-height: 160px;
+    min-height: 200px;
   }
   .register-page .auth-card {
-    min-height: 360px;
-    height: auto;              /* no forced stretch */
-    overflow-y: auto;          /* ensure form remains usable */
+    min-height: 320px;
+    height: 100%;              /* stretch to container height on mobile */
   }
 }
 
@@ -3994,9 +3996,6 @@ body[data-page='index-hero'] { --shadow: none; }
   gap: 2rem;
   margin-bottom: 4rem;
 }
-@media (max-width: 900px) {
-  .verify-news-page .verification-grid { grid-template-columns: 1fr; gap: 16px; }
-}
 
 .verify-news-page .verify-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
@@ -5241,16 +5240,16 @@ input[style*="--placeholder-color"]::placeholder {
 
 
 
-.site-simple-nav nav .nav-links { 
-  display: flex !important; 
-  gap: 28px !important; 
-  align-items: center; 
-  white-space: nowrap;
-  
-  /* THIS CENTERS THE MENU ITEMS */
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+@media screen and (max-width: 1200px) {
+  .site-simple-nav nav .nav-links { 
+    display: flex !important; 
+    gap: 28px !important; 
+    align-items: center; 
+    white-space: nowrap;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
 
 .site-simple-nav nav .nav-links a {
@@ -5274,37 +5273,42 @@ input[style*="--placeholder-color"]::placeholder {
 .navbar .nav-container { width: 100%; display: flex; align-items: center; justify-content: space-between; }
 
 /* Mobile Devices User Interface compatibility */
-.navbar,
-.site-simple-nav nav {
-    background: transparent !important;
-    position: absolute !important; /* Scrolls away with page */
-    top: 0;
-    width: 100%;
-    z-index: 1000;
-}
-
 @media screen and (max-width: 900px) {
-    .site-simple-nav nav,
-    .navbar {
+    .navbar,
+    .site-simple-nav nav {
+        background: transparent !important;
+        position: absolute !important; 
+        top: 0;
+        width: 100%;
+        z-index: 1000;
+    }
+
+    .site-simple-nav nav {
         padding: 10px 15px;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+        align-items: center;
         height: auto;
     }
 
     .site-simple-nav .logo {
         margin-right: 0;
-        margin-bottom: 10px;
+        margin-bottom: 0;
+        grid-column: 1;
+        grid-row: 1;
     }
 
-    .site-simple-nav nav .nav-links,
-    .navbar .nav-links {
+    .site-simple-nav nav .nav-links {
         position: static; 
         transform: none;
         gap: 15px !important;
         flex-wrap: wrap;
         justify-content: center;
-        margin-bottom: 15px;
+        margin: 10px 0 15px;
         width: 100%;
+        grid-column: 1 / span 2;
+        grid-row: 2;
     }
 
     .site-simple-nav nav .nav-links a {
@@ -5312,10 +5316,15 @@ input[style*="--placeholder-color"]::placeholder {
     }
 
     .nav-controls {
-        margin: 0 auto;
-        width: 100%;
-        justify-content: center;
+        margin: 0;
+        width: auto;
+        justify-content: flex-end;
+        grid-column: 2;
+        grid-row: 1;
     }
+
+    .user-account-btn { padding: 8px 12px; min-width: 0; }
+}
 
     /* Homepage Text Fixes */
     .hero-container {
@@ -5350,7 +5359,7 @@ input[style*="--placeholder-color"]::placeholder {
         width: 100%;
         justify-content: center;
     }
-}
+
 
 
 @media screen and (max-width: 768px) {
@@ -5404,4 +5413,64 @@ input[style*="--placeholder-color"]::placeholder {
     .form-input, .form-textarea {
         font-size: 16px !important; /* Prevents zoom on iOS */
     }
+}
+
+@media screen and (min-width: 901px) {
+  .hero-container {
+    display: grid !important;
+    grid-template-columns: 1.2fr 0.8fr !important; /* Restore the left/right split */
+    align-items: center !important;
+    text-align: left !important; /* Force text to align left */
+    padding-top: 0 !important;
+    max-width: 1300px !important;
+    gap: 2rem !important;
+    min-height: 100vh !important;
+  }
+
+  .hero-left {
+    grid-column: 1 !important;
+    text-align: left !important;
+    align-items: flex-start !important;
+    margin-top: -20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+
+  .cta-group {
+    justify-content: flex-start !important;
+    width: auto !important;
+  }
+
+  .hero-title {
+    font-size: 4rem !important;
+    text-align: left !important;
+    line-height: 1.4 !important;
+  }
+
+  .description {
+    text-align: left !important;
+    max-width: 90% !important;
+  }
+
+
+  .navbar,
+  .site-simple-nav nav {
+    position: absolute !important; 
+    top: 0 !important;
+    padding: 1.5rem 3rem !important;
+    background: transparent !important; 
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .site-simple-nav nav .nav-links {
+    position: static !important;
+    transform: none !important;
+    display: flex !important;
+    gap: 2rem !important;
+    left: auto !important;
+  }
 }
