@@ -14,7 +14,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Immediately change the button to Sign Indropdown
     updateAuthButton();
     updatePlatformStats();
-    enforceAccessRules();
+    
+    // 🛑 REMOVED: enforceAccessRules() is now called inside onAuthStateChanged
     
     console.log('✅ Initialization complete!');
 });
@@ -110,7 +111,7 @@ function updateAuthButton() {
             const headerName = ensureDropdown.querySelector('.user-display-name');
             if (headerName) headerName.textContent = displayName;
             const headerEmail = ensureDropdown.querySelector('.user-email');
-            if (headerEmail) headerEmail.textContent = email || '';
+            if (headerEmail) headerName.textContent = email || '';
             const avatarEl = ensureDropdown.querySelector('.user-avatar');
             if (avatarEl && photoURL) {
                 avatarEl.innerHTML = `<img src="${photoURL}" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
@@ -795,51 +796,3 @@ function enforceAccessRules() {
         firebase.auth().onAuthStateChanged(user => check(user));
     }
 }
-
-// --- NEW CODE ADDED HERE ---
-
-// verify-auth.js utility definition
-const BASE_API_URL = 'https://credinews-poser-api.onrender.com';
-
-/**
- * Executes a protected API call to the Python backend.
- * @param {string} endpoint - The specific API path.
- */
-function fetchProtected(endpoint, options = {}) {
-    const authData = JSON.parse(sessionStorage.getItem('authData') || localStorage.getItem('authData') || '{}');
-    const token = authData.idToken;
-
-    if (!token) {
-        // Redirect if token is missing
-        console.error("TOKEN FAILURE: Authentication token not found. Redirecting.");
-        window.location.href = 'login.html?clearAuth=1'; 
-        return Promise.reject(new Error("Authentication required."));
-    }
-
-    const headers = {
-        'Authorization': `Bearer ${token}`, // Attaches the Firebase ID Token
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-    };
-
-    console.log(`📤 Sending secure request to: ${BASE_API_URL + endpoint}`);
-    
-    return fetch(BASE_API_URL + endpoint, {
-        ...options,
-        headers: headers
-    })
-    .then(response => {
-        // Handle rejection from the Python backend (401 or 403 from @firebase_auth_required)
-        if (response.status === 401 || response.status === 403) {
-            console.error(`BACKEND REJECTED TOKEN: Status ${response.status}. Forcing logout.`);
-            sessionStorage.removeItem('authData');
-            localStorage.removeItem('authData');
-            window.location.href = 'login.html?clearAuth=1';
-            throw new Error("Session expired.");
-        }
-        return response.json();
-    });
-}
-
-// Make the function available globally
-window.fetchProtected = fetchProtected;
