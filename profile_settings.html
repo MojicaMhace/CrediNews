@@ -1,116 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Settings // CrediNews</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="profile_settings.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings // CrediNews</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="profile_settings.css" />
 </head>
 <body>
 
-  <div class="layout-wrapper">
-    <aside class="sidebar-panel">
-      <div class="brand">
-        <i class="fas fa-layer-group"></i> <span>Settings</span>
-      </div>
-      <nav class="nav-menu">
-        <button class="nav-btn active" data-tab="security">
-          <i class="fas fa-shield-halved"></i> Security
-        </button>
-        <div class="spacer" style="flex:1;"></div>
-        <button class="nav-btn danger" data-tab="danger">
-          <i class="fas fa-radiation"></i> Danger Zone
-        </button>
-      </nav>
-      
-      <div class="sidebar-footer">
-        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Home</a>
-      </div>
-    </aside>
+  <div class="layout-wrapper">
+    <aside class="sidebar-panel">
+      <div class="brand">
+        <i class="fas fa-layer-group"></i> <span>Settings</span>
+      </div>
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="security">
+          <i class="fas fa-shield-halved"></i> Security
+        </button>
+        <div class="spacer" style="flex:1;"></div>
+        <button class="nav-btn danger" data-tab="danger">
+          <i class="fas fa-radiation"></i> Danger Zone
+        </button>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Home</a>
+      </div>
+    </aside>
 
-    <main class="content-area">
-      
-      <section class="tab-content active" id="tab-security">
-        <div class="header-animate">
-          <h1>Security</h1>
-          <p class="subtitle">Protect your digital fortress.</p>
-        </div>
+    <main class="content-area">
+      
+      <section class="tab-content active" id="tab-security">
+        <div class="header-animate">
+          <h1>Security</h1>
+          <p class="subtitle">Protect your digital fortress.</p>
+        </div>
 
-        <div class="content-panel">
-          <div class="form-grid">
-            <div class="input-group full">
-              <label>Update Email</label>
-              <div class="row-action">
-                <input type="email" id="ps_email" placeholder="New email address" />
-                <button id="changeEmailBtn" class="btn-secondary">Update</button>
-              </div>
-            </div>
-            
-            <div class="divider"></div>
+        <div class="content-panel">
+          <div class="form-grid">
+            <div class="input-group full">
+              <label>Update Email</label>
+              <div class="row-action">
+                <input type="email" id="ps_email" placeholder="New email address" />
+                <button id="changeEmailBtn" class="btn-secondary">Update</button>
+              </div>
+            </div>
+            
+            <div class="divider"></div>
 
-            <h3 style="margin-bottom:12px; font-size:16px;">Change Password</h3>
-            
+            <h3 style="margin-bottom:12px; font-size:16px;">Change Password</h3>
             <div class="input-group">
-              <label>Current Password</label>
-              <div class="input-with-toggle">
-                <input type="password" id="ps_current_password" placeholder="••••••••" />
-                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_current_password"><i class="fas fa-eye-slash"></i></button>
-              </div>
-            </div>
-            
-                        <div class="input-group">
-              <label>New Password</label>
-              <div class="input-with-toggle">
-                <input type="password" id="ps_new_password" placeholder="••••••••" />
-                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_new_password"><i class="fas fa-eye-slash"></i></button>
-              </div>
-              <div class="input-note" style="color:#9ca3af; font-size:12px;">Must be at least 8 characters.</div>
-              <div id="strength-meter"><div id="strength-bar"></div></div>
-              <ul class="req-list">
-                <li id="req-len">At least 8 characters</li>
-                <li id="req-num">Contains a number</li>
-                <li id="req-sym">Contains a symbol</li>
-              </ul>
-            </div>
-            
-                        <div class="input-group">
-              <label>Confirm New Password</label>
-              <div class="input-with-toggle">
-                <input type="password" id="ps_confirm_password" placeholder="••••••••" />
-                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_confirm_password"><i class="fas fa-eye-slash"></i></button>
-              </div>
-            </div>
-            <div></div> 
-            </div>
-          <div class="action-bar">
-            <button id="changePasswordBtn" class="btn-primary">Update Password</button>
-          </div>
-        </div>
-      </section>
+              <label>Current Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_current_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_current_password"><i class="fas fa-eye-slash"></i></button>
+              </div>
+            </div>
+            
+            <div class="input-group">
+              <label>New Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_new_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_new_password"><i class="fas fa-eye-slash"></i></button>
+              </div>
+              <div class="input-note" style="color:#9ca3af; font-size:12px;">Must be at least 8 characters.</div>
+              <div id="strength-meter"><div id="strength-bar"></div></div>
+              <ul class="req-list">
+                <li id="req-len">At least 8 characters</li>
+                <li id="req-num">Contains a number</li>
+                <li id="req-sym">Contains a symbol</li>
+              </ul>
+            </div>
+            
+            <div class="input-group">
+              <label>Confirm New Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_confirm_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_confirm_password"><i class="fas fa-eye-slash"></i></button>
+              </div>
+            </div>
+            </div>
+          <div class="action-bar">
+            <button id="changePasswordBtn" class="btn-primary">Update Password</button>
+          </div>
+        </div>
+      </section>
 
-      <section class="tab-content" id="tab-danger">
-        <div class="header-animate">
-          <h1 style="color:var(--danger);">Danger Zone</h1>
-          <p class="subtitle">Irreversible actions live here.</p>
-        </div>
+      <section class="tab-content" id="tab-danger">
+        <div class="header-animate">
+          <h1 style="color:var(--danger);">Danger Zone</h1>
+          <p class="subtitle">Irreversible actions live here.</p>
+        </div>
 
-        <div class="content-panel danger-border">
-          
-          <div class="danger-item">
-            <div class="danger-info">
-              <h4>Delete Account</h4>
-              <p>Permanently remove your data. This cannot be undone.</p>
-            </div>
-            <button id="deleteAccountBtn" class="btn-danger-solid">Delete Account</button>
-          </div>
-        </div>
-      </section>
+        <div class="content-panel danger-border">
+          
+          <div class="danger-item">
+            <div class="danger-info">
+              <h4>Delete Account</h4>
+              <p>Permanently remove your data. This cannot be undone.</p>
+            </div>
+            <button id="deleteAccountBtn" class="btn-danger-solid">Delete Account</button>
+          </div>
+        </div>
+      </section>
 
-    </main>
-  </div>
+    </main>
+  </div>
 
-  <div id="ps_toast" class="toast"></div>
+  <div id="ps_toast" class="toast"></div>
 
 </body>
 </html>
