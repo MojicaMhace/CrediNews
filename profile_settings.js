@@ -248,10 +248,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Bind Password Toggles
   document.querySelectorAll('.toggle-visibility').forEach((btn) => {
     const targetId = btn.dataset.target;
+    // Attach listener to the button
     btn.addEventListener('click', (e) => {
         e.preventDefault(); 
         togglePassword(targetId, btn);
     });
+  });
+  
+  // The global click listener for any late-loaded elements
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.toggle-visibility');
+    if (!btn) return;
+    const targetId = btn.dataset.target;
+    togglePassword(targetId, btn);
   });
   
   // Bind Strength Meter
