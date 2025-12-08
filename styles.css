@@ -5327,6 +5327,7 @@ input[style*="--placeholder-color"]::placeholder {
 }
 
     /* Homepage Text Fixes */
+@media screen and (max-width: 900px) {
     .hero-container {
         grid-template-columns: 1fr;
         padding-top: 140px; /* More space for the stacked nav */
@@ -5359,6 +5360,7 @@ input[style*="--placeholder-color"]::placeholder {
         width: 100%;
         justify-content: center;
     }
+}
 
 
 
