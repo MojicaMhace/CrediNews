@@ -942,6 +942,10 @@ body[data-page='index-hero'] .hero-section::before {
     margin-top: -20px; 
 }
 
+.hero-section {
+    padding-top: 80px; /* Adjust this value to match your navbar's height */
+}
+
 /* 4. Typography (No Text Shadow) */
 .hero-title {
     text-transform: uppercase;
@@ -5236,16 +5240,16 @@ input[style*="--placeholder-color"]::placeholder {
 
 
 
-.site-simple-nav nav .nav-links { 
-  display: flex !important; 
-  gap: 28px !important; 
-  align-items: center; 
-  white-space: nowrap;
-  
-  /* THIS CENTERS THE MENU ITEMS */
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+@media screen and (max-width: 1200px) {
+  .site-simple-nav nav .nav-links { 
+    display: flex !important; 
+    gap: 28px !important; 
+    align-items: center; 
+    white-space: nowrap;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
 
 .site-simple-nav nav .nav-links a {
@@ -5269,16 +5273,16 @@ input[style*="--placeholder-color"]::placeholder {
 .navbar .nav-container { width: 100%; display: flex; align-items: center; justify-content: space-between; }
 
 /* Mobile Devices User Interface compatibility */
-.navbar,
-.site-simple-nav nav {
-    background: transparent !important;
-    position: absolute !important; /* Scrolls away with page */
-    top: 0;
-    width: 100%;
-    z-index: 1000;
-}
-
 @media screen and (max-width: 900px) {
+    .navbar,
+    .site-simple-nav nav {
+        background: transparent !important;
+        position: absolute !important; 
+        top: 0;
+        width: 100%;
+        z-index: 1000;
+    }
+
     .site-simple-nav nav {
         padding: 10px 15px;
         display: grid;
