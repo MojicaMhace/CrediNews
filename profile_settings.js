@@ -36,16 +36,18 @@ function toast(msg, type = 'normal'){
 // Password Visibility Toggle
 function togglePassword(inputId, btn) {
     const input = document.getElementById(inputId);
+    if (!input) return;
+
     const icon = btn.querySelector('i');
     
-    if (input.type === "password") {
+    if (input.type === "password") { 
         input.type = "text";
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
+        icon.classList.remove('fa-eye-slash'); 
+        icon.classList.add('fa-eye');      
     } else {
         input.type = "password";
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
+        icon.classList.remove('fa-eye');        
+        icon.classList.add('fa-eye-slash');    
     }
 }
 
@@ -56,7 +58,7 @@ function checkPasswordStrength(password) {
     const reqNum = document.getElementById('req-num');
     const reqSym = document.getElementById('req-sym');
     
-    if(!bar) return; // Guard clause if UI elements missing
+    if(!bar) return;
 
     // Check Requirements
     const hasLength = password.length >= 8;
@@ -77,16 +79,16 @@ function checkPasswordStrength(password) {
     // Update Bar Color & Width
     if (password.length === 0) {
         bar.style.width = '0%';
-        bar.style.backgroundColor = '#ef4444'; // Red
+        bar.style.backgroundColor = '#ef4444';
     } else if (strength === 1) {
         bar.style.width = '33%';
-        bar.style.backgroundColor = '#ef4444'; // Red
+        bar.style.backgroundColor = '#ef4444';
     } else if (strength === 2) {
         bar.style.width = '66%';
-        bar.style.backgroundColor = '#f59e0b'; // Orange
+        bar.style.backgroundColor = '#f59e0b';
     } else if (strength === 3) {
         bar.style.width = '100%';
-        bar.style.backgroundColor = '#10b981'; // Green
+        bar.style.backgroundColor = '#10b981';
     }
 }
 
@@ -95,30 +97,37 @@ function checkPasswordStrength(password) {
 async function handleChangePassword() {
     const currentPassEl = document.getElementById('ps_current_password');
     const newPassEl = document.getElementById('ps_new_password');
+    const confirmPassEl = document.getElementById('ps_confirm_password'); // CRITICAL: Get confirmation field
     const btn = document.getElementById('changePasswordBtn');
     
     const currentPass = currentPassEl.value;
     const newPass = newPassEl.value;
+    const confirmPass = confirmPassEl ? confirmPassEl.value : newPass; // Use confirmPassEl if available
 
     // 1. Basic Validation
     if (!currentPass) return toast('Please enter your current password.', 'error');
     if (!newPass) return toast('Please enter a new password.', 'error');
     if (newPass.length < 8) return toast('New password must be at least 8 chars.', 'error');
     
+    // 2. NEW VALIDATION: Check if new password matches confirmation
+    if (newPass !== confirmPass) {
+         return toast('New password and confirmation do not match.', 'error');
+    }
+    
     const user = firebase.auth().currentUser;
     if (!user) return toast('You are not signed in.', 'error');
 
-    // 2. UI Loading State
+    // 3. UI Loading State
     const originalBtnText = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
     btn.disabled = true;
 
     try {
-        // 3. Re-authenticate User (Required for password changes)
+        // 4. Re-authenticate User (Required for security)
         const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPass);
         await user.reauthenticateWithCredential(credential);
         
-        // 4. Update Password
+        // 5. Update Password
         await user.updatePassword(newPass);
         
         toast('Password updated successfully!', 'success');
@@ -126,47 +135,81 @@ async function handleChangePassword() {
         // Clear fields
         currentPassEl.value = '';
         newPassEl.value = '';
+        if (confirmPassEl) confirmPassEl.value = ''; // Clear confirmation field
         checkPasswordStrength(''); // Reset strength meter
 
     } catch (error) {
         console.error("Error updating password:", error);
         
-        // --- UPDATED ERROR HANDLING HERE ---
-        // Checks for both "wrong-password" (old) and "invalid-login-credentials" (new)
+        // --- UPDATED ERROR HANDLING ---
         if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials') {
-            toast('Incorrect current password. Please try again.', 'error');
+            toast('Incorrect current password.', 'error');
         } else if (error.code === 'auth/weak-password') {
             toast('Password is too weak.', 'error');
         } else if (error.code === 'auth/requires-recent-login') {
-            toast('Session timed out. Please sign out and sign in again.', 'error');
-        } else if (error.code === 'auth/too-many-requests') {
-            toast('Too many failed attempts. Please wait a moment.', 'error');
+            toast('Please log in again before changing password.', 'error');
         } else {
-            // Fallback for other errors
             toast(error.message || 'Failed to update password.', 'error');
         }
     } finally {
-        // 5. Reset UI
+        // 6. Reset UI
         btn.innerHTML = originalBtnText;
         btn.disabled = false;
     }
 }
 
 async function handleDeleteAccount() {
-    if(!confirm('Are you sure you want to permanently delete your account? This cannot be undone.')) return;
-
     const user = firebase.auth().currentUser;
-    if (!user) return;
+    
+    if (!user) {
+        return toast('System not ready. Please refresh.', 'error');
+    }
+
+    // 1. Confirm Intent
+    if(!confirm('CRITICAL: This will permanently delete your account and all data. You will have to register again. Are you sure?')) return;
+
+    // 2. Force Re-authentication via Prompt (Fixes "Requires Recent Login")
+    const password = prompt("To confirm deletion, please type your password:");
+    if (!password) {
+        return toast("Deletion cancelled (Password required).", "normal");
+    }
+
+    const btn = document.getElementById('deleteAccountBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+    btn.disabled = true;
 
     try {
-        await user.delete();
-        window.location.href = 'index.html'; // Redirect after deletion
-    } catch (error) {
-        if (error.code === 'auth/requires-recent-login') {
-            toast('For security, please sign out and sign in again to delete your account.', 'error');
-        } else {
-            toast(error.message, 'error');
+        // 3. Re-authenticate User
+        const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
+        await user.reauthenticateWithCredential(credential);
+
+        // 4. Delete Firestore Data 
+        try {
+            const db = firebase.firestore();
+            await db.collection('users').doc(user.uid).delete();
+            console.log("Firestore data deleted.");
+        } catch (dbErr) {
+            console.warn("Firestore delete skipped or failed:", dbErr);
         }
+
+        // 5. Delete Auth Account
+        await user.delete();
+        
+        // 6. Redirect to Register
+        alert("Your account has been successfully deleted.");
+        window.location.href = 'register.html'; 
+
+    } catch (error) {
+        console.error(error);
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials') {
+            alert("Incorrect password. Account was NOT deleted.");
+        } else {
+            alert("Error deleting account: " + error.message);
+        }
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 }
 
@@ -175,14 +218,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check auth state
   firebase.auth().onAuthStateChanged(user => {
       if (user) {
-          const emailField = document.getElementById('ps_email_view');
+          const emailField = document.getElementById('ps_email');
           if(emailField) emailField.value = user.email;
           
           // Pre-fill display name if available
           const nameField = document.getElementById('ps_displayName');
           if(nameField && user.displayName) nameField.value = user.displayName;
       } else {
-          // window.location.href = 'login.html'; // Uncomment to force login
+          // You may want to redirect users who access this page while logged out:
+          // window.location.href = 'login.html'; 
       }
   });
 
@@ -192,7 +236,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
   });
 
-  // Attach Real Actions
   const saveBtn = document.getElementById('saveProfileBtn');
   if(saveBtn) saveBtn.addEventListener('click', () => toast('Profile details saved (Simulated).', 'success'));
 
@@ -202,16 +245,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const dangerBtn = document.getElementById('deleteAccountBtn');
   if(dangerBtn) dangerBtn.addEventListener('click', handleDeleteAccount);
 
+  // Bind Password Toggles
   document.querySelectorAll('.toggle-visibility').forEach((btn) => {
     const targetId = btn.dataset.target;
-    btn.addEventListener('click', () => togglePassword(targetId, btn));
+    btn.addEventListener('click', (e) => {
+        e.preventDefault(); 
+        togglePassword(targetId, btn);
+    });
   });
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.toggle-visibility');
-    if (!btn) return;
-    const targetId = btn.dataset.target;
-    togglePassword(targetId, btn);
-  });
+  
+  // Bind Strength Meter
   const newPassEl = document.getElementById('ps_new_password');
   if (newPassEl) {
     newPassEl.addEventListener('input', () => checkPasswordStrength(newPassEl.value));
