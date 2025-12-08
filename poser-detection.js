@@ -1,10 +1,8 @@
 // Poser Detection Script
 
-// 1. UPDATED: Define the API Base URL dynamically
-// It checks your Vercel Environment Variable first. If missing, it falls back to your Render URL.
 const POSER_BASE = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_POSER_API_URL)
   ? process.env.REACT_APP_POSER_API_URL
-  : ((typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-backend-poser.onrender.com');
+  : ((typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-poser-api.onrender.com');
 
 document.addEventListener('DOMContentLoaded', () => {
   const goFacebookBtn = document.getElementById('show-facebook-verify');
