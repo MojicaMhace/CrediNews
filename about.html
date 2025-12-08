@@ -294,7 +294,14 @@
 @media screen and (max-width: 900px) {
     /* Smooth scrolling without rigid 100vh sections */
     .scroll-container { height: auto; overflow-y: auto; }
-    .page-section { min-height: auto; padding: 0 15px; }
+    .page-section { height: auto !important; min-height: auto !important; padding: 30px 15px; }
+
+    /* Add breathing space between Tech and Impact sections */
+    #tech .hero-content { margin-bottom: 40px; }
+    #impact { padding-top: 60px; }
+    #impact .hero-content { margin-top: 10px; }
+    /* Prevent scroll hint from overlapping following section on mobile */
+    .scroll-hint { position: static; margin: 16px 0; transform: none; }
 
     /* Ensure hero clears stacked nav and centers background */
     #hero { padding-top: 140px; background-position: center; }
@@ -418,6 +425,9 @@
             <div class="scroll-hint">See the Impact <i class="fas fa-chevron-down"></i></div>
         </section>
 
+
+
+        
         <section class="page-section" id="impact">
             <div class="hero-content" style="grid-template-columns: 1fr; text-align: center;">
                 <div>

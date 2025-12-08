@@ -722,6 +722,9 @@
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
+    /* Clear navbar overlap and tighten spacing */
+    .trends-page .latest-news-section .container { margin-top: 140px; }
+    .trends-page .section-title { font-size: 1.6rem; line-height: 1.25; margin-bottom: 10px; }
     .panels-row {
         flex-direction: column !important;
     }

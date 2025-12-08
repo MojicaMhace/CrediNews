@@ -185,9 +185,10 @@ function renderCards(data) {
     card.className = 'trend-card';
     if (item.id) card.setAttribute('data-id', item.id);
 
-    // Show Image
-    const imageHtml = item.imageUrl 
-      ? '<div class="trend-image-container"><img src="'+safeText(item.imageUrl)+'" alt="Trend Image" loading="lazy" style="width:100%; height:180px; object-fit:cover;"></div>' 
+    // Show Image with robust field fallback
+    const imgSrc = item.imageUrl || item.image_url || item.image || item.postImage || '';
+    const imageHtml = imgSrc
+      ? '<div class="trend-image-container"><img src="'+safeText(imgSrc)+'" alt="Trend Image" loading="lazy" style="width:100%; height:180px; object-fit:cover;"></div>'
       : '';
 
     card.innerHTML = (
