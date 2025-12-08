@@ -65,7 +65,7 @@ class AuthManager {
     bindEvents() {
         console.log('🔗 Binding events...');
         
-         // Full Name input handling
+          // Full Name input handling
           const fullNameInput = document.getElementById('fullName');
           if (fullNameInput) {
               fullNameInput.addEventListener('input', (e) => {
@@ -178,6 +178,10 @@ class AuthManager {
             const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
             const user = userCredential.user;
             
+            // *** CRITICAL FIX: Get the Firebase ID Token for backend auth ***
+            const idToken = await user.getIdToken(); 
+            // ***************************************************************
+            
             // Check if email is verified
             if (!user.emailVerified) {
                 this.showError('Your email is not verified. Please check your inbox or resend the verification email.');
@@ -217,7 +221,8 @@ class AuthManager {
                 email: user.email,
                 isAuthenticated: true,
                 emailVerified: user.emailVerified,
-                loginTime: new Date().toISOString()
+                loginTime: new Date().toISOString(),
+                idToken: idToken // <--- CRITICAL: Save the ID Token
             };
             
             if (remember) {
@@ -321,6 +326,10 @@ class AuthManager {
             }
             const user = result.user;
             
+            // *** CRITICAL FIX: Get the Firebase ID Token for backend auth ***
+            const idToken = await user.getIdToken(); 
+            // ***************************************************************
+            
             // Check if user exists in Firestore
             const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
             
@@ -342,7 +351,8 @@ class AuthManager {
                 fullName: user.displayName || 'Google User',
                 isAuthenticated: true,
                 provider: 'google',
-                loginTime: new Date().toISOString()
+                loginTime: new Date().toISOString(),
+                idToken: idToken // <--- CRITICAL: Save the ID Token
             };
             
             sessionStorage.setItem('authData', JSON.stringify(authData));
@@ -588,8 +598,8 @@ class AuthManager {
                 const user = firebase.auth().currentUser;
                 if (user) {
                     const safeOrigin = (window.location.origin && window.location.origin.startsWith('http'))
-                      ? window.location.origin
-                      : `${window.location.protocol}//${window.location.host}`;
+                        ? window.location.origin
+                        : `${window.location.protocol}//${window.location.host}`;
                     const actionCodeSettings = {
                         url: `${safeOrigin}/login.html`,
                         handleCodeInApp: true
@@ -1065,9 +1075,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check if user just verified their email
         checkEmailVerificationStatus();
     
-    // Check if user is already authenticated
-    checkAuthStatus();
-    
     // Set up auth state listener for email verification
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
@@ -1082,6 +1089,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize auth manager
     console.log('🔧 Creating AuthManager...');
     window.authManager = new AuthManager();
+    
+    // Check for Google Redirect Result (added async to handle getToken())
+    if (firebase && firebase.auth) {
+        firebase.auth().getRedirectResult().then(async (result) => {
+            if (result && result.user) {
+                const user = result.user;
+                // *** CRITICAL FIX: Get the Firebase ID Token ***
+                const idToken = await user.getIdToken();
+                // **********************************************
+                const authData = {
+                    uid: user.uid,
+                    email: user.email,
+                    fullName: user.displayName || 'Google User',
+                    isAuthenticated: true,
+                    provider: 'google',
+                    loginTime: new Date().toISOString(),
+                    idToken: idToken // ADDED
+                };
+                sessionStorage.setItem('authData', JSON.stringify(authData));
+                setTimeout(() => { window.location.href = 'index.html'; }, 500);
+            }
+        }).catch((err) => {
+            console.warn('Redirect result error:', err);
+        });
+    }
+
     
     console.log('✅ Authentication system initialized!');
 });
@@ -1135,22 +1168,3 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(style);
 });
-    if (firebase && firebase.auth) {
-        firebase.auth().getRedirectResult().then((result) => {
-            if (result && result.user) {
-                const user = result.user;
-                const authData = {
-                    uid: user.uid,
-                    email: user.email,
-                    fullName: user.displayName || 'Google User',
-                    isAuthenticated: true,
-                    provider: 'google',
-                    loginTime: new Date().toISOString()
-                };
-                sessionStorage.setItem('authData', JSON.stringify(authData));
-                setTimeout(() => { window.location.href = 'index.html'; }, 500);
-            }
-        }).catch((err) => {
-            console.warn('Redirect result error:', err);
-        });
-    }
