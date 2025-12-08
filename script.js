@@ -611,117 +611,117 @@ function debounce(func, wait) {
 }
 
 function ensureAuthLinksWork() {
-  const navControls = document.querySelector('.nav-controls');
-  if (!navControls) return;
+    const navControls = document.querySelector('.nav-controls');
+    if (!navControls) return;
 
-  // Target only the auth buttons container to avoid collisions with other elements
-  const authContainer = navControls.querySelector('#authButtons') || navControls.querySelector('.auth-buttons') || navControls;
-  const loginLink = authContainer.querySelector('#authButtons .login-btn, .auth-buttons .login-btn, .login-btn');
-  const signupLink = authContainer.querySelector('#authButtons .signup-btn, .auth-buttons .signup-btn, .signup-btn');
+    // Target only the auth buttons container to avoid collisions with other elements
+    const authContainer = navControls.querySelector('#authButtons') || navControls.querySelector('.auth-buttons') || navControls;
+    const loginLink = authContainer.querySelector('#authButtons .login-btn, .auth-buttons .login-btn, .login-btn');
+    const signupLink = authContainer.querySelector('#authButtons .signup-btn, .auth-buttons .signup-btn, .signup-btn');
 
-  const navigateTo = (url) => { window.location.href = url; };
+    const navigateTo = (url) => { window.location.href = url; };
 
-  const clearAuthStorage = () => {
-    try {
-      sessionStorage.removeItem('authData');
-      localStorage.removeItem('authData');
-      console.log('🧹 Cleared authData from storage');
-    } catch (e) {
-      console.warn('⚠️ Failed to clear auth storage:', e);
-    }
-  };
-
-  const signOutIfNeededThenNavigate = (url) => {
-    console.log('🔄 signOutIfNeededThenNavigate called for:', url);
-    const hasFirebase = typeof firebase !== 'undefined' && firebase.auth;
-    const currentUser = hasFirebase ? firebase.auth().currentUser : null;
-
-    clearAuthStorage();
-
-    if (hasFirebase && currentUser) {
-      console.log('User is authenticated, signing out before navigating to', url);
-      try {
-        const sid = sessionStorage.getItem('current_session_id');
-        if (sid && firebase.firestore) {
-          firebase.firestore().collection('login_sessions').doc(sid).set({
-            logout_time: new Date().toISOString(),
-            session_status: 'completed'
-          }, { merge: true });
-          sessionStorage.removeItem('current_session_id');
+    const clearAuthStorage = () => {
+        try {
+            sessionStorage.removeItem('authData');
+            localStorage.removeItem('authData');
+            console.log('🧹 Cleared authData from storage');
+        } catch (e) {
+            console.warn('⚠️ Failed to clear auth storage:', e);
         }
-      } catch (_e) {}
-      firebase.auth().signOut()
-        .then(() => {
-          console.log('✅ Firebase Sign Out complete');
-          clearAuthStorage();
-          // Add URL parameter to signal auth clearing to prevent redirect race condition
-          const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
-          console.log('Navigating to:', targetUrl);
-          navigateTo(targetUrl);
-        })
-        .catch((err) => {
-          console.error('❌ Firebase signOut error, proceeding anyway:', err);
-          clearAuthStorage();
-          const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
-          console.log(' Navigating to (after error):', targetUrl);
-          navigateTo(targetUrl);
+    };
+
+    const signOutIfNeededThenNavigate = (url) => {
+        console.log('🔄 signOutIfNeededThenNavigate called for:', url);
+        const hasFirebase = typeof firebase !== 'undefined' && firebase.auth;
+        const currentUser = hasFirebase ? firebase.auth().currentUser : null;
+
+        clearAuthStorage();
+
+        if (hasFirebase && currentUser) {
+            console.log('User is authenticated, signing out before navigating to', url);
+            try {
+                const sid = sessionStorage.getItem('current_session_id');
+                if (sid && firebase.firestore) {
+                    firebase.firestore().collection('login_sessions').doc(sid).set({
+                        logout_time: new Date().toISOString(),
+                        session_status: 'completed'
+                    }, { merge: true });
+                    sessionStorage.removeItem('current_session_id');
+                }
+            } catch (_e) {}
+            firebase.auth().signOut()
+                .then(() => {
+                    console.log('✅ Firebase Sign Out complete');
+                    clearAuthStorage();
+                    // Add URL parameter to signal auth clearing to prevent redirect race condition
+                    const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
+                    console.log('Navigating to:', targetUrl);
+                    navigateTo(targetUrl);
+                })
+                .catch((err) => {
+                    console.error('❌ Firebase signOut error, proceeding anyway:', err);
+                    clearAuthStorage();
+                    const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
+                    console.log(' Navigating to (after error):', targetUrl);
+                    navigateTo(targetUrl);
+                });
+        } else {
+            console.log('No authentication needed, navigating directly to:', url);
+            // Add URL parameter to signal auth clearing even for non-authenticated users
+            const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
+            navigateTo(targetUrl);
+        }
+    };
+
+    const bind = (el, url) => {
+        if (!el) return;
+        el.style.pointerEvents = 'auto';
+        el.style.cursor = 'pointer';
+        const handler = (e) => { e.preventDefault(); e.stopPropagation(); signOutIfNeededThenNavigate(url); };
+        el.addEventListener('click', handler, { capture: true });
+        el.setAttribute('tabindex', '0');
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { handler(e); }
         });
-    } else {
-      console.log('No authentication needed, navigating directly to:', url);
-      // Add URL parameter to signal auth clearing even for non-authenticated users
-      const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
-      navigateTo(targetUrl);
-    }
-  };
+    };
 
-  const bind = (el, url) => {
-    if (!el) return;
-    el.style.pointerEvents = 'auto';
-    el.style.cursor = 'pointer';
-    const handler = (e) => { e.preventDefault(); e.stopPropagation(); signOutIfNeededThenNavigate(url); };
-    el.addEventListener('click', handler, { capture: true });
-    el.setAttribute('tabindex', '0');
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { handler(e); }
-    });
-  };
+    bind(loginLink, 'login.html');
+    bind(signupLink, 'register.html');
 
-  bind(loginLink, 'login.html');
-  bind(signupLink, 'register.html');
-
-  // Delegated capture-phase handler scoped to auth buttons container
-  const delegatedHandler = (e) => {
-    console.log('Delegated click handler triggered on:', e.target);
-    const target = e.target.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
-    if (!target) {
-      console.log('❌ No matching target found for delegation');
-      return;
-    }
-    // Ignore clicks on logout fallback if any; ensure it does not use login-btn class
-    if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) {
-      console.log('Ignoring click on logout fallback');
-      return;
-    }
-    console.log('✅ Valid auth button clicked:', target.className);
-    e.preventDefault();
-    e.stopPropagation();
-    const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
-    console.log('Target URL determined:', url);
-    signOutIfNeededThenNavigate(url);
-  };
-  document.addEventListener('click', delegatedHandler, { capture: true });
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const active = document.activeElement;
-    if (!active) return;
-    const target = active.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
-    if (!target) return;
-    if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
-    signOutIfNeededThenNavigate(url);
-  }, { capture: true });
+    // Delegated capture-phase handler scoped to auth buttons container
+    const delegatedHandler = (e) => {
+        console.log('Delegated click handler triggered on:', e.target);
+        const target = e.target.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
+        if (!target) {
+            console.log('❌ No matching target found for delegation');
+            return;
+        }
+        // Ignore clicks on logout fallback if any; ensure it does not use login-btn class
+        if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) {
+            console.log('Ignoring click on logout fallback');
+            return;
+        }
+        console.log('✅ Valid auth button clicked:', target.className);
+        e.preventDefault();
+        e.stopPropagation();
+        const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
+        console.log('Target URL determined:', url);
+        signOutIfNeededThenNavigate(url);
+    };
+    document.addEventListener('click', delegatedHandler, { capture: true });
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const active = document.activeElement;
+        if (!active) return;
+        const target = active.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
+        if (!target) return;
+        if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
+        signOutIfNeededThenNavigate(url);
+    }, { capture: true });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
