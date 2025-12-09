@@ -16,8 +16,9 @@
     return tpl.content.firstElementChild;
   }
 
-  function showToast(message){
-    const toast = createEl(`<div class="feedback-toast">${message}</div>`);
+  function showToast(message, type){
+    const cls = (type === 'error') ? 'feedback-toast error' : 'feedback-toast';
+    const toast = createEl(`<div class="${cls}">${message}</div>`);
     document.body.appendChild(toast);
     setTimeout(()=>{ toast.classList.add('fade-out'); }, 2200);
     setTimeout(()=>{ toast.remove(); }, 2600);
@@ -242,7 +243,7 @@
         setTimeout(() => overlay.remove(), 260);
       } catch (e){
         console.warn('Feedback save failed:', e && e.message ? e.message : e);
-        showToast('Failed to submit feedback. Check your account verification and try again.');
+        showToast('Failed to submit feedback. Check your account verification and try again.', 'error');
       }
     });
   }

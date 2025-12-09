@@ -2282,7 +2282,9 @@ body[data-page='index-hero'] { --shadow: none; }
 
 /* Register Page Overrides (register.html): single viewport, compact layout, form-only scroll */
 .register-page.auth-body {
-  height: 100vh;              
+  min-height: 100vh; 
+  height: auto;     
+  overflow-y: auto;       
   padding: 16px;              
 }
 
@@ -5474,5 +5476,72 @@ input[style*="--placeholder-color"]::placeholder {
     display: flex !important;
     gap: 2rem !important;
     left: auto !important;
+  }
+}
+
+/* --- MOBILE FIX FOR AUTH PAGES (LOGIN & REGISTER) --- */
+@media (max-width: 768px) {
+
+  /* 1. Allow body to scroll for both Login and Register 
+     This is crucial so the taller image doesn't push the form off-screen permanently. */
+  .auth-body.register-page,
+  .auth-body.login-page {
+    height: auto !important;
+    min-height: 100vh;
+    overflow-y: auto !important; /* ENABLE SCROLLING */
+    padding: 20px 16px !important;
+    align-items: flex-start !important; /* Start layout from top */
+    padding-top: 30px !important; /* Slightly less top padding to maximize screen space */
+  }
+
+  /* 2. Reset container layout for vertical stacking */
+  .register-page .auth-container.auth-split,
+  .login-page .auth-container.auth-split {
+    height: auto !important;
+    max-height: none !important;
+    flex-direction: column; /* Stack image on top of form */
+    max-width: 100%;
+    margin-bottom: 40px; /* Margin for scrolling space at bottom */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); /* Slightly deeper shadow for pop */
+  }
+
+  /* --- KEY CHANGE HERE --- */
+  /* 3. MAKE THE ROBOT POP! Increase height and center it. */
+  .register-page .auth-hero,
+  .login-page .auth-hero {
+    /* Increased height substantially so more of the robot is visible */
+    min-height: 280px !important; 
+    height: 280px !important;
+    flex: none;
+    border-radius: 16px 16px 0 0 !important; /* Round top corners */
+    /* Ensure the center of the robot (torso/head) is the focus, not the feet */
+    background-position: center center !important; 
+  }
+
+  /* 4. Fix the Form Card Area below the image */
+  .register-page .auth-card,
+  .login-page .auth-card {
+    min-height: auto !important;
+    height: auto !important;
+    border-radius: 0 0 16px 16px !important; /* Round bottom corners */
+    border-top: none;
+    padding: 24px 20px !important;
+    display: block !important;
+  }
+
+  /* 5. Stop internal form scroll barriers */
+  .register-page .auth-form,
+  .login-page .auth-form {
+    overflow-y: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    margin-bottom: 20px;
+  }
+
+  /* 6. Title adjustments for mobile */
+  .register-page .auth-header h2,
+  .login-page .auth-header h2 {
+    font-size: 24px !important; /* Slightly larger title */
+    margin-top: 0;
   }
 }

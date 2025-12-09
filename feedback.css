@@ -134,6 +134,11 @@ textarea.feedback-textarea {
   z-index: 10000;
 }
 
+.feedback-toast.error {
+  background: #dc2626;
+  border-color: #b91c1c;
+}
+
 /* Transitions */
 .hidden { display: none !important; }
 .fade-out { animation: fbFadeOut 220ms ease-in forwards; }
