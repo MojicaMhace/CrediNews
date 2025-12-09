@@ -176,32 +176,32 @@
 
             const firestore = firebase.firestore();
             const userDocRef = firestore.collection('users').doc(user.uid);
-            
-            const dataToMerge = { 
-                emailVerified: user.emailVerified || (providerId !== 'password'),
-                email: user.email,
-                provider: providerId,
-                role: 'user', // Default role
-            };
-            
-            // Only set fullname if available (useful for social logins)
-            if (user.displayName) {
-                dataToMerge.fullname = user.displayName;
-            }
-            // Add createdAt only if it doesn't exist (i.e., this is the first sync)
-            return userDocRef.get().then(doc => {
-                if (!doc.exists) {
-                    dataToMerge.createdAt = new Date().toISOString();
-                }
-                return userDocRef.set(dataToMerge, { merge: true })
-                    .then(() => {
-                        console.log("SUCCESS: Firestore document synced.");
-                    })
-                    .catch((error) => {
-                        console.error("CRITICAL ERROR: Failed to update Firestore document:", error.message);
-                        throw error;
-                    });
-            });
+            
+            const dataToMerge = { 
+                emailVerified: user.emailVerified || (providerId !== 'password'),
+                email: user.email,
+                provider: providerId,
+                role: 'user', // Default role
+            };
+            
+            // Only set fullname if available (useful for social logins)
+            if (user.displayName) {
+                dataToMerge.fullname = user.displayName;
+            }
+            // Add createdAt only if it doesn't exist (i.e., this is the first sync)
+            return userDocRef.get().then(doc => {
+                if (!doc.exists) {
+                    dataToMerge.createdAt = new Date().toISOString();
+                }
+                return userDocRef.set(dataToMerge, { merge: true })
+                    .then(() => {
+                        console.log("SUCCESS: Firestore document synced.");
+                    })
+                    .catch((error) => {
+                        console.error("CRITICAL ERROR: Failed to update Firestore document:", error.message);
+                        throw error;
+                    });
+            });
         }
 
         // ----------------------------------------------------------------------
@@ -223,6 +223,7 @@
                     auth.applyActionCode(oobCode)
                         .then(() => {
                             const currentUser = auth.currentUser;
+                            // Force reload to update verification status in client session if user is logged in
                             if (currentUser) {
                                 return currentUser.reload().then(() => currentUser);
                             }
@@ -254,6 +255,7 @@
                         })
                         .catch((error) => {
                             console.error('Verification error:', error);
+                            // ... error message display logic ...
                             window.history.replaceState({}, document.title, window.location.pathname);
                         });
                 } else if (mode === 'resetPassword' && oobCode) {
@@ -306,41 +308,39 @@
                         });
                 });
             }
-            
-            // --- 3. HANDLE GOOGLE SIGN-IN (FIXED LOGIC) ---
-            const googleSignInButton = document.getElementById('googleSignIn');
-            
-            if (googleSignInButton) {
-                googleSignInButton.addEventListener('click', function() {
-                    const provider = new firebase.auth.GoogleAuthProvider();
+            
+            // --- 3. HANDLE GOOGLE SIGN-IN (FIXED LOGIC) ---
+            const googleSignInButton = document.getElementById('googleSignIn');
+            
+            if (googleSignInButton) {
+                googleSignInButton.addEventListener('click', function() {
+                    const provider = new firebase.auth.GoogleAuthProvider();
 
-                    auth.signInWithPopup(provider)
-                        .then((result) => {
-                            const user = result.user;
-                            
-                            // 🔑 CRITICAL: Sync Firestore for social sign-ins
-                            // Social logins are automatically verified by provider.
-                            return syncFirestoreVerificationStatus(user, result.credential.providerId).then(() => user);
-                        })
-                        .then(() => {
-                            // Redirect to your main application after successful login
-                            window.location.href = 'index.html'; 
-                        })
-                        .catch((error) => {
-                            console.error('Google Sign-In Failed:', error);
-                            if (error.code === 'auth/popup-closed-by-user') {
-                                // User cancelled, no alert needed
-                            } else {
-                                alert('Google Sign-In failed: ' + error.message);
-                            }
-                        });
-                });
-            }
+                    auth.signInWithPopup(provider)
+                        .then((result) => {
+                            const user = result.user;
+                            
+                            // 🔑 CRITICAL: Sync Firestore for social sign-ins
+                            return syncFirestoreVerificationStatus(user, result.credential.providerId).then(() => user);
+                        })
+                        .then(() => {
+                            // Redirect to your main application after successful login
+                            window.location.href = 'index.html'; 
+                        })
+                        .catch((error) => {
+                            console.error('Google Sign-In Failed:', error);
+                            if (error.code === 'auth/popup-closed-by-user') {
+                                // User cancelled, no alert needed
+                            } else {
+                                alert('Google Sign-In failed: ' + error.message);
+                            }
+                        });
+                });
+            }
             
             // --- 4. FALLBACK: Sync Firestore status upon persistent session load ---
             auth.onAuthStateChanged((user) => {
                 // This is a safety net for users who refresh the page while logged in.
-                // Only run if they are logged in and not on their first sign-in of this session (metadata check)
                 if (user && user.emailVerified && user.metadata.creationTime !== user.metadata.lastSignInTime) {
                     syncFirestoreVerificationStatus(user);
                 }
