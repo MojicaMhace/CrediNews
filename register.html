@@ -25,7 +25,7 @@
             <form class="auth-form" id="registerForm">
                 <div class="form-group">
                     <label for="fullName">Full Name</label>
-                    <input type="text" pattern="^[A-Za-z][A-Za-z\s'\-]*$" title="Name should start with a letter and can contain letters, spaces, hyphens, and apostrophes.">
+                    <input type="text" id="fullName" name="fullName" required pattern="^[A-Za-z][A-Za-z\s'-]*$" title="Use letters, spaces, apostrophes or hyphens; no numbers.">
                 </div>
 
                 <div class="form-group">
@@ -105,7 +105,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
     <script src="firebase-config.js"></script>
-    <script src="emailjs-config.js"></script>
     <script src="auth.js"></script>
 
     <script>
