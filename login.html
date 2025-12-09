@@ -291,6 +291,43 @@
                         });
                 });
             }
+
+            // --- 3. HANDLE GOOGLE SIGN-IN ---
+            const googleBtn = document.getElementById('googleSignIn');
+            
+            if (googleBtn) {
+                googleBtn.addEventListener('click', function() {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    
+                    // Force account selection so users can switch accounts if needed
+                    provider.setCustomParameters({ prompt: 'select_account' });
+
+                    auth.signInWithPopup(provider)
+                        .then((result) => {
+                            const user = result.user;
+                            
+                            // Google users are verified by default.
+                            // We create/update the user document in Firestore to ensure they exist in your DB.
+                            const firestore = firebase.firestore();
+                            return firestore.collection('users').doc(user.uid).set({
+                                fullname: user.displayName,
+                                email: user.email,
+                                emailVerified: true,
+                                provider: 'google',
+                                lastLogin: new Date().toISOString(),
+                                // Only set createdAt if it doesn't exist yet (using merge)
+                            }, { merge: true });
+                        })
+                        .then(() => {
+                            console.log("Google Sign-In successful");
+                            window.location.href = 'index.html'; // Redirect to your homepage
+                        })
+                        .catch((error) => {
+                            console.error('Google Sign-In Error:', error);
+                            alert('Google Sign-In failed: ' + error.message);
+                        });
+                });
+            }
             
             // --- 3. FALLBACK: Sync Firestore status upon persistent session load ---
             auth.onAuthStateChanged((user) => {
