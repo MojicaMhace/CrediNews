@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const u = new URL(urlOrId);
       return /facebook\.com$/.test(u.hostname) || u.hostname.includes('fb.com');
     } catch (_) {
-      return /^\d{5,}$/.test(urlOrId);
+      return false;
     }
   }
 

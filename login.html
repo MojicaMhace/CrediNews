@@ -7,13 +7,13 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
-<body class="auth-body login-page">
+<body class="auth-body">
     <div class="site-simple-nav">
-        <nav>
-            <div class="logo">
-                <i class="fas fa-shield-halved" style="color: #22c55e;"></i>
-            </div>
-        </nav>
+      <nav>
+          <div class="logo">
+              <i class="fas fa-shield-halved" style="color: #22c55e;"></i>
+          </div>
+      </nav>
     </div>
     <div class="auth-container auth-split">
         <aside class="auth-hero has-image" style="background-image: url('images/credinews1.jpg');"></aside>
@@ -25,7 +25,9 @@
                 <h2>Welcome Back</h2>
                 <p>Sign in to your account to continue</p>
             </div>
-            
+           
+
+
             <div id="verificationMessage" class="verification-message" style="display: none;">
                 <div class="message-content">
                     <i class="fas fa-envelope-open-text"></i>
@@ -33,6 +35,7 @@
                     <p>We've sent a verification link to your email address. Please check your inbox and click the link to verify your account before signing in.</p>
                 </div>
             </div>
+
 
             <div id="verificationSuccessMessage" class="verification-success-message" style="display: none;">
                 <div class="message-content">
@@ -42,6 +45,7 @@
                 </div>
             </div>
 
+
             <div id="otpVerificationContainer" class="otp-verification-container" style="display: none;">
                 <div class="otp-header">
                     <i class="fas fa-key"></i>
@@ -49,7 +53,7 @@
                     <p>Enter the 6-digit verification code sent to your email address.</p>
                     <p class="otp-email" id="otpEmail"></p>
                 </div>
-                
+               
                 <form class="otp-form" id="otpForm">
                     <div class="otp-input-group">
                         <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
@@ -59,13 +63,13 @@
                         <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
                         <input type="text" class="otp-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
                     </div>
-                    
+                   
                     <button type="submit" class="auth-btn primary">
                         <i class="fas fa-check"></i>
                         Verify Code
                     </button>
                 </form>
-                
+               
                 <div class="otp-actions">
                     <button type="button" class="auth-btn secondary" id="resendOtpBtn">
                         <i class="fas fa-redo"></i>
@@ -78,11 +82,13 @@
                 </div>
             </div>
 
+
             <form class="auth-form" id="loginForm">
                 <div class="form-group">
                     <label for="email">Email Address</label>
                     <input type="email" id="email" name="email" required>
                 </div>
+
 
                 <div class="form-group">
                     <label for="password">Password</label>
@@ -94,6 +100,7 @@
                     </div>
                 </div>
 
+
                 <div class="form-options">
                     <label class="checkbox-label">
                         <input type="checkbox" name="remember">
@@ -103,20 +110,24 @@
                     <a href="forgot-password.html" class="forgot-link">Forgot password?</a>
                 </div>
 
-                <button type="submit" class="auth-btn primary" id="signInButton">
+
+                <button type="submit" class="auth-btn primary">
                     <i class="fas fa-sign-in-alt"></i>
                     Sign In
                 </button>
 
+
                 <div class="divider">
                     <span>or</span>
                 </div>
+
 
                 <button type="button" class="auth-btn google" id="googleSignIn">
                     <i class="fab fa-google"></i>
                     Continue with Google
                 </button>
             </form>
+
 
             <div id="inlineResetContainer" class="auth-form" style="display:none;">
                 <div class="form-group">
@@ -155,110 +166,132 @@
                 </div>
             </div>
 
+
             <div class="auth-footer">
                 <p>Don't have an account? <a href="register.html">Sign up</a></p>
             </div>
         </div>
 
+
     </div>
+
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    
+   
     <script src="firebase-config.js"></script>
-    <script>
-        // ----------------------------------------------------------------------
-        // Helper Function to Sync Firestore Status
-        // ----------------------------------------------------------------------
-        function syncFirestoreVerificationStatus(user) {
-            if (user && user.emailVerified) {
-                const firestore = firebase.firestore();
-                const userDocRef = firestore.collection('users').doc(user.uid);
-                // Prefer a merge set to avoid role/provider rule conflicts
-                userDocRef.set({ emailVerified: true }, { merge: true })
-                .then(() => {
-                    console.log("SUCCESS: Firestore document synced to verified = true (merge set).");
-                })
-                .catch((error) => {
-                    console.error("CRITICAL ERROR: Failed to update Firestore document:", error.message);
-                });
-            }
-        }
+    <script src="auth.js"></script>
+   <script>
+        // ----------------------------------------------------------------------
+        // Helper Function to Sync Firestore Status (Updated to handle displayName)
+        // ----------------------------------------------------------------------
+        function syncFirestoreVerificationStatus(user, providerId = 'password') {
+            if (!user) return Promise.resolve();
 
-        // ----------------------------------------------------------------------
-        // Main Initialization and Handlers (runs on page load)
-        // ----------------------------------------------------------------------
-        (function() {
-            const auth = firebase.auth();
-            const loginFormEl = document.getElementById('loginForm');
-            const signInButton = document.getElementById('signInButton');
-            
-            // --- 1. HANDLE FIREBASE ACTION LINKS (VERIFICATION/RESET) ---
-            try {
-                const params = new URLSearchParams(window.location.search);
-                const mode = params.get('mode');
-                const oobCode = params.get('oobCode');
-                const resetBox = document.getElementById('inlineResetContainer');
+            const firestore = firebase.firestore();
+            const userDocRef = firestore.collection('users').doc(user.uid);
+            
+            const dataToMerge = { 
+                emailVerified: user.emailVerified || (providerId !== 'password'),
+                email: user.email,
+                provider: providerId,
+                role: 'user', // Default role
+            };
+            
+            // Only set fullname if available (useful for social logins)
+            if (user.displayName) {
+                dataToMerge.fullname = user.displayName;
+            }
+            // Add createdAt only if it doesn't exist (i.e., this is the first sync)
+            return userDocRef.get().then(doc => {
+                if (!doc.exists) {
+                    dataToMerge.createdAt = new Date().toISOString();
+                }
+                return userDocRef.set(dataToMerge, { merge: true })
+                    .then(() => {
+                        console.log("SUCCESS: Firestore document synced.");
+                    })
+                    .catch((error) => {
+                        console.error("CRITICAL ERROR: Failed to update Firestore document:", error.message);
+                        throw error;
+                    });
+            });
+        }
 
-                if (mode === 'verifyEmail' && oobCode) {
-                    auth.applyActionCode(oobCode)
-                        .then(() => {
-                            const currentUser = auth.currentUser;
-                            // Force reload to update verification status in client session if user is logged in
-                            if (currentUser) {
-                                return currentUser.reload().then(() => currentUser);
-                            }
-                            return null; 
-                        })
-                        .then((reloadedUser) => {
-                            const successEl = document.getElementById('verificationSuccessMessage');
-                            const msgEl = document.getElementById('verificationMessage');
-                            
-                            if (loginFormEl) loginFormEl.style.display = 'none'; 
-                            if (resetBox) resetBox.style.display = 'none';
-                            if (msgEl) msgEl.style.display = 'none';
+        // ----------------------------------------------------------------------
+        // Main Initialization and Handlers (runs on page load)
+        // ----------------------------------------------------------------------
+        (function() {
+            const auth = firebase.auth();
+            const loginFormEl = document.getElementById('loginForm');
+            const signInButton = document.getElementById('signInButton');
+            
+            // --- 1. HANDLE FIREBASE ACTION LINKS (VERIFICATION/RESET) ---
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const mode = params.get('mode');
+                const oobCode = params.get('oobCode');
+                const resetBox = document.getElementById('inlineResetContainer');
 
-                            if (successEl) {
-                                successEl.style.display = 'block';
-                                sessionStorage.setItem('verification_just_completed', '1');
-                                setTimeout(() => {
-                                    successEl.style.display = 'none';
-                                    if (loginFormEl) loginFormEl.style.display = 'block'; 
-                                }, 5000);
-                            }
-                            
-                            // Sync Firestore if user is available and verified
-                            if (reloadedUser && reloadedUser.emailVerified) {
-                                syncFirestoreVerificationStatus(reloadedUser);
-                            }
+                if (mode === 'verifyEmail' && oobCode) {
+                    auth.applyActionCode(oobCode)
+                        .then(() => {
+                            const currentUser = auth.currentUser;
+                            // Force reload to update verification status in client session if user is logged in
+                            if (currentUser) {
+                                return currentUser.reload().then(() => currentUser);
+                            }
+                            return null; 
+                        })
+                        .then((reloadedUser) => {
+                            const successEl = document.getElementById('verificationSuccessMessage');
+                            const msgEl = document.getElementById('verificationMessage');
+                            
+                            if (loginFormEl) loginFormEl.style.display = 'none'; 
+                            if (resetBox) resetBox.style.display = 'none';
+                            if (msgEl) msgEl.style.display = 'none';
 
-                            window.history.replaceState({}, document.title, window.location.pathname);
-                        })
-                        .catch((error) => {
-                            console.error('Verification error:', error);
-                            // ... error message display logic ...
-                            window.history.replaceState({}, document.title, window.location.pathname);
-                        });
-                } else if (mode === 'resetPassword' && oobCode) {
-                    // ... Existing Password Reset Logic (Omitted for brevity) ...
-                }
-            } catch (err) {
-                console.error('Action handler error:', err);
-            }
+                            if (successEl) {
+                                successEl.style.display = 'block';
+                                sessionStorage.setItem('verification_just_completed', '1');
+                                setTimeout(() => {
+                                    successEl.style.display = 'none';
+                                    if (loginFormEl) loginFormEl.style.display = 'block'; 
+                                }, 5000);
+                            }
+                            
+                            // Sync Firestore if user is available and verified
+                            if (reloadedUser && reloadedUser.emailVerified) {
+                                syncFirestoreVerificationStatus(reloadedUser);
+                            }
 
-            // --- 2. HANDLE LOGIN FORM SUBMISSION (PRIMARY SYNC POINT) ---
-            if (loginFormEl) {
-                loginFormEl.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    
-                    const email = document.getElementById('email').value;
-                    const password = document.getElementById('password').value;
-                    
-                    if (signInButton) {
-                        signInButton.disabled = true;
-                        signInButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
-                    }
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        })
+                        .catch((error) => {
+                            console.error('Verification error:', error);
+                            // ... error message display logic ...
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        });
+                } else if (mode === 'resetPassword' && oobCode) {
+                    // ... Existing Password Reset Logic (Omitted for brevity) ...
+                }
+            } catch (err) {
+                console.error('Action handler error:', err);
+            }
+
+            // --- 2. HANDLE LOGIN FORM SUBMISSION (PRIMARY SYNC POINT) ---
+            if (loginFormEl) {
+                loginFormEl.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    
+                    if (signInButton) {
+                        signInButton.disabled = true;
+                        signInButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+                    }
 
                     firebase.auth().signInWithEmailAndPassword(email, password)
                         .then((userCredential) => {
@@ -337,27 +370,27 @@
                 }
             });
 
-        })();
-        
-        // --- Password visibility toggle logic ---
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.toggle-visibility').forEach((btn) => {
-                const targetId = btn.dataset.target;
-                const input = document.getElementById(targetId);
-                if (!input) return;
-                btn.addEventListener('click', () => {
-                    const isHidden = input.type === 'password';
-                    input.type = isHidden ? 'text' : 'password';
-                    btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
-                    const icon = btn.querySelector('i');
-                    if (icon) {
-                        icon.classList.toggle('fa-eye', isHidden);
-                        icon.classList.toggle('fa-eye-slash', !isHidden);
-                    }
-                });
-            });
-        });
+        })();
+        
+        // --- Password visibility toggle logic ---
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.toggle-visibility').forEach((btn) => {
+                const targetId = btn.dataset.target;
+                const input = document.getElementById(targetId);
+                if (!input) return;
+                btn.addEventListener('click', () => {
+                    const isHidden = input.type === 'password';
+                    input.type = isHidden ? 'text' : 'password';
+                    btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+                    const icon = btn.querySelector('i');
+                    if (icon) {
+                        icon.classList.toggle('fa-eye', isHidden);
+                        icon.classList.toggle('fa-eye-slash', !isHidden);
+                    }
+                });
+            });
+        });
 
-    </script>
+    </script>
 </body>
 </html>
