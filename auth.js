@@ -1079,6 +1079,12 @@ document.addEventListener('DOMContentLoaded', () => {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
             await user.reload();
+            try {
+                if (user.emailVerified) {
+                    const db = firebase.firestore();
+                    await db.collection('users').doc(user.uid).set({ emailVerified: true }, { merge: true });
+                }
+            } catch (_e) {}
             const justVerified = sessionStorage.getItem('verification_just_completed');
             if (user.emailVerified && justVerified === '1') {
                 checkEmailVerificationStatus();
