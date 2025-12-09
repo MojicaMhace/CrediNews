@@ -1,274 +1,239 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-  const grid = document.getElementById('historyGrid');
-  const modal = null;
-  const closeModal = null;
-  const modalTitle = null;
-  const modalBody = null;
-  const searchInput = document.getElementById('ph-search');
-  const sortSelect = document.getElementById('ph-sort');
+// Global variables
+const container = document.getElementById('historyGrid');
+const searchInput = document.getElementById('ph-search');
+const sortSelect = document.getElementById('ph-sort');
+const prevBtn = document.getElementById('ph-prev');
+const nextBtn = document.getElementById('ph-next');
+const pageInfo = document.getElementById('ph-page');
+const totalPagesInfo = document.getElementById('ph-pages');
 
-  let allDocs = [];
-  let currentQuery = '';
-  let currentSort = 'date_desc';
-  let currentPage = 0;
-  const pageSize = 6;
+const pageSize = 9; // 3 columns * 3 rows
+let allDocs = [];
+let currentPage = 1;
+let totalPages = 1;
+let currentUserID = null;
+let currentSort = 'date_desc';
+let currentQuery = '';
 
-  function getCategory(doc){
-    const score = Number(doc.score || doc.trustScore || doc.credi_score || (doc.analysis && doc.analysis.final_trust_score) || 0);
-    const breakdown = (doc.analysis && doc.analysis.breakdown) ? doc.analysis.breakdown : {};
-    const aiVerdict = String(breakdown.ai_verdict || '').toLowerCase();
-    if (aiVerdict.includes('poser')) return 'poser';
-    if (aiVerdict.includes('mixed')) return 'mixed';
-    if (aiVerdict.includes('authentic')) return 'authentic';
-    if (score >= 80) return 'authentic';
-    if (score >= 50) return 'mixed';
-    return 'poser';
-  }
+// --- HELPER FUNCTIONS ---
+function safeText(s) {
+    if (!s) return '';
+    return String(s).replace(/[&<>]/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]; });
+}
 
-  function getFilteredDocs(){
-    const list = allDocs.slice();
-    const q = String(currentQuery||'').trim().toLowerCase();
-    let docs = list;
-    docs = docs.filter(d => !d.deletedAt); // hide soft-deleted
-    if (q){
-      docs = docs.filter(d => {
-        const name = String(getName(d)).toLowerCase();
-        const input = String(d.input||'').toLowerCase();
-        const verdict = String(d.verdict || (d.analysis && d.analysis.verdict) || '').toLowerCase();
-        return name.includes(q) || input.includes(q) || verdict.includes(q);
-      });
-    }
-    if (currentSort === 'verdict_poser') {
-      docs = docs.filter(d => getCategory(d) === 'poser');
-    } else if (currentSort === 'verdict_mixed') {
-      docs = docs.filter(d => getCategory(d) === 'mixed');
-    } else if (currentSort === 'verdict_authentic') {
-      docs = docs.filter(d => getCategory(d) === 'authentic');
-    }
-    return docs;
-  }
-
-  function safeText(s){ try{ return String(s||''); } catch(_){ return ''; } }
-  function formatTs(ts){
-    try{
-      if (ts && typeof ts.toDate === 'function') return ts.toDate().toLocaleString();
-      if (ts && ts.seconds) return new Date(ts.seconds*1000).toLocaleString();
-      if (typeof ts === 'string') return new Date(ts).toLocaleString();
-    }catch(_){}
-    return '';
-  }
-  function tsMillis(ts){
-    try{
-      if (ts && typeof ts.toDate === 'function') return ts.toDate().getTime();
-      if (ts && ts.seconds) return ts.seconds*1000;
-      if (typeof ts === 'number') return ts;
-    }catch(_){}
-    return 0;
-  }
-
-  function labelBadge(score){
-    const s = Number(score||0);
-    if (s >= 80) return '<span class="badge badge-verified">Trusted</span>';
-    if (s >= 50) return '<span class="badge badge-warning">Moderate Risk</span>';
-    return '<span class="badge badge-danger">High Risk</span>';
-  }
-
-  function getScoreClass(score){
-    const s = Number(score||0);
-    if (s >= 80) return 'high';
-    if (s >= 50) return 'medium';
-    return 'low';
-  }
-
-  function getName(doc){
-    const meta = doc.metadata || {};
-    return meta.name || doc.pageName || doc.pageId || doc.poster_id || safeText(doc.input) || 'Unknown';
-  }
-
-  function openModal(d){ return; }
-
-  
-
-  function render(){
-    if (!grid) return;
-    let docs = getFilteredDocs();
-    if (currentSort === 'date_desc') docs.sort((a,b)=> tsMillis((b.createdAt||b.analyzedAt||b.last_updated)) - tsMillis((a.createdAt||a.analyzedAt||a.last_updated)));
-    else if (currentSort === 'date_asc') docs.sort((a,b)=> tsMillis((a.createdAt||a.analyzedAt||a.last_updated)) - tsMillis((b.createdAt||b.analyzedAt||b.last_updated)));
-    else if (currentSort === 'score_desc') docs.sort((a,b)=> ((b.score||b.trustScore||b.credi_score||0) - (a.score||a.trustScore||a.credi_score||0)));
-    else if (currentSort === 'score_asc') docs.sort((a,b)=> ((a.score||a.trustScore||a.credi_score||0) - (b.score||b.trustScore||b.credi_score||0)));
-
-    if (docs.length === 0){
-      grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#9ca3af; padding:2rem;"><i class="fas fa-folder-open" style="font-size:2rem; margin-bottom:1rem;"></i><p>No poser detections found.</p><a href="poser-detection.html" style="color:#3b82f6; text-decoration: underline;">Run a poser detection</a></div>`;
-      return;
-    }
-
-    const totalPages = Math.max(1, Math.ceil(docs.length / pageSize));
-    if (currentPage >= totalPages) currentPage = totalPages - 1;
-    if (currentPage < 0) currentPage = 0;
-    const start = currentPage * pageSize;
-    const end = start + pageSize;
-    const displayDocs = docs.slice(start, end);
-    grid.innerHTML = displayDocs.map(d => {
-      const score = Math.round(Number(d.score || d.trustScore || d.credi_score || (d.analysis && d.analysis.final_trust_score) || 0));
-      const name = getName(d);
-      const verdict = d.verdict || (d.analysis && d.analysis.verdict) || '';
-      const explanation = (d.analysis && (d.analysis.human_explanation || d.analysis.ai_explanation)) || '';
-      const hasBadge = !!(d.metadata && (d.metadata.verification_status === 'blue_verified' || d.metadata.is_verified || d.metadata.verification_source === 'verified_registry'));
-      const donutClass = getScoreClass(score);
-      const posterId = safeText(d.poster_id || d.input || '');
-      const created = d.createdAt || d.analyzedAt || d.last_updated;
-      const createdStr = formatTs(created);
-      const breakdown = d.analysis && d.analysis.breakdown ? d.analysis.breakdown : {};
-      const aiTrust = typeof breakdown.ai_agent_trust_score === 'number' ? Math.round(breakdown.ai_agent_trust_score) : null;
-      const ruleScore = typeof breakdown.rule_based_score === 'number' ? Math.round(breakdown.rule_based_score) : null;
-      const whyLine = (aiTrust !== null && ruleScore !== null) ? `Final Score uses 70% AI + 30% Rules: AI Trust ${aiTrust}% • Rule Score ${ruleScore}% → ${score}%` : '';
-      const requestTarget = String(d.input || d.poster_id || '').replace(/'/g, "\\'");
-      return `
-        <div class="poser-result-card" data-id="${d.id}">
-          ${hasBadge ? `<div style="background:linear-gradient(135deg,#0ea5e9 0%,#38bdf8 100%);color:#07283b;padding:0.75rem 1rem;border-radius:10px;margin-bottom:10px;display:flex;align-items:center;gap:10px;"><i class='fas fa-check-circle' style='font-size:1.25rem;'></i><div><strong>Verified</strong><div style='font-size:0.9rem;opacity:.9;'>Official Blue Badge detected.</div></div></div>` : ''}
-          <div class="summary-band ${donutClass}">
-            <div class="score-donut ${donutClass}" style="--pct:${score}">
-              <div class="inner"><div class="num">${score}</div><div class="pct">%</div></div>
-            </div>
-            <div>
-              <h3 class="poser-result-title" style="margin:0 0 6px; color:#e5e7eb;">${safeText(name)}</h3>
-              <div style="color:#9fb3c8; font-weight:600;">${safeText(verdict || 'Unknown')}</div>
-              ${explanation ? `<div class="expl" style='margin-top:8px; color:#cbd5e1;'>${safeText(explanation)}</div>` : ''}
-            </div>
-          </div>
-          <div class="meta-row"><span class="meta-label">ID:</span><span class="mono">${posterId || 'N/A'}</span><span class="dot">•</span><span class="meta-label">Analyzed:</span><span class="meta-value">${createdStr}</span></div>
-          <div class="why-card">
-            <h5>WHY THIS SCORE</h5>
-            ${whyLine ? `<div style='opacity:.7; font-size:.9rem; margin-bottom:8px;'>${whyLine}</div>` : ''}
-            ${(breakdown.ai_verdict || breakdown.ai_explanation) ? `<div style='color:#e2e8f0; font-size:.95rem; line-height:1.6;'>${safeText(breakdown.ai_verdict || '')}${(breakdown.ai_verdict && breakdown.ai_explanation) ? ' • ' : ''}${safeText(breakdown.ai_explanation || '')}</div>` : ''}
-            <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display:flex; justify-content: space-between; align-items:center;">
-              <p style="font-size: 0.85rem; color: #cbd5e1; margin: 0;">Is this actually a legitimate official news source?</p>
-              <div style="display:flex; gap:8px;">
-                <button class="btn-primary" onclick="window.submitVerificationRequest('${requestTarget}')"><i class="fas fa-paper-plane"></i> Request Manual Verification</button>
-                <button class="btn-delete" title="Hold Shift to permanently delete" data-id="${d.id}"><i class="fas fa-trash"></i> Delete</button>
-              </div>
-            </div>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-document.addEventListener('click', async (e)=>{
-  const delBtn = e.target.closest('.btn-delete');
-  if (delBtn){
-    e.preventDefault();
-    const id = delBtn.getAttribute('data-id');
-    if (!id) return;
-    try{
-      if (typeof firebase === 'undefined' || !firebase.firestore){ alert('Database connection not ready.'); return; }
-      const user = (firebase.auth && firebase.auth().currentUser) ? firebase.auth().currentUser : null;
-      if (!user){ window.location.href = 'login.html'; return; }
-      const hardDelete = !!e.shiftKey;
-      if (hardDelete) {
-        const ok = window.confirm('Permanently delete this entry? This cannot be undone.');
-        if (!ok) return;
-      } else {
-        const ok = window.confirm('Move this entry to trash? It will be hidden from your history.');
-        if (!ok) return;
-      }
-      delBtn.disabled = true;
-      delBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-      const dbx = firebase.firestore();
-      if (hardDelete) {
-        await dbx.collection('poser_detections').doc(id).delete();
-        await dbx.collection('account_activity').add({
-          userId: user.uid,
-          action: 'delete_poser_history_hard',
-          details: { id },
-          timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      } else {
-        await dbx.collection('poser_detections').doc(id).set({
-          deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          deletedBy: user.uid
-        }, { merge: true });
-        await dbx.collection('account_activity').add({
-          userId: user.uid,
-          action: 'delete_poser_history_soft',
-          details: { id },
-          timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }
-    } catch(err){
-      console.error('Delete failed:', err);
-      alert('Failed to delete entry.');
-    } finally {
-      delBtn.disabled = false;
-      delBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
-    }
-    return;
-  }
-  const card = e.target.closest('.poser-result-card');
-  if (!card) return;
-});
-
-  auth.onAuthStateChanged(user => {
-    if (!user){ window.location.href = 'login.html'; return; }
-    const q = db.collection('poser_detections').where('userId','==',user.uid).limit(50);
-    const unsubscribe = q.onSnapshot(snap => {
-      allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      render();
-      updatePager();
-    }, err => {
-      console.error('Error loading poser history:', err);
-      grid.innerHTML = '<div style="color:#ef4444; padding:2rem; text-align:center;">Error loading history. Please try again later.</div>';
-    });
+function formatTimestamp(ts) {
     try {
-      window.addEventListener('beforeunload', () => { try { unsubscribe && unsubscribe(); } catch(_){} });
-      window.addEventListener('pagehide', () => { try { unsubscribe && unsubscribe(); } catch(_){} });
-    } catch(_){}
-  });
+        if (ts && typeof ts.toDate === 'function') return ts.toDate().toLocaleString();
+        if (ts && ts.seconds) return new Date(ts.seconds * 1000).toLocaleString();
+        if (typeof ts === 'string' || typeof ts === 'number') return new Date(ts).toLocaleString();
+    } catch (e) {}
+    return 'N/A';
+}
 
-  if (searchInput) searchInput.addEventListener('input', (e)=>{ currentQuery = e.target.value; currentPage = 0; render(); updatePager(); });
-  if (sortSelect) sortSelect.addEventListener('change', (e)=>{ currentSort = e.target.value; currentPage = 0; render(); updatePager(); });
+function getVerdictStyle(verdict) {
+    const v = String(verdict || '').toLowerCase();
+    if (v.includes('likely authentic')) return 'high';
+    if (v.includes('likely poser')) return 'low';
+    return 'medium';
+}
 
-  function updatePager(){
-    const pageEl = document.getElementById('ph-page');
-    const pagesEl = document.getElementById('ph-pages');
-    const prevBtn = document.getElementById('ph-prev');
-    const nextBtn = document.getElementById('ph-next');
-    const docs = getFilteredDocs();
-    const totalPages = Math.max(1, Math.ceil(docs.length / pageSize));
-    if (pageEl) pageEl.textContent = String(currentPage + 1);
-    if (pagesEl) pagesEl.textContent = String(totalPages);
-    if (prevBtn) prevBtn.disabled = currentPage <= 0;
-    if (nextBtn) nextBtn.disabled = currentPage >= (totalPages - 1);
-  }
+function getScoreColor(score) {
+    const s = Number(score || 0);
+    if (s >= 80) return '#22c55e'; // High Trust (Green)
+    if (s >= 55) return '#f59e0b'; // Mixed (Yellow)
+    return '#ef4444'; // Low Trust (Red)
+}
 
-  const prevBtn = document.getElementById('ph-prev');
-  const nextBtn = document.getElementById('ph-next');
-  if (prevBtn) prevBtn.addEventListener('click', ()=>{ if (currentPage > 0) { currentPage--; render(); updatePager(); } });
-  if (nextBtn) nextBtn.addEventListener('click', ()=>{ currentPage++; render(); updatePager(); });
+function getVerdictScore(verdict) {
+    const v = String(verdict || '').toLowerCase();
+    if (v.includes('likely authentic')) return 3;
+    if (v.includes('likely poser')) return 1;
+    if (v.includes('mixed signals')) return 2;
+    return 0;
+}
 
-  window.submitVerificationRequest = async function(urlToCheck){
-    if (!urlToCheck) return;
-    try{
-      if (typeof firebase === 'undefined' || !firebase.firestore){ alert('Database connection not ready.'); return; }
-      const dbx = firebase.firestore();
-      const user = (firebase.auth && firebase.auth().currentUser) ? firebase.auth().currentUser : null;
-      async function getNotifyOptInOnce(){
-        if (!user) { try { if (typeof showNotification === 'function') showNotification('Sign in to manage notifications in the Notifications page.', 'info'); } catch(_){} return false; }
-        const ref = dbx.collection('users').doc(user.uid);
-        const snap = await ref.get();
-        const data = snap.exists ? (snap.data() || {}) : {};
-        if (typeof data.notifyOptIn === 'boolean') return !!data.notifyOptIn;
-        const wants = window.confirm('Would you like to receive a notification when this verification request is processed?');
-        await ref.set({ notifyOptIn: !!wants }, { merge: true });
-        return !!wants;
-      }
-      const wants = await getNotifyOptInOnce();
-      await dbx.collection('pending_verifications').add({ url: urlToCheck, timestamp: firebase.firestore.FieldValue.serverTimestamp(), status: 'pending', source: 'user_report', notifyUser: !!wants, userId: user ? user.uid : null });
-      if (wants && user){
-        await dbx.collection('notifications').add({ userId: user.uid, type: 'info', title: 'Verification requested', message: 'We will notify you when your request is processed.', timestamp: firebase.firestore.FieldValue.serverTimestamp(), link: 'my-verifications.html' });
-      } else { try { if (typeof showNotification === 'function') showNotification('You can enable notifications in the Notifications page.', 'info'); } catch(_){} }
-      alert('Request submitted!');
-    } catch(e){ alert('Error sending request.'); }
-  };
+// --- RENDERING & FILTERING ---
+
+function renderCards(docs) {
+    if (!container) return;
+
+    if (docs.length === 0 && currentPage === 1) {
+        container.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 3rem;">
+                <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                <p>No poser detection results found for your account.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = '';
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageDocs = docs.slice(start, end);
+
+    pageDocs.forEach(item => {
+        const score = Number(item.score || item.final_trust_score || 0);
+        const verdict = item.verdict || 'Mixed Signals';
+        const pageName = item.pageName || item.name || shorten(item.input || 'No input URL', 50);
+        const color = getScoreColor(score);
+        const verdictClass = getVerdictStyle(verdict);
+        
+        const card = document.createElement('div');
+        card.className = `poser-card poser-result-card ${verdictClass}`;
+        card.setAttribute('data-id', item.id);
+        
+        // This is a minimal representation of the verification result structure
+        card.innerHTML = `
+            <div class="card-body">
+                <div class="summary-band" style="border-left-color: ${color};">
+                    <div class="risk-score-circle" style="background: ${color}20; color: ${color};">
+                        ${Math.round(score)}%
+                    </div>
+                    <div class="risk-details">
+                        <div class="risk-verdict">${safeText(verdict)}</div>
+                        <div class="risk-subtext">${safeText(pageName)}</div>
+                        <div class="risk-explanation" style="font-size:0.8rem; margin-top:5px; color:#a1a1aa;">
+                           ${safeText(item.ai_explanation || item.rawExplanation || 'No AI summary available.')}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer" style="padding: 10px 0; border: none; background: transparent; justify-content: flex-start; gap: 15px;">
+                    <div class="source-row" style="color:#9ca3af; font-size:0.85rem;">
+                        <i class="fas fa-calendar"></i>
+                        <span>${formatTimestamp(item.analyzedAt || item.createdAt)}</span>
+                    </div>
+                    <button class="btn-primary" data-action="view-details">View Details</button>
+                    </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+    updatePaginationUI(docs.length);
+}
+
+function applyFiltersAndRender() {
+    const q = String(currentQuery || '').trim().toLowerCase();
+    let docs = allDocs.slice();
+
+    if (q) {
+        docs = docs.filter(d => {
+            const name = String(d.pageName || d.name || '').toLowerCase();
+            const input = String(d.input || '').toLowerCase();
+            const verdict = String(d.verdict || '').toLowerCase();
+            return name.includes(q) || input.includes(q) || verdict.includes(q);
+        });
+    }
+
+    // Sorting Logic
+    if (currentSort === 'date_desc') {
+        docs.sort((a, b) => (b.analyzedAt ? b.analyzedAt.toMillis() : 0) - (a.analyzedAt ? a.analyzedAt.toMillis() : 0));
+    } else if (currentSort === 'date_asc') {
+        docs.sort((a, b) => (a.analyzedAt ? a.analyzedAt.toMillis() : 0) - (b.analyzedAt ? b.analyzedAt.toMillis() : 0));
+    } else if (currentSort.startsWith('verdict_')) {
+        const targetScore = getVerdictScore(currentSort.replace('verdict_', ''));
+        // Higher scores first, then sort by proximity to target verdict score
+        docs.sort((a, b) => {
+            const scoreA = getVerdictScore(a.verdict);
+            const scoreB = getVerdictScore(b.verdict);
+            
+            // Primary sort: closest to target verdict
+            const diffA = Math.abs(scoreA - targetScore);
+            const diffB = Math.abs(scoreB - targetScore);
+            if (diffA !== diffB) return diffA - diffB;
+            
+            // Secondary sort: newest first
+            return (b.analyzedAt ? b.analyzedAt.toMillis() : 0) - (a.analyzedAt ? a.analyzedAt.toMillis() : 0);
+        });
+    }
+
+    renderCards(docs);
+}
+
+function updatePaginationUI(totalItems) {
+    totalPages = Math.ceil(totalItems / pageSize) || 1;
+    currentPage = Math.min(currentPage, totalPages);
+
+    if (pageInfo) pageInfo.textContent = currentPage;
+    if (totalPagesInfo) totalPagesInfo.textContent = totalPages;
+
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+}
+
+// --- DATA FETCHING (FIXED QUERY) ---
+
+async function fetchHistory(user) {
+    if (!container || !user || !user.uid) {
+        if (container) container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 3rem;">Please log in to view history.</div>';
+        return;
+    }
+
+    currentUserID = user.uid;
+    const db = firebase.firestore();
+    
+    // *** CRITICAL FIX: Secure Query for Poser History ***
+    const q = db.collection('poser_detections')
+                .where('userId', '==', user.uid) // Filter by authenticated user's ID
+                .orderBy('analyzedAt', 'desc'); // Order by newest first
+
+    try {
+        const snap = await q.get();
+        allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Ensure that client-side sorting/filtering runs on the full dataset
+        // and only the current page is rendered.
+        applyFiltersAndRender();
+
+    } catch (e) {
+        console.error("Error fetching poser history:", e);
+        
+        // This usually indicates the user is UNVERIFIED or the Index is MISSING/BUILDING
+        container.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 3rem;">
+                <i class="fas fa-exclamation-circle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                <p>Failed to load history due to permission or indexing issues.</p>
+                <p style="color:#f59e0b; margin-top:10px;">Please ensure your account is verified and the required Firestore indexes are enabled.</p>
+            </div>`;
+    }
+}
+
+// --- EVENT LISTENERS & INIT ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (searchInput) searchInput.addEventListener('input', (e) => {
+        currentQuery = e.target.value;
+        currentPage = 1;
+        applyFiltersAndRender();
+    });
+    if (sortSelect) sortSelect.addEventListener('change', (e) => {
+        currentSort = e.target.value;
+        currentPage = 1;
+        applyFiltersAndRender();
+    });
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            applyFiltersAndRender();
+        }
+    });
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+        if (currentPage < totalPages) {
+            currentPage++;
+            applyFiltersAndRender();
+        }
+    });
+    // Add listener for View Details modal if needed (requires a modal function definition)
 });
+
+if (window.firebase && firebase.auth) {
+    firebase.auth().onAuthStateChanged(user => {
+        if (user) {
+            // NOTE: Add your verification check here if you want to block unverified users before fetch.
+            // (e.g., if (!user.emailVerified) { display verification error message; return; })
+            fetchHistory(user);
+        } else {
+            // Redirect unauthenticated users
+            window.location.href = 'login.html'; 
+        }
+    });
+}

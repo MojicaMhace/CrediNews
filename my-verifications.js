@@ -308,29 +308,38 @@ function applyFilters() {
   renderCards(docs);
 }
 
-// --- INITIALIZATION ---
+// --- INITIALIZATION (FIXED QUERY) ---
 
 function start(user) {
   if (!container) return;
+  
+  // Reroute if user is null (safety check, though onAuthStateChanged should handle this)
+  if (!user || !user.uid) {
+      window.location.href = 'login.html'; 
+      return;
+  }
+  
   currentUserID = user.uid; // Store ID for voting
   const db = firebase.firestore();
   
+  // *** CRITICAL FIX: Query ONLY documents where the 'userId' field matches the current user's UID ***
+  // Assuming the field storing the user ID in the results collection is named 'userId'.
   const q = db.collection('facebook_verification_results')
+              .where('userId', '==', user.uid) 
               .orderBy('analyzed_at', 'desc')
               .limit(50);
 
   const unsubscribe = q.onSnapshot(snapshot => {
     const rawDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
-    // Filter by User ID
-    allDocs = rawDocs.filter(d => {
-        return d.userID === user.uid || d.userId === user.uid || d.user_id === user.uid || d.uid === user.uid;
-    });
+    // The filter below is now redundant but kept for robustness against inconsistent data:
+    allDocs = rawDocs.filter(d => d.userId === user.uid || d.user_id === user.uid || d.uid === user.uid);
 
     applyFilters();
   }, error => {
     console.error("Error fetching data:", error);
-    container.innerHTML = '<div style="color:#ef4444; padding:2rem; text-align:center;">Error loading history. Please try again later.</div>';
+    // Note: If the user is unverified, the error will happen here due to security rules.
+    container.innerHTML = '<div style="color:#ef4444; padding:2rem; text-align:center;">Error loading history. Please try again later. (Check verification status or contact support.)</div>';
   });
 
   try {
@@ -367,12 +376,25 @@ document.addEventListener('click', (e) => {
 if (window.firebase && firebase.auth) {
     firebase.auth().onAuthStateChanged(user => {
         if (user) {
-            if(document.getElementById('userAccountBtn')) {
-                document.getElementById('userAccountBtn').style.display = 'flex';
-                document.querySelector('.user-name').textContent = user.displayName || 'My Account';
+            // Check if user is verified before starting the process
+            if (user.emailVerified) {
+                // If the user has completed the Auth verification, proceed to fetch data
+                if(document.getElementById('userAccountBtn')) {
+                    document.getElementById('userAccountBtn').style.display = 'flex';
+                    document.querySelector('.user-name').textContent = user.displayName || 'My Account';
+                }
+                start(user);
+            } else {
+                // If Auth email is not verified, redirect or display a strong message
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ff9800; padding: 3rem;">' + 
+                                      '<i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>' +
+                                      '<p>Please verify your email address to view your history.</p>' +
+                                      '<a href="login.html" style="color: #3b82f6; text-decoration: underline;">Go to Login / Resend Verification</a>' +
+                                      '</div>';
             }
-            start(user);
+
         } else {
+            // Not logged in, redirect to login
             window.location.href = 'login.html'; 
         }
     });
