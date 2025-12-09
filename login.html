@@ -9,11 +9,11 @@
 </head>
 <body class="auth-body">
     <div class="site-simple-nav">
-      <nav>
-          <div class="logo">
-              <i class="fas fa-shield-halved" style="color: #22c55e;"></i>
-          </div>
-      </nav>
+        <nav>
+            <div class="logo">
+                <i class="fas fa-shield-halved" style="color: #22c55e;"></i>
+            </div>
+        </nav>
     </div>
     <div class="auth-container auth-split">
         <aside class="auth-hero has-image" style="background-image: url('images/credinews1.jpg');"></aside>
@@ -26,7 +26,6 @@
                 <p>Sign in to your account to continue</p>
             </div>
             
-
             <div id="verificationMessage" class="verification-message" style="display: none;">
                 <div class="message-content">
                     <i class="fas fa-envelope-open-text"></i>
@@ -171,27 +170,82 @@
     <script src="auth.js"></script>
     
     <script>
-        // Handle Firebase email verification link and Password Reset directly on login page
+        // ----------------------------------------------------------------------
+        // Helper Function to Sync Firestore Status
+        // ----------------------------------------------------------------------
+        function syncFirestoreVerificationStatus(user) {
+            // We only proceed if a user object is provided and the email is verified in Auth
+            if (user && user.emailVerified) {
+                const firestore = firebase.firestore();
+                
+                // Reference the user document using the Auth UID (assuming 'users' collection)
+                const userDocRef = firestore.collection('users').doc(user.uid);
+                
+                // Manually update the Firestore document
+                userDocRef.update({ 
+                    emailVerified: true 
+                })
+                .then(() => {
+                    console.log("SUCCESS: Firestore document synced to verified = true.");
+                })
+                .catch((error) => {
+                    console.error("ERROR: Failed to update Firestore document:", error);
+                });
+            }
+        }
+
+        // ----------------------------------------------------------------------
+        // Main Firebase Action Handler (runs on page load)
+        // ----------------------------------------------------------------------
         (function() {
             try {
                 const params = new URLSearchParams(window.location.search);
                 const mode = params.get('mode');
                 const oobCode = params.get('oobCode');
                 const auth = firebase.auth();
-    
+                const loginFormEl = document.getElementById('loginForm');
+                const resetBox = document.getElementById('inlineResetContainer');
+
                 // 1. HANDLE EMAIL VERIFICATION
                 if (mode === 'verifyEmail' && oobCode) {
+                    
+                    // 1a. Attempt to apply the verification code
                     auth.applyActionCode(oobCode)
                         .then(() => {
+                            // Action code successful! Email is now verified on the Firebase server.
+                            // Get the user object and reload status if logged in
+                            const currentUser = auth.currentUser;
+                            
+                            if (currentUser) {
+                                return currentUser.reload().then(() => currentUser);
+                            }
+                            // Return null if not logged in (status syncs on next login)
+                            return null; 
+                        })
+                        .then((reloadedUser) => {
+                            // Hide login/reset forms and show success message
                             const successEl = document.getElementById('verificationSuccessMessage');
+                            const msgEl = document.getElementById('verificationMessage');
+                            
+                            if (loginFormEl) loginFormEl.style.display = 'none';
+                            if (resetBox) resetBox.style.display = 'none';
+                            if (msgEl) msgEl.style.display = 'none';
+                            
                             if (successEl) {
                                 successEl.style.display = 'block';
                                 sessionStorage.setItem('verification_just_completed', '1');
                                 setTimeout(() => {
                                     successEl.style.display = 'none';
+                                    if (loginFormEl) loginFormEl.style.display = 'block'; // Show login form again
                                 }, 5000);
                             }
-                            // Clean URL
+                            
+                            // Sync Firestore if the user is available in the current session
+                            if (reloadedUser && reloadedUser.emailVerified) {
+                                syncFirestoreVerificationStatus(reloadedUser);
+                            }
+
+                            // Clean URL to prevent re-running on refresh
                             window.history.replaceState({}, document.title, window.location.pathname);
                         })
                         .catch((error) => {
@@ -201,10 +255,11 @@
                                 msgEl.style.display = 'block';
                                 msgEl.innerHTML = `<div class="message-content"><i class="fas fa-exclamation-circle"></i><h3>Verification Failed</h3><p>${error.message}</p></div>`;
                             }
+                            window.history.replaceState({}, document.title, window.location.pathname);
                         });
                 } 
                 
-                // 2. HANDLE PASSWORD RESET (Separated from verifyEmail)
+                // 2. HANDLE PASSWORD RESET (Existing logic maintained)
                 else if (mode === 'resetPassword' && oobCode) {
                     const loginFormEl = document.getElementById('loginForm');
                     const resetBox = document.getElementById('inlineResetContainer');
@@ -212,10 +267,10 @@
                     const newPwd = document.getElementById('newResetPassword');
                     const confirmPwd = document.getElementById('confirmResetPassword');
                     const confirmBtn = document.getElementById('confirmResetBtn');
-    
+        
                     if (loginFormEl) loginFormEl.style.display = 'none';
                     if (resetBox) resetBox.style.display = 'block';
-    
+        
                     // Resolve email tied to oobCode
                     auth.verifyPasswordResetCode(oobCode)
                         .then(function(email) {
@@ -226,8 +281,8 @@
                             alert('This password reset link is invalid or expired.');
                             window.location.href = 'login.html';
                         });
-    
-                    // Strength meter logic
+        
+                    // Strength meter logic (existing code kept for completeness)
                     function updateStrength(p) {
                         const bar = document.getElementById('li-strength-bar');
                         const len = document.getElementById('li-req-len');
@@ -241,54 +296,54 @@
                         const hasLow = /[a-z]/.test(p || '');
                         const hasNum = /\d/.test(p || '');
                         const hasSym = /[!@#$%^&*(),.?":{}|<>]/.test(p || '');
-    
+        
                         // Update list colors
                         if(len) len.style.color = hasLen ? '#22c55e' : '#9ca3af';
                         if(up) up.style.color = hasUp ? '#22c55e' : '#9ca3af';
                         if(low) low.style.color = hasLow ? '#22c55e' : '#9ca3af';
                         if(num) num.style.color = hasNum ? '#22c55e' : '#9ca3af';
                         if(sym) sym.style.color = hasSym ? '#22c55e' : '#9ca3af';
-    
+        
                         let score = 0;
                         if (hasLen) score++;
                         if (hasUp) score++;
                         if (hasLow) score++;
                         if (hasNum) score++;
                         if (hasSym) score++;
-    
+        
                         if (bar) {
                             const pct = Math.min(100, score * 20);
                             bar.style.width = pct + '%';
                             bar.style.background = score <= 2 ? '#ef4444' : (score <= 4 ? '#f59e0b' : '#10b981');
                         }
                     }
-    
+        
                     if (newPwd) {
                         newPwd.addEventListener('input', function() {
                             updateStrength(newPwd.value);
                         });
                         updateStrength(newPwd.value || '');
                     }
-    
+        
                     // Submit New Password
                     if (confirmBtn) {
                         confirmBtn.addEventListener('click', function() {
                             const p1 = newPwd ? newPwd.value : '';
                             const p2 = confirmPwd ? confirmPwd.value : '';
-    
+        
                             if (!p1 || p1.length < 8 || !/[A-Z]/.test(p1) || !/[a-z]/.test(p1) || !/\d/.test(p1) || !/[!@#$%^&*(),.?":{}|<>]/.test(p1)) {
                                 alert('Please enter a strong password: 8+ chars, uppercase, lowercase, number, and symbol.');
                                 return;
                             }
-    
+        
                             if (p1 !== p2) {
                                 alert('Passwords do not match.');
                                 return;
                             }
-    
+        
                             confirmBtn.disabled = true;
                             confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
-    
+        
                             auth.confirmPasswordReset(oobCode, p1)
                                 .then(function() {
                                     alert('Password updated! Please sign in.');
@@ -305,14 +360,24 @@
                         });
                     }
                 }
-    
+                
+                // 3. FALLBACK: Sync Firestore status upon manual login/auth state change
+                auth.onAuthStateChanged((user) => {
+                    // Check if the user is logged in, their email is verified in Auth, 
+                    // and it's not the initial creation (to avoid updating immediately after registration).
+                    if (user && user.emailVerified && user.metadata.creationTime !== user.metadata.lastSignInTime) {
+                        // We rely on the sign-in process to reload the user's status, so we can now sync Firestore.
+                        syncFirestoreVerificationStatus(user);
+                    }
+                });
+
             } catch (err) {
                 console.error('Verification handler error:', err);
             }
-        })(); // <--- Properly closed IIFE
+        })();
     </script>
     <script>
-      // Password visibility toggle for login form
+      // Password visibility toggle for login form (existing code maintained)
       document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.toggle-visibility').forEach((btn) => {
           const targetId = btn.dataset.target;
@@ -331,5 +396,5 @@
         });
       });
     </script>
-  </body>
+</body>
 </html>
