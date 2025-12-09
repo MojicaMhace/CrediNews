@@ -18,13 +18,20 @@ try {
     firebase.initializeApp(firebaseConfig);
     console.log('✅ Firebase initialized successfully');
     
-    
     // Export for global access
     window.firebaseAuth = firebase.auth();
     window.firebaseDb = firebase.firestore();
     window.firebaseApp = firebase.app();
     window.firebaseConfig = firebaseConfig;
-    try { window.firebaseDb.settings({ experimentalForceLongPolling: true, useFetchStreams: false }); } catch (_) {}
+
+    // --- FIX IS HERE: Added merge: true ---
+    try { 
+        window.firebaseDb.settings({ 
+            experimentalForceLongPolling: true, 
+            useFetchStreams: false,
+            merge: true  
+        }); 
+    } catch (_) {}
     
     console.log('✅ Firebase services exported globally');
     
