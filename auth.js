@@ -1083,8 +1083,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (user.emailVerified) {
                     const db = firebase.firestore();
                     await db.collection('users').doc(user.uid).set({ emailVerified: true }, { merge: true });
+                    console.log('Synced emailVerified=true on auth state');
                 }
-            } catch (_e) {}
+            } catch (e) {
+                console.error('Failed to sync emailVerified on auth state:', e && e.message);
+            }
             const justVerified = sessionStorage.getItem('verification_just_completed');
             if (user.emailVerified && justVerified === '1') {
                 checkEmailVerificationStatus();
