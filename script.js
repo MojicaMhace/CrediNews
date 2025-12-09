@@ -111,7 +111,7 @@ function updateAuthButton() {
             const headerName = ensureDropdown.querySelector('.user-display-name');
             if (headerName) headerName.textContent = displayName;
             const headerEmail = ensureDropdown.querySelector('.user-email');
-            if (headerEmail) headerName.textContent = email || '';
+            if (headerEmail) headerEmail.textContent = email || '';
             const avatarEl = ensureDropdown.querySelector('.user-avatar');
             if (avatarEl && photoURL) {
                 avatarEl.innerHTML = `<img src="${photoURL}" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
@@ -148,7 +148,7 @@ function updateAuthButton() {
 
                 dropdown.style.position = 'fixed';
                 dropdown.style.top = `${Math.round(btnRect.bottom + 8)}px`;
-                dropdown.style.left = `${Math.round(btnRect.left)}px`;
+                dropdown.style.left = `${Math.round(btnRect.left + -75)}px`;
                 dropdown.style.right = 'auto';
                 dropdown.style.visibility = 'visible';
                 dropdown.style.opacity = '1';
@@ -516,6 +516,11 @@ function handleLogout() {
 }
 
 async function updatePlatformStats() {
+    if (typeof firebase === 'undefined' || !firebase.firestore) {
+        console.warn('⚠️ Firebase not ready yet - skipping Platform Stats update.');
+        return;
+    }
+
     const db = firebase.firestore();
     const animateValue = (id, start, end, duration, suffix = "") => {
         const obj = document.getElementById(id);
@@ -558,6 +563,7 @@ async function updatePlatformStats() {
         animateValue("stat-users", 0, totalUsers, 2000);
 
     } catch (e) {
+        console.error('Error fetching stats:', e);
         const vEl = document.getElementById("stat-verified");
         if (vEl) vEl.innerText = "0";
     }
