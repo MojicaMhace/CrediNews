@@ -2,15 +2,15 @@
 
 /* Poser toggle purple gradient (keeps shared spacing from styles.css) */
 #open-poser-detection.toggle-btn {
-    background: linear-gradient(135deg, #7e22ce 0%, #6d28d9 50%, #9333ea 100%);
+    background: linear-gradient(135deg, #1d4ed8 0%, #1877f2 45%, #60a5fa 100%);
     color: #fff;
-    border-color: #7e22ce;
+    border-color: transparent;
 }
 #open-poser-detection.toggle-btn:hover {
-    background: linear-gradient(135deg, #6d28d9 0%, #7e22ce 50%, #c084fc 100%);
+    background: linear-gradient(135deg, #1d4ed8 0%, #1877f2 45%, #60a5fa 100%);
 }
 #open-poser-detection.toggle-btn.active {
-    background: linear-gradient(135deg, #581c87 0%, #6d28d9 50%, #9333ea 100%);
+    background: linear-gradient(135deg, #1d4ed8 0%, #1877f2 45%, #60a5fa 100%);
 }
 
 @media (max-width: 820px) {
@@ -530,9 +530,9 @@
     border-color: #166fe5 !important;
 }
 .poser-detection-page .verify-news-container #open-poser-detection.toggle-btn:hover {
-    background: linear-gradient(135deg, #7e22ce 0%, #6d28d9 50%, #9333ea 100%) !important;
+    background: linear-gradient(135deg, #1d4ed8 0%, #1877f2 45%, #60a5fa 100%) !important;
     color: #fff !important;
-    border-color: #7e22ce !important;
+    border-color: transparent !important;
 }
 
 .poser-detection-page .verify-news-container #show-facebook-verify.toggle-btn.active,

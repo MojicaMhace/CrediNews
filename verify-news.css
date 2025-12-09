@@ -478,7 +478,7 @@
 .hl-bad { background: linear-gradient(135deg, #fca5a5 0%, #ef4444 50%, #fecaca 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 
-.verify-news-page .verify-news-container #open-poser-detection.toggle-btn:hover { background: linear-gradient(135deg, #7e22ce 0%, #6d28d9 50%, #9333ea 100%) !important; color: #fff !important; border-color: #7e22ce !important; }
+.verify-news-page .verify-news-container #open-poser-detection.toggle-btn:hover { background: linear-gradient(135deg, #1d4ed8 0%, #1877f2 45%, #60a5fa 100%) !important; color: #fff !important; border-color: transparent !important; }
 .verify-news-page .verify-news-container #open-poser-detection.toggle-btn.active { background: linear-gradient(135deg, #1d4ed8 0%, #1877f2 45%, #60a5fa 100%) !important; color: #fff !important; border-color: transparent !important; box-shadow: 0 8px 24px rgba(24,119,242,0.25) !important; }
 /* Verify News navbar styles (scoped) */
 .verify-news-page .navbar {

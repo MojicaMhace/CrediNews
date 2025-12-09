@@ -385,7 +385,7 @@
                         }, { merge: true });
                     }
                 } catch (err) {}
-                showInlineMessage(`Account created! A verification email was sent to ${email}. Please verify your email before logging in.`, 'success');
+                showInlineMessage(`Verification email sent to${email}. Check your Spam/Junk folder. Please verify your email before logging in.`, 'success');
                 const until = Date.now() + COOLDOWN_MS;
                 localStorage.setItem(cooldownKey, String(until));
                 startCountdown(until);
