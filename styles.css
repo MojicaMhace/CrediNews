@@ -839,6 +839,7 @@ nav.navbar .auth-buttons .signup-btn:hover {
   align-items: flex-start;
   justify-content: center;
   text-align: center;
+  padding-top: 60px;
 }
 
 .hero-left {
