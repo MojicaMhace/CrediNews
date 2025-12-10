@@ -1,6 +1,5 @@
 console.log('🔧 auth.js is loading...');
 
-// --- 1. OTP Management System is DELETED ---
 // --- 2. Authentication Manager Class ---
 class AuthManager {
     constructor() {
@@ -14,7 +13,6 @@ class AuthManager {
     init() {
         this.bindEvents();
         this.initTheme();
-        // Removed: this.checkForOTPVerification();
         
         // Ensure the login form is shown by default if not redirected
         const urlParams = new URLSearchParams(window.location.search);
@@ -24,8 +22,6 @@ class AuthManager {
         }
     }
     
-    // initTheme remains the same
-
     initTheme() {
         const theme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', theme);
@@ -85,8 +81,6 @@ class AuthManager {
             googleSignUp.addEventListener('click', () => this.handleGoogleAuth('signup'));
         }
 
-        // Removed: OTP form binding (otpForm, otpInputs, resendOtpBtn)
-
         const backToLoginBtn = document.getElementById('backToLoginBtn');
         if (backToLoginBtn) {
             backToLoginBtn.addEventListener('click', () => this.showLoginForm());
@@ -123,7 +117,7 @@ class AuthManager {
                 return;
             }
             
-            // --- CRITICAL UPDATE: Update Profile fields on Successful Login ---
+            // --- CRITICAL FIX: Profile Repair Check on Successful Login ---
             try {
                 const userRef = this.db.collection('users').doc(user.uid);
                 const snap = await userRef.get();
@@ -133,19 +127,23 @@ class AuthManager {
                     emailVerified: user.emailVerified 
                 };
                 
-                if (!snap.exists) {
-                    // Scenario: Profile was never created or was deleted. Re-create the full profile.
+                // Check if document is missing OR is missing the 'name' field (indicating an incomplete profile)
+                if (!snap.exists || !snap.data().name) {
+                    // PROFILE REPAIR / INITIAL CREATION
+                    
+                    const existingData = snap.exists ? snap.data() : {};
+                    
                     await userRef.set({
-                        name: user.displayName || 'User',
+                        name: user.displayName || existingData.name || 'User', // Use display name, or existing name, or default
                         email: user.email,
-                        profilePictureUrl: user.photoURL || null,
-                        providerId: (user.providerData && user.providerData[0] && user.providerData[0].providerId) || 'password',
-                        role: 'user',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        preferences: { theme: 'dark', notifications: true },
+                        profilePictureUrl: user.photoURL || existingData.profilePictureUrl || null,
+                        providerId: (user.providerData && user.providerData[0] && user.providerData[0].providerId) || existingData.providerId || 'password',
+                        role: existingData.role || 'user', // Preserve existing role or default
+                        createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(), // Preserve existing timestamp or set new
+                        preferences: existingData.preferences || { theme: 'dark', notifications: true }, // Preserve existing preferences
                         ...updateData
                     });
-                    console.log('✅ Firestore profile re-created and updated.');
+                    console.log('✅ Firestore profile re-created/repaired and updated.');
                 } else {
                     // Standard Login: Only update the dynamic fields
                     await userRef.update(updateData);
@@ -197,7 +195,7 @@ class AuthManager {
         }
     }
 
-    // Google OAuth (Sign-In/Sign-Up) remains the same
+    // Google OAuth (Sign-In/Sign-Up) 
     async handleGoogleAuth(type) {
         const actionText = type === 'signin' ? 'Signing in' : 'Signing up';
         
@@ -226,16 +224,33 @@ class AuthManager {
             const userRef = this.db.collection('users').doc(user.uid);
             const userDoc = await userRef.get();
             
+            // --- FIX: IMMEDIATE FULL PROFILE CREATION FOR NEW GOOGLE USERS ---
             if (!userDoc.exists) {
-                // --- CRITICAL: New Google user -> Registration Gate ---
+                console.log('✅ NEW Google user detected. Creating full profile immediately.');
+                
+                // 1. Create the full profile document instantly
+                await userRef.set({
+                    name: user.displayName || 'Google User', // Use Google's name immediately
+                    email: user.email,
+                    profilePictureUrl: user.photoURL || null,
+                    providerId: user.providerData[0].providerId,
+                    role: 'user', 
+                    emailVerified: true, 
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    preferences: { theme: 'dark', notifications: true }
+                });
+                
+                // 2. Store minimal data and proceed to registration gate for finalization
                 sessionStorage.setItem('googleAuthPending', JSON.stringify({
                     uid: user.uid, email: user.email, name: user.displayName, 
                     photoURL: user.photoURL, providerId: user.providerData[0].providerId, idToken: idToken 
                 }));
                 
+                // 3. Sign out to enforce completing registration (Terms, Custom Name)
                 await firebase.auth().signOut();
                 
-                this.showInfo(`Please complete your registration...`);
+                this.showInfo(`Profile created. Redirecting for final setup...`);
                 setTimeout(() => { window.location.href = 'register.html?google_signup=1'; }, 500);
                 
                 return;
@@ -264,7 +279,7 @@ class AuthManager {
         }
     }
 
-    // --- Registration Flow: E/P Sign-up (Now using Firebase Verification Link) ---
+    // --- Registration Flow: E/P Sign-up (Full Profile Creation) ---
     async handleEmailPasswordRegister({ fullName, email, password }) {
         let createdUser = null;
         
@@ -304,7 +319,7 @@ class AuthManager {
         }
     }
     
-    // --- Google Signup Submission (Remains the same) ---
+    // --- Google Signup Submission (Finalizing Registration/Custom Name) ---
     async handleGoogleSignupSubmit(e, pendingData) {
         e.preventDefault();
         const fullName = document.getElementById("fullName").value.trim();
@@ -325,27 +340,29 @@ class AuthManager {
 
         try {
             let user = firebase.auth().currentUser;
+            // The user may or may not be signed in here, depending on browser state.
+            // We use the ID Token from pendingData to ensure we get the correct user.
             if (!user || user.uid !== pendingData.uid) {
                  const cred = firebase.auth.GoogleAuthProvider.credential(pendingData.idToken);
                  const userCredential = await firebase.auth().signInWithCredential(cred);
                  user = userCredential.user;
             }
             
+            // Since the full profile was already created in handleGoogleAuth, 
+            // we only need to update the custom name field and finalize login.
+            
             const userRef = this.db.collection('users').doc(user.uid);
-            await userRef.set({
-                name: fullName, 
-                email: pendingData.email,
-                profilePictureUrl: pendingData.photoURL || null, 
-                providerId: pendingData.providerId || 'google.com', 
-                role: 'user', 
-                emailVerified: true, // Auto-verified by Google
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(), 
-                preferences: { theme: 'dark', notifications: true }
-            }, { merge: true });
-
+            
+            // 1. Update the name in Firebase Auth profile
             await user.updateProfile({ displayName: fullName });
             
+            // 2. Update the name in Firestore profile
+            await userRef.update({ 
+                name: fullName, 
+                lastLoginAt: firebase.firestore.FieldValue.serverTimestamp() // Final login update
+            });
+            
+            // 3. Clean up session and redirect
             sessionStorage.removeItem('googleAuthPending');
             
             this.showSuccess(`Welcome, ${fullName}! Registration complete. Redirecting to homepage.`);
@@ -360,14 +377,11 @@ class AuthManager {
         }
     }
     
-    // --- Removed: handleOTPVerification, handleResendOTP, setupOTPInputs, updateOTPInputState (and all related functions) ---
-    
     // --- Resend Verification Option (for Login page) ---
     showResendVerificationOption(email) {
         const COOLDOWN_MS = 60 * 1000; // 60 seconds
         const cooldownKey = `resend_verif_cooldown_${email}`;
         
-        // ... (resend button creation and cooldown logic remains the same)
         const resendBtn = document.createElement('button');
         resendBtn.textContent = 'Resend Verification Email';
         resendBtn.className = 'auth-btn secondary';
@@ -448,15 +462,55 @@ class AuthManager {
     }
     
     // --- UI Helpers (remain the same) ---
-    validateEmail(email) { /* ... */ }
-    setButtonLoading(button, isLoading) { /* ... */ }
-    showNotification(message, type = 'info') { /* ... */ }
-    getNotificationIcon(type) { /* ... */ }
-    showSuccess(message) { /* ... */ }
-    showError(message) { /* ... */ }
-    showInfo(message) { /* ... */ }
+    validateEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+    
+    setButtonLoading(button, isLoading) {
+        if (!button) return;
+        if (isLoading) {
+            button.disabled = true;
+            const originalContent = button.innerHTML;
+            button.dataset.originalContent = originalContent;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Please wait...';
+        } else {
+            button.disabled = false;
+            button.innerHTML = button.dataset.originalContent || button.innerHTML;
+        }
+    }
+    
+    showNotification(message, type = 'info') {
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(notification => notification.remove());
+
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <i class="fas ${this.getNotificationIcon(type)}"></i>
+            <span>${message}</span>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 4000);
+    }
+
+    getNotificationIcon(type) {
+        switch (type) {
+            case 'success': return 'fa-check-circle';
+            case 'error': return 'fa-times-circle';
+            case 'warning': return 'fa-exclamation-triangle';
+            default: return 'fa-info-circle';
+        }
+    }
+
+    showSuccess(message) { this.showNotification(message, 'success'); }
+    showError(message) { this.showNotification(message, 'error'); }
+    showInfo(message) { this.showNotification(message, 'info'); }
+
     showLoginForm() {
-        // Only hides OTP container if it exists, otherwise just ensures login is visible
         const otpContainer = document.getElementById('otpVerificationContainer');
         const loginForm = document.getElementById('loginForm');
         
@@ -464,19 +518,14 @@ class AuthManager {
         if (loginForm) loginForm.style.display = 'block';
         
         window.history.replaceState({}, document.title, window.location.pathname);
-        // Removed: sessionStorage.removeItem('pendingVerification');
     }
-    // showOTPForm is DELETED
 }
 
 // --- 3. Global Initialization and Auth State Listeners ---
 
-// Removed: window.otpManager = new OTPManager();
-
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 DOMContentLoaded event fired!');
     
-    // ... (URL parameter checking for verification message/status)
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('message') === 'verify-email') {
         const verificationMessage = document.getElementById('verificationMessage');
@@ -527,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     window.authManager = new AuthManager();
     
-    // Check for Google Redirect Result
+    // Check for Google Redirect Result (with Profile Repair Check)
     if (firebase && firebase.auth) {
         firebase.auth().getRedirectResult().then(async (result) => {
             if (result && result.user) {
@@ -538,20 +587,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 const idToken = await user.getIdToken(); 
                 
                 if (!userDoc.exists) {
+                    // --- New User detected via Redirect Result: GO TO REGISTRATION GATE ---
+                    
+                    // 1. Create full profile immediately (Fixes the missing document problem)
+                    await userRef.set({
+                        name: user.displayName || 'Google User', 
+                        email: user.email,
+                        profilePictureUrl: user.photoURL || null,
+                        providerId: user.providerData[0].providerId,
+                        role: 'user', 
+                        emailVerified: true, 
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        preferences: { theme: 'dark', notifications: true }
+                    });
+                    
+                    // 2. Store minimal data and proceed to registration gate for finalization
                     sessionStorage.setItem('googleAuthPending', JSON.stringify({
                         uid: user.uid, email: user.email, name: user.displayName,
                         photoURL: user.photoURL, providerId: user.providerData[0].providerId, idToken: idToken 
                     }));
                     
+                    // 3. Sign out to enforce completing registration (Terms, Custom Name)
                     await firebase.auth().signOut();
                     window.location.href = 'register.html?google_signup=1';
                     return;
                 } 
                 
-                await userRef.update({
+                // --- Existing User / Profile Repair Check ---
+                const updateData = {
                     lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
                     emailVerified: user.emailVerified 
-                });
+                };
+                
+                // Check if profile exists but is incomplete (missing 'name' field is the proxy for completion)
+                if (!userDoc.data().name) {
+                    // PROFILE REPAIR: Document exists but is incomplete (e.g., only {emailVerified, lastLoginAt})
+                    const existingData = userDoc.data();
+                    
+                    await userRef.set({
+                        name: user.displayName || existingData.name || 'Google User', // Use display name, or existing name, or default
+                        email: user.email,
+                        profilePictureUrl: user.photoURL || existingData.profilePictureUrl || null,
+                        providerId: user.providerData[0].providerId,
+                        role: existingData.role || 'user', // Preserve existing role or default
+                        createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(), // Preserve existing timestamp
+                        preferences: existingData.preferences || { theme: 'dark', notifications: true }, // Preserve existing preferences
+                        ...updateData
+                    });
+                    console.log('✅ Existing Google user profile repaired and updated.');
+                } else {
+                    // --- Complete User: Update dynamic fields only ---
+                    await userRef.update(updateData);
+                    console.log('✅ Existing Google user login time and verification status updated.');
+                }
 
                 const authData = {
                     uid: user.uid, email: user.email, fullName: user.displayName || 'Google User',
