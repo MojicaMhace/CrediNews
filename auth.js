@@ -129,20 +129,16 @@ class AuthManager {
                 
                 // Check if document is missing OR is missing the 'name' field (indicating an incomplete profile)
                 if (!snap.exists || !snap.data().name) {
-                    // PROFILE REPAIR / INITIAL CREATION
-                    
                     const existingData = snap.exists ? snap.data() : {};
-                    
                     await userRef.set({
-                        name: user.displayName || existingData.name || 'User', // Use display name, or existing name, or default
+                        name: user.displayName || existingData.name || 'User',
                         email: user.email,
                         profilePictureUrl: user.photoURL || existingData.profilePictureUrl || null,
                         providerId: (user.providerData && user.providerData[0] && user.providerData[0].providerId) || existingData.providerId || 'password',
-                        role: existingData.role || 'user', // Preserve existing role or default
-                        createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(), // Preserve existing timestamp or set new
-                        preferences: existingData.preferences || { theme: 'dark', notifications: true }, // Preserve existing preferences
+                        createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+                        preferences: existingData.preferences || { theme: 'dark', notifications: true },
                         ...updateData
-                    });
+                    }, { merge: true });
                     console.log('✅ Firestore profile re-created/repaired and updated.');
                 } else {
                     // Standard Login: Only update the dynamic fields
@@ -227,19 +223,21 @@ class AuthManager {
             // --- FIX: IMMEDIATE FULL PROFILE CREATION FOR NEW GOOGLE USERS ---
             if (!userDoc.exists) {
                 console.log('✅ NEW Google user detected. Creating full profile immediately.');
-                
-                // 1. Create the full profile document instantly
-                await userRef.set({
-                    name: user.displayName || 'Google User', // Use Google's name immediately
-                    email: user.email,
-                    profilePictureUrl: user.photoURL || null,
-                    providerId: user.providerData[0].providerId,
-                    role: 'user', 
-                    emailVerified: true, 
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    preferences: { theme: 'dark', notifications: true }
-                });
+                try {
+                    await userRef.set({
+                        name: user.displayName || 'Google User',
+                        email: user.email,
+                        profilePictureUrl: user.photoURL || null,
+                        providerId: user.providerData[0].providerId,
+                        role: 'user',
+                        emailVerified: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        preferences: { theme: 'dark', notifications: true }
+                    });
+                } catch (err) {
+                    console.error('Failed to create full Google profile:', err && err.message);
+                }
                 
                 // 2. Store minimal data and proceed to registration gate for finalization
                 sessionStorage.setItem('googleAuthPending', JSON.stringify({
@@ -255,7 +253,17 @@ class AuthManager {
                 
                 return;
             } else {
-                // --- Existing User: Update dynamic fields only ---
+                const existingData = userDoc.data();
+                if (!existingData.name) {
+                    await userRef.set({
+                        name: user.displayName || 'Google User',
+                        email: user.email,
+                        profilePictureUrl: user.photoURL || null,
+                        providerId: user.providerData[0].providerId,
+                        createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+                        preferences: existingData.preferences || { theme: 'dark', notifications: true }
+                    }, { merge: true });
+                }
                 await userRef.update({
                     lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
                     emailVerified: user.emailVerified 
@@ -622,19 +630,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Check if profile exists but is incomplete (missing 'name' field is the proxy for completion)
                 if (!userDoc.data().name) {
-                    // PROFILE REPAIR: Document exists but is incomplete (e.g., only {emailVerified, lastLoginAt})
                     const existingData = userDoc.data();
-                    
                     await userRef.set({
-                        name: user.displayName || existingData.name || 'Google User', // Use display name, or existing name, or default
+                        name: user.displayName || existingData.name || 'Google User',
                         email: user.email,
                         profilePictureUrl: user.photoURL || existingData.profilePictureUrl || null,
                         providerId: user.providerData[0].providerId,
-                        role: existingData.role || 'user', // Preserve existing role or default
-                        createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(), // Preserve existing timestamp
-                        preferences: existingData.preferences || { theme: 'dark', notifications: true }, // Preserve existing preferences
+                        createdAt: existingData.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+                        preferences: existingData.preferences || { theme: 'dark', notifications: true },
                         ...updateData
-                    });
+                    }, { merge: true });
                     console.log('✅ Existing Google user profile repaired and updated.');
                 } else {
                     // --- Complete User: Update dynamic fields only ---
