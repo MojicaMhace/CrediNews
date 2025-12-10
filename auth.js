@@ -1056,25 +1056,32 @@ async function checkEmailVerificationStatus() {
 }
 
 // Check if user is already authenticated
+// Check if user is already authenticated
 function checkAuthStatus() {
-    console.log('🔍 Checking auth status...');
-    
-    // Check for clearAuth URL parameter first
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('clearAuth') === '1') {
-        console.log('🧹 clearAuth parameter detected, clearing auth data');
-        localStorage.removeItem('authData');
-        sessionStorage.removeItem('authData');
-        // Clear the URL parameter
-        urlParams.delete('clearAuth');
-        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
-        window.history.replaceState({}, document.title, newUrl);
-        console.log('✅ Auth data cleared, allowing login form to show');
-        return; // Don't redirect, allow the login form to show
-    }
-    
-    const authData = localStorage.getItem('authData') || sessionStorage.getItem('authData');
-    
+    console.log('🔍 Checking auth status...');
+    
+    // Check for clearAuth URL parameter first
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('clearAuth') === '1') {
+        // ... (existing clearAuth logic) ...
+        // Lines 542-550 remain unchanged
+        
+        console.log('✅ Auth data cleared, allowing login form to show');
+        return; // Don't redirect, allow the login form to show
+    }
+    
+    // --- START CRITICAL INSERTION (New Lines 552-557) ---
+    const isGoogleSignupPending = urlParams.get('google_signup') === '1' || sessionStorage.getItem('googleAuthPending');
+    
+    // If a Google sign-up is pending, DO NOT redirect yet. 
+    // The Google redirect handlers below must execute first.
+    if (isGoogleSignupPending) {
+        console.log('⚠️ Google signup flag detected. Delaying standard auth check.');
+        return; 
+    }
+    // --- END CRITICAL INSERTION ---
+
+    const authData = localStorage.getItem('authData') || sessionStorage.getItem('authData');
     if (authData) {
         console.log('📄 Found auth data, parsing...');
         try {
@@ -1144,31 +1151,64 @@ document.addEventListener('DOMContentLoaded', () => {
     window.authManager = new AuthManager();
     
     // Check for Google Redirect Result (added async to handle getToken())
-    if (firebase && firebase.auth) {
-        firebase.auth().getRedirectResult().then(async (result) => {
-            if (result && result.user) {
-                const user = result.user;
-                // *** CRITICAL FIX: Get the Firebase ID Token ***
-                const idToken = await user.getIdToken();
-                // **********************************************
-                const authData = {
+    // Check for Google Redirect Result (This runs when returning to login.html after a redirect sign-in)
+if (firebase && firebase.auth) {
+    firebase.auth().getRedirectResult().then(async (result) => {
+        if (result && result.user) {
+            const user = result.user;
+            const db = firebase.firestore();
+            const userRef = db.collection('users').doc(user.uid);
+            // Check if the profile document exists
+            const userDoc = await userRef.get();
+            const idToken = await user.getIdToken(); 
+            
+            if (!userDoc.exists) {
+                // --- New User detected via Redirect Result: GO TO REGISTRATION GATE ---
+                
+                // 1. Store the Google Auth data
+                sessionStorage.setItem('googleAuthPending', JSON.stringify({
                     uid: user.uid,
                     email: user.email,
-                    fullName: user.displayName || 'Google User',
-                    isAuthenticated: true,
-                    provider: 'google',
-                    loginTime: new Date().toISOString(),
-                    idToken: idToken // ADDED
-                };
-                sessionStorage.setItem('authData', JSON.stringify(authData));
-                setTimeout(() => { window.location.href = 'index.html'; }, 500);
-            }
-        }).catch((err) => {
-            console.warn('Redirect result error:', err);
-        });
-    }
+                    name: user.displayName,
+                    photoURL: user.photoURL,
+                    providerId: user.providerData[0].providerId,
+                    idToken: idToken 
+                }));
+                
+                // 2. Sign out the user and redirect to registration page
+                await firebase.auth().signOut();
+                console.log('New Google user detected via redirect. Redirecting to registration.');
+                window.location.href = 'register.html?google_signup=1';
+                
+                return; // Stop processing and prevent default redirect
+            } 
+            
+            // --- Existing User: Complete Login (Standard Path) ---
+            
+            // Update login time and sync verification status
+            await userRef.update({
+                lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+                emailVerified: user.emailVerified 
+            });
 
-    
+            // Store session data and redirect to homepage
+            const authData = {
+                uid: user.uid,
+                email: user.email,
+                fullName: user.displayName || 'Google User',
+                isAuthenticated: true,
+                provider: 'google',
+                loginTime: new Date().toISOString(),
+                idToken: idToken 
+            };
+            sessionStorage.setItem('authData', JSON.stringify(authData));
+            
+            setTimeout(() => { window.location.href = 'index.html'; }, 500);
+        }
+    }).catch((err) => {
+        console.warn('Redirect result error:', err);
+    });
+}    
     console.log('✅ Authentication system initialized!');
 });
 
