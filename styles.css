@@ -832,19 +832,31 @@ nav.navbar .auth-buttons .signup-btn:hover {
 }
 
 .hero-container {
-  max-width: 1100px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  text-align: center;
-  padding-top: 60px;
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr; 
+    align-items: flex-start; 
+    gap: 2rem;
+    padding: 0 5%;
+    max-width: 1300px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    padding-top: 60px; 
 }
 
 .hero-left {
-  text-align: center;
-  max-width: 900px;
+    grid-column: 1; 
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 0; 
+    margin-top: -20px; 
+}
+
+.hero-right {
+    display: none; 
 }
 
 .hero-subtitle {
@@ -5455,18 +5467,19 @@ input[style*="--placeholder-color"]::placeholder {
 }
 
 @media screen and (min-width: 901px) {
-  .hero-container {
+
+.hero-container {
     display: grid !important;
-    grid-template-columns: 1.2fr 0.8fr !important; /* Restore the left/right split */
-    align-items: center !important;
-    text-align: left !important; /* Force text to align left */
-    padding-top: 0 !important;
+    grid-template-columns: 1.2fr 0.8fr !important; 
+    align-items: flex-start !important;
+    text-align: left !important;
+    padding-top: 60px !important; 
     max-width: 1300px !important;
     gap: 2rem !important;
     min-height: 100vh !important;
   }
 
-  .hero-left {
+.hero-left {
     grid-column: 1 !important;
     text-align: left !important;
     align-items: flex-start !important;
@@ -5476,6 +5489,7 @@ input[style*="--placeholder-color"]::placeholder {
     justify-content: center !important;
     width: 100% !important;
   }
+}
 
   .cta-group {
     justify-content: flex-start !important;
@@ -5512,7 +5526,6 @@ input[style*="--placeholder-color"]::placeholder {
     gap: 2rem !important;
     left: auto !important;
   }
-}
 
 /* --- MOBILE FIX FOR AUTH PAGES (LOGIN & REGISTER) --- */
 @media (max-width: 768px) {
