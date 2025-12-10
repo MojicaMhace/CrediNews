@@ -5272,7 +5272,6 @@ input[style*="--placeholder-color"]::placeholder {
 }
 
 .site-simple-nav .logoshield .brand-logo { width: 28px; height: 28px; object-fit: contain; display: inline-block; }
-.site-simple-nav .logo .brand-logo { width: 28px; height: 28px; display: inline-block; background-image: url('images/logo2.png'); background-size: contain; background-repeat: no-repeat; background-position: center; }
 .site-simple-nav .logoshield .brand-text { font-weight: 800; letter-spacing: 0.02em; }
 
 
