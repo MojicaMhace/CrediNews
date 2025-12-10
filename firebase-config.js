@@ -3,13 +3,12 @@ console.log('Loading Firebase configuration...');
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyBB-DI9bjMXFx4-DFw2Nbr5F4Av7YCgM2U",
-    authDomain: "credinews-2e5c0.firebaseapp.com",
-    projectId: "credinews-2e5c0",
-    storageBucket: "credinews-2e5c0.firebasestorage.app",
-    messagingSenderId: "862665853708",
-    appId: "1:862665853708:web:bb9dcef6418920df7c1729",
-    measurementId: "G-SSWHWBNPD0"
+  apiKey: "AIzaSyCjjNo-ljRh-STMj5ZvKR8m29tAX2fRWkE",
+  authDomain: "credinews-c6433.firebaseapp.com",
+  projectId: "credinews-c6433",
+  storageBucket: "credinews-c6433.firebasestorage.app",
+  messagingSenderId: "379730284424",
+  appId: "1:379730284424:web:d3bd346663e7c3f97d743d"
 };
 
 // Initialize Firebase immediately (v8 style)
