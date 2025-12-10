@@ -197,8 +197,6 @@ class AuthManager {
                 return;
             }
             
-            // Ensure Firestore user profile exists only after verification
-            // ... (inside handleLogin)
             // --- CRITICAL UPDATE: Update Profile fields on Successful Login ---
             try {
                 const db = firebase.firestore();
@@ -352,7 +350,7 @@ class AuthManager {
             const db = firebase.firestore();
             const userRef = db.collection('users').doc(user.uid);
             const userDoc = await userRef.get();
-           
+            
             // Fields to sync/update on every successful login:
             const updateData = {
                 lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -387,7 +385,7 @@ class AuthManager {
                 await userRef.update(updateData);
                 console.log('✅ Existing Google user login time and verification status updated.');
             }
-           
+            
             // Store auth state (continues here)
             const authData = {
                 uid: user.uid,
@@ -1056,32 +1054,37 @@ async function checkEmailVerificationStatus() {
 }
 
 // Check if user is already authenticated
-// Check if user is already authenticated
 function checkAuthStatus() {
-    console.log('🔍 Checking auth status...');
-    
-    // Check for clearAuth URL parameter first
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('clearAuth') === '1') {
-        // ... (existing clearAuth logic) ...
-        // Lines 542-550 remain unchanged
-        
-        console.log('✅ Auth data cleared, allowing login form to show');
-        return; // Don't redirect, allow the login form to show
-    }
-    
-    // --- START CRITICAL INSERTION (New Lines 552-557) ---
-    const isGoogleSignupPending = urlParams.get('google_signup') === '1' || sessionStorage.getItem('googleAuthPending');
-    
-    // If a Google sign-up is pending, DO NOT redirect yet. 
-    // The Google redirect handlers below must execute first.
-    if (isGoogleSignupPending) {
-        console.log('⚠️ Google signup flag detected. Delaying standard auth check.');
-        return; 
-    }
-    // --- END CRITICAL INSERTION ---
+    console.log('🔍 Checking auth status...');
+    
+    const urlParams = new URLSearchParams(window.location.search);
 
-    const authData = localStorage.getItem('authData') || sessionStorage.getItem('authData');
+    // --- START CRITICAL INSERTION ---
+    const isGoogleSignupPending = urlParams.get('google_signup') === '1' || sessionStorage.getItem('googleAuthPending');
+    
+    // If a Google sign-up is pending, DO NOT check stored tokens. 
+    // The redirect handlers below must execute first.
+    if (isGoogleSignupPending) {
+        console.log('⚠️ Google signup flag detected. Delaying standard auth check.');
+        return; 
+    }
+    // --- END CRITICAL INSERTION ---
+    
+    // Check for clearAuth URL parameter first
+    if (urlParams.get('clearAuth') === '1') {
+        console.log('🧹 clearAuth parameter detected, clearing auth data');
+        localStorage.removeItem('authData');
+        sessionStorage.removeItem('authData');
+        
+        // Clear the URL parameter
+        urlParams.delete('clearAuth');
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, document.title, newUrl);
+        console.log('✅ Auth data cleared, allowing login form to show');
+        return; // Don't redirect, allow the login form to show
+    }
+
+    const authData = localStorage.getItem('authData') || sessionStorage.getItem('authData');
     if (authData) {
         console.log('📄 Found auth data, parsing...');
         try {
@@ -1150,7 +1153,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('🔧 Creating AuthManager...');
     window.authManager = new AuthManager();
     
-    // Check for Google Redirect Result (added async to handle getToken())
     // Check for Google Redirect Result (This runs when returning to login.html after a redirect sign-in)
 if (firebase && firebase.auth) {
     firebase.auth().getRedirectResult().then(async (result) => {
@@ -1208,7 +1210,7 @@ if (firebase && firebase.auth) {
     }).catch((err) => {
         console.warn('Redirect result error:', err);
     });
-}    
+}    
     console.log('✅ Authentication system initialized!');
 });
 
