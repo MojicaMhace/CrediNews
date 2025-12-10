@@ -107,10 +107,10 @@
     <script src="auth.js"></script>
 
     <script>
+    // --- Setup and Helper Functions (MUST REMAIN HERE) ---
     const auth = firebase.auth();
-    const db = firebase.firestore(); // Define db globally for both handlers
+    const db = firebase.firestore();
 
-    // --- Helper Functions (No Change) ---
     // Disallow digits in Full Name as user types
     const fullNameInput = document.getElementById("fullName");
     if (fullNameInput) {
@@ -136,7 +136,6 @@
     }
 
     function updatePasswordHints(pwd) {
-        // ... (existing updatePasswordHints logic)
         const states = {
             length: (pwd || '').length >= 8,
             upper: /[A-Z]/.test(pwd || ''),
@@ -164,7 +163,6 @@
     }
 
     function updateConfirmHint(pwd, confirm) {
-        // ... (existing updateConfirmHint logic)
         const hint = document.getElementById('confirmHint');
         if (!hint) return;
         const confirmInput = document.getElementById('confirmPassword');
@@ -214,9 +212,8 @@
         });
     });
 
-    // Simple notification helpers (No Change)
+    // Simple notification helpers (Inline message - must be kept for local errors)
     function showInlineMessage(text, type = 'info') {
-        // Remove existing messages
         document.querySelectorAll('.notification.inline').forEach(n => n.remove());
         const box = document.createElement('div');
         box.className = `notification inline ${type}`;
@@ -231,12 +228,11 @@
         form.parentNode.insertBefore(box, form);
     }
 
-    // Cooldowns for anti-abuse (No Change)
+    // Cooldown setup (Must be kept here)
     const COOLDOWN_MS = 60 * 1000;
     const BLOCK_COOLDOWN_MS = 5 * 60 * 1000;
     const cooldownKey = 'register_cooldown_until';
     const BLOCK_KEY = 'register_block_until';
-    const ATTEMPT_KEY = 'register_attempts';
     let submitting = false;
     let countdownTimer = null;
     function startCountdown(untilTs) {
@@ -270,9 +266,9 @@
         startCountdown(existingUntil);
     }
 
-    // Modal functions (No Change)
+    // Modal functions (must be kept here)
     const modal = (function(){
-        // ... (modal creation logic)
+        // ... (modal creation and link event listeners remain the same)
         const el = document.createElement('div');
         el.id = 'legalModal';
         el.style.position = 'fixed';
@@ -312,192 +308,8 @@
     if (termsLink) termsLink.addEventListener('click', (e)=>{ e.preventDefault(); modal.show('Terms of Service', termsHtml); });
     if (privacyLink) privacyLink.addEventListener('click', (e)=>{ e.preventDefault(); modal.show('Privacy Policy', privacyHtml); });
 
-    
-    // --- 1. EXTRACTED: Standard Email/Password Registration Handler ---
-    async function handleEmailPasswordRegister(e) {
-        e.preventDefault();
 
-        const fullName = document.getElementById("fullName").value.trim();
-        const email = document.getElementById("email").value.trim();
-        const password = document.getElementById("password").value;
-        const confirmPassword = document.getElementById("confirmPassword").value;
-        let createdUser = null;
-
-        const blockUntil = parseInt(localStorage.getItem(BLOCK_KEY) || '0', 10);
-        if (blockUntil > Date.now()) {
-            showInlineMessage('We have blocked requests from this device due to unusual activity. Please wait and try again later.', 'error');
-            return;
-        }
-        if (submitting) return; submitting = true;
-        if (!isValidFullName(fullName)) {
-            showInlineMessage("Please enter a valid full name using letters only (spaces, hyphens, apostrophes allowed).", 'error');
-            submitting = false;
-            return;
-        }
-
-        if (!isStrongPassword(password)) {
-            showInlineMessage("Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.", 'error');
-            submitting = false;
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            showInlineMessage("Passwords do not match!", 'error');
-            submitting = false;
-            return;
-        }
-
-        auth.createUserWithEmailAndPassword(email, password)
-            .then((userCredential) => {
-                const user = userCredential.user;
-                createdUser = user;
-
-                // Update display name first
-                return user.updateProfile({
-                        displayName: fullName
-                    }).then(() => {
-                        // ✅ Send email with redirect link (handle in app)
-                        const safeOrigin = (window.location.origin && window.location.origin.startsWith('http'))
-                          ? window.location.origin
-                          : `${window.location.protocol}//${window.location.host}`;
-                        const actionCodeSettings = {
-                            url: `${safeOrigin}/login.html`,
-                            handleCodeInApp: true
-                        };
-                        console.log('📧 Sending verification with continue URL:', actionCodeSettings.url);
-                        return user.sendEmailVerification(actionCodeSettings)
-                          .catch((err) => {
-                            console.warn('⚠️ sendEmailVerification failed with actionCodeSettings, retrying without settings:', err && err.message);
-                            return user.sendEmailVerification();
-                          });
-
-                    });
-            })
-            // --- ALIGNED FIREBASE WRITE LOGIC (from previous steps) ---
-            .then(async () => {
-                try {
-                    if (createdUser) {
-                        const userRef = db.collection('users').doc(createdUser.uid);
-                        
-                        await userRef.set({
-                            name: fullName, 
-                            email: email,
-                            profilePictureUrl: createdUser.photoURL || null, 
-                            providerId: 'password', 
-                            role: 'user', 
-                            emailVerified: false, 
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(), 
-                            preferences: { theme: 'dark', notifications: true }
-                        }, { merge: true });
-                        // Removed redundant email_verifications write
-                    }
-                } catch (err) {
-                    console.error("Firestore user profile creation failed:", err);
-                }
-                showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder. Please verify your email before logging in.`, 'success');
-                const until = Date.now() + COOLDOWN_MS;
-                localStorage.setItem(cooldownKey, String(until));
-                startCountdown(until);
-                submitting = false;
-            })
-            .catch((error) => {
-                console.error('Registration error:', error);
-                let msg = 'Registration failed. Please try again.';
-                switch (error.code) {
-                    case 'auth/email-already-in-use':
-                        msg = 'This email is already registered. Try signing in or resetting your password.';
-                        break;
-                    case 'auth/invalid-email':
-                        msg = 'Invalid email address.';
-                        break;
-                    case 'auth/weak-password':
-                        msg = 'Password is too weak. Please choose a stronger password.';
-                        break;
-                    case 'auth/too-many-requests':
-                        msg = 'We have blocked requests from this device due to unusual activity. Please wait and try again later.';
-                        const blockUntil = Date.now() + BLOCK_COOLDOWN_MS;
-                        localStorage.setItem(BLOCK_KEY, String(blockUntil));
-                        showInlineMessage(msg, 'error');
-                        startCountdown(blockUntil);
-                        break;
-                }
-                showInlineMessage(`${msg} (${error.code || 'unknown'})`, 'error');
-                submitting = false;
-            });
-    }
-
-    // --- 2. NEW FUNCTION: Handles Submission for Google Users (No Password) ---
-    async function handleGoogleSignupSubmit(e, pendingData) {
-        e.preventDefault();
-
-        const fullName = document.getElementById("fullName").value.trim();
-        const submitBtn = document.querySelector('#registerForm button[type="submit"]');
-
-        const blockUntil = parseInt(localStorage.getItem(BLOCK_KEY) || '0', 10);
-        if (blockUntil > Date.now()) {
-            showInlineMessage('We have blocked requests from this device due to unusual activity. Please wait and try again later.', 'error');
-            return;
-        }
-        if (submitting) return; submitting = true;
-        
-        if (!isValidFullName(fullName)) {
-            showInlineMessage("Please enter a valid full name using letters only (spaces, hyphens, apostrophes allowed).", 'error');
-            submitting = false;
-            return;
-        }
-        
-        // Set loading state
-        if (submitBtn) submitBtn.disabled = true;
-
-        try {
-            // CRITICAL: Get the user object from Firebase Auth. Since we signed them out 
-            // in auth.js, we need to sign them back in using the pending credentials.
-            // This assumes pendingData.idToken was successfully stored in auth.js.
-            let user = firebase.auth().currentUser;
-            if (!user || user.uid !== pendingData.uid) {
-                 // Try signing in using the UID, email, and ID Token.
-                 const cred = firebase.auth.GoogleAuthProvider.credential(pendingData.idToken);
-                 const userCredential = await firebase.auth().signInWithCredential(cred);
-                 user = userCredential.user;
-            }
-            
-            // 1. Create the profile in Firestore
-            const userRef = db.collection('users').doc(user.uid);
-
-            await userRef.set({
-                name: fullName, 
-                email: pendingData.email,
-                profilePictureUrl: pendingData.photoURL || null, 
-                providerId: pendingData.providerId || 'google.com', 
-                role: 'user', 
-                emailVerified: true, // Auto-verified by Google
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(), 
-                preferences: { theme: 'dark', notifications: true }
-            }, { merge: true });
-
-            // 2. Clean up and redirect
-            sessionStorage.removeItem('googleAuthPending');
-            
-            showInlineMessage(`Welcome, ${fullName}! Registration complete. Redirecting to homepage.`, 'success');
-            
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 1000);
-
-        } catch (error) {
-            console.error('Google Signup Submission error:', error);
-            showInlineMessage(`Registration failed: ${error.message}. Please try logging in again.`, 'error');
-            // Ensure the user is signed out again if an error occurred during profile creation
-            await firebase.auth().signOut();
-        } finally {
-            submitting = false;
-            if (submitBtn) submitBtn.disabled = false;
-        }
-    }
-
-    // --- 3. DISPATCHER: Logic to choose which handler to use on page load ---
+    // --- DISPATCHER: Logic to choose which handler to use on page load ---
     (function initializeRegistrationFlow() {
         const urlParams = new URLSearchParams(window.location.search);
         const isGoogleSignup = urlParams.get('google_signup') === '1';
@@ -506,7 +318,7 @@
         const registerForm = document.getElementById('registerForm');
         const submitBtn = registerForm ? registerForm.querySelector('button[type="submit"]') : null;
 
-        if (!registerForm) return; // Exit if form is not found
+        if (!registerForm || !window.authManager) return; // Exit if form or AuthManager is not found
 
         if (isGoogleSignup && pendingData) {
             console.log('✅ Google signup flow detected. Adjusting form.');
@@ -522,7 +334,6 @@
             
             if (fullNameInput) {
                 fullNameInput.value = pendingData.name || '';
-                // The name field remains editable for the user to customize
             }
             if (emailInput) {
                 emailInput.value = pendingData.email;
@@ -540,16 +351,83 @@
                 submitBtn.innerHTML = '<i class="fas fa-check"></i> Complete Registration';
             }
             
-            // 3. Attach Google Submit Handler
+            // 3. Attach Google Submit Handler (Calls the method in auth.js)
             registerForm.addEventListener("submit", function (e) {
-                handleGoogleSignupSubmit(e, pendingData);
+                // Ensure form and cooldown checks are done locally before calling authManager
+                const blockUntil = parseInt(localStorage.getItem(BLOCK_KEY) || '0', 10);
+                if (blockUntil > Date.now() || submitting) {
+                    e.preventDefault();
+                    return;
+                }
+                
+                // Call the consolidated method in auth.js
+                window.authManager.handleGoogleSignupSubmit(e, pendingData);
             });
             
         } else {
-            // Standard Email/Password flow: Attach the standard handler
-            registerForm.addEventListener("submit", handleEmailPasswordRegister);
+            // Standard Email/Password flow: Attach the standard handler (Calls the method in auth.js)
+            registerForm.addEventListener("submit", (e) => {
+                e.preventDefault();
+                
+                // Perform local checks (cooldown, validation)
+                const blockUntil = parseInt(localStorage.getItem(BLOCK_KEY) || '0', 10);
+                if (blockUntil > Date.now() || submitting) return;
+
+                const fullName = document.getElementById("fullName").value.trim();
+                const email = document.getElementById("email").value.trim();
+                const password = document.getElementById("password").value;
+                const confirmPassword = document.getElementById("confirmPassword").value;
+
+                if (!isValidFullName(fullName)) {
+                    showInlineMessage("Please enter a valid full name using letters only (spaces, hyphens, apostrophes allowed).", 'error');
+                    return;
+                }
+                if (!isStrongPassword(password)) {
+                    showInlineMessage("Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.", 'error');
+                    return;
+                }
+                if (password !== confirmPassword) {
+                    showInlineMessage("Passwords do not match!", 'error');
+                    return;
+                }
+                
+                // Call the consolidated method in auth.js
+                submitting = true;
+                window.authManager.setButtonLoading(submitBtn, true);
+                
+                window.authManager.handleEmailPasswordRegister({ fullName, email, password })
+                    .then(result => {
+                        submitting = false;
+                        window.authManager.setButtonLoading(submitBtn, false);
+                        
+                        if (result.success) {
+                            showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder. Please verify your email before logging in.`, 'success');
+                            const until = Date.now() + COOLDOWN_MS;
+                            localStorage.setItem(cooldownKey, String(until));
+                            startCountdown(until);
+                            
+                        } else {
+                            let msg = 'Registration failed. Please try again.';
+                            switch (result.code) {
+                                case 'auth/email-already-in-use':
+                                    msg = 'This email is already registered. Try signing in or resetting your password.';
+                                    break;
+                                case 'auth/too-many-requests':
+                                    msg = 'We have blocked requests from this device due to unusual activity. Please wait and try again later.';
+                                    const blockUntil = Date.now() + BLOCK_COOLDOWN_MS;
+                                    localStorage.setItem(BLOCK_KEY, String(blockUntil));
+                                    startCountdown(blockUntil);
+                                    break;
+                                default:
+                                    // Use the message from Firebase error if available
+                                    msg = result.message || msg; 
+                            }
+                            showInlineMessage(`${msg} (${result.code || 'unknown'})`, 'error');
+                        }
+                    });
+            });
         }
     })();
-</script>
+    </script>
 </body>
 </html>
