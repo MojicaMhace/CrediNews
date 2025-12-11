@@ -817,3 +817,9 @@ function enforceAccessRules() {
         firebase.auth().onAuthStateChanged(user => check(user));
     }
 }
+// Refresh dropdown when profile is updated elsewhere
+try {
+  window.addEventListener('user-profile-updated', () => {
+    try { updateAuthButton(); } catch(_) {}
+  });
+} catch(_) {}

@@ -51,13 +51,16 @@
               </div>
             </div>
             <div class="input-group full">
-              <label style="display:flex;align-items:center;gap:10px;">
-                <span>Display Name</span>
-                <span class="badge" style="cursor:pointer;">
-                  <input type="checkbox" id="ps_enable_display_name" style="vertical-align:middle; margin-right:6px;"> Update display name
-                </span>
-              </label>
-              <input type="text" id="ps_display_name" placeholder="Your display name" disabled />
+              <div class="label-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                <label>Display Name</label>
+                <label class="badge" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                  <input type="checkbox" id="ps_enable_display_name"> Update
+                </label>
+              </div>
+              <div class="input-wrapper">
+                <i class="fas fa-id-badge icon"></i>
+                <input type="text" id="ps_display_name" placeholder="Your display name" disabled />
+              </div>
             </div>
             <div class="input-group full">
               <label>Avatar</label>
@@ -378,6 +381,11 @@
             if (Object.keys(updatePayload).length) await user.updateProfile(updatePayload);
             const db = firebase.firestore();
             await db.collection('users').doc(user.uid).set({ name: v.value || user.displayName || null, profilePictureUrl: photoURL || user.photoURL || null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            try { await user.reload(); } catch(_){ }
+            try {
+              const detail = { displayName: v.value || user.displayName || '', photoURL: photoURL || user.photoURL || '', email: user.email || '' };
+              window.dispatchEvent(new CustomEvent('user-profile-updated', { detail }));
+            } catch(_){ }
             const prev = document.getElementById('ps_avatar_preview');
             if (prev && photoURL) { prev.src = photoURL; prev.style.display = 'inline-block'; }
             toast('Profile saved.', 'success');
