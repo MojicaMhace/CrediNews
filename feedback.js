@@ -61,7 +61,7 @@
     // Step 1
     const step1 = createEl(`
       <div class="feedback-step step-1">
-        <div class="feedback-header"><h3 class="feedback-title">Feedback</h3></div>
+        <div class="feedback-header"><h3 class="feedback-title">Feedback</h3><button class="feedback-close" id="fbClose1" aria-label="Close">&times;</button></div>
         <div class="feedback-body">
           <div style="text-align:center;">
             <p style="margin:0; font-weight:600;">How would you rate your website experience?</p>
@@ -77,7 +77,7 @@
     // Step 2
     const step2 = createEl(`
       <div class="feedback-step step-2 hidden">
-        <div class="feedback-header"><h3 class="feedback-title">Share Your Feedback</h3></div>
+        <div class="feedback-header"><h3 class="feedback-title">Share Your Feedback</h3><button class="feedback-close" id="fbClose2" aria-label="Close">&times;</button></div>
         <div class="feedback-body">
           <div class="feedback-row">
             <label class="feedback-label" for="fbCategory">Feedback Category</label>
@@ -107,6 +107,15 @@
 
     try { sessionStorage.setItem(S_OVERLAY_SHOWN, '1'); } catch(_){}
 
+    function closeOverlayPending(){
+      try {
+        localStorage.setItem(KEY_PENDING_NEXT, '1');
+        sessionStorage.removeItem(S_SUBMITTED_THIS_SESSION);
+      } catch(_){ }
+      overlay.classList.add('fade-out');
+      setTimeout(() => overlay.remove(), 220);
+    }
+
     let rating = 0;
     // Star interactions
     const continueBtn = step1.querySelector('#fbContinue');
@@ -132,16 +141,14 @@
       });
     }
 
-    // Cancel → close overlay
     step2.querySelector('#fbCancel').addEventListener('click', () => {
-      // Mark to remind on next session if not submitted this one
-      try {
-        localStorage.setItem(KEY_PENDING_NEXT, '1');
-        sessionStorage.removeItem(S_SUBMITTED_THIS_SESSION);
-      } catch(_){ }
-      overlay.classList.add('fade-out');
-      setTimeout(() => overlay.remove(), 220);
+      closeOverlayPending();
     });
+
+    const close1 = step1.querySelector('#fbClose1');
+    const close2 = step2.querySelector('#fbClose2');
+    if (close1) close1.addEventListener('click', closeOverlayPending);
+    if (close2) close2.addEventListener('click', closeOverlayPending);
 
     const submitBtn = step2.querySelector('#fbSubmit');
     const msgEl = step2.querySelector('#fbMessage');
