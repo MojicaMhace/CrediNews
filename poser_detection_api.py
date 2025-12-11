@@ -247,7 +247,7 @@ def _check_verified_registry(url: str) -> Optional[Dict[str, Any]]:
                     mhost = ('m.' + host) if not host.startswith('m.') else host
                     candidates.extend([
                         f"{scheme}://{mhost}{path}",
-                        f"{scheme}://{mhost}{mhost}{path.rstrip('/')}",
+                        f"{scheme}://{mhost}{path.rstrip('/')}",
                         f"{scheme}://{mhost}{(path.rstrip('/') + '/') if path != '/' else '/'}"
                     ])
         except Exception as e:
@@ -1383,6 +1383,7 @@ def poser_analyze_full():
             url = resolved
             parsed = parse_url(url)
     fbid = extract_fbid(url)
+    base_page_url = _normalize_to_page_url(url)
     registry = None
     try:
         registry = _check_verified_registry(url)
@@ -1547,7 +1548,7 @@ def poser_analyze_full():
 
     # Check verified registry
     try:
-        reg = registry or _check_verified_registry(url)
+        reg = registry or _check_verified_registry(url) or _check_verified_registry(base_page_url) or _check_verified_registry(meta.get("link") or "")
         if reg and (reg.get("verified") or reg.get("is_verified") or reg.get("is_verified_source")):
             meta["is_verified"] = True
             meta["verification_status"] = "blue_verified"
