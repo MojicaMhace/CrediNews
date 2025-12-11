@@ -2,81 +2,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 1. Helper Function: Check Verification Status ---
-    function isVerified() {
-      // User must be logged in AND their custom 'emailVerified' field must be true.
-      return request.auth != null 
-             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.emailVerified == true;
+    // --- 1. Helper Function: Check Authentication Status (No Change) ---
+    function isAuthenticatedAndVerified() {
+      // User must be logged in AND their email must be verified on the Auth server
+      return request.auth != null && request.auth.token.email_verified == true;
     }
     
-    // --- 2. Main Data Collection (TRENDS, MY-VERIFICATIONS Data Source) ---
-    match /facebook_verification_results/{docId} { 
-      // Allows EVERYONE (verified or not, guest or logged in) to READ this data (for Trends page).
-      allow read: if true; 
-      
-      // Allows only VERIFIED users to WRITE (voting/feedback).
-      allow write: if isVerified(); 
-    }
-    
-    // --- 3. Public Report/Stats Collections ---
-    match /poser_detections/{docId} { 
-      // Allows EVERYONE to READ poser_detections data for reporting/stats.
-      allow read: if true; 
-      // Allows only VERIFIED users to WRITE (e.g., logging a new detection).
-      allow write: if isVerified(); 
-    }
-    match /analyzed_pages_cache/{docId} { 
-      allow read: if true;
-      allow write: if false; // System only
-    }
-    match /trends/{trendId} { 
-      allow read: if true;
-      allow write: if isVerified();
-    }
-    
-    // --- 4. Private User History Collections (Must be filtered client-side) ---
-    // User history collections that are NOT publicly readable (e.g., temporary/sensitive logs).
-    match /pending_news_verification/{docId} {
-      // Allows read/write access ONLY if the user is verified.
-      allow read, write: if isVerified(); 
-    }
-
-    // --- 5. Core User/Auth Rules (FIXED) ---
+    // --- 2. Core User/Auth Rules (The original user doc) ---
+    // User must always be able to read/create their OWN profile.
     match /users/{userId} {
-      // Allow creation and read access only if the request UID matches the document UID
       allow create: if request.auth != null && request.auth.uid == userId;
       allow read: if request.auth != null && request.auth.uid == userId;
       
-      // FIX: Allow update only if:
-      // 1. User is the document owner.
-      // 2. The update only changes 'emailVerified' from FALSE to TRUE, OR 
-      // 3. The update doesn't change 'emailVerified' at all (e.g., updating 'fullName').
+      // Allow update only if:
+      // a) The user owns the document.
+      // b) The update is allowed (e.g., changing emailVerified from false to true, or only updating name/preferences).
       allow update: if request.auth != null 
-                    && request.auth.uid == userId
-                    && (
-                        // Case 1: Allow emailVerified to change from false to true
-                        (
-                            resource.data.emailVerified == false 
-                            && request.resource.data.emailVerified == true
+                        && request.auth.uid == userId
+                        && (
+                            // Case 1: Allow emailVerified to change from false to true OR remain unchanged
+                            (
+                                resource.data.emailVerified == false 
+                                && request.resource.data.emailVerified == true
+                            )
+                            || (
+                                request.resource.data.emailVerified == resource.data.emailVerified
+                            )
                         )
-                        // Case 2: Allow updates where emailVerified remains unchanged
-                        || (
-                            request.resource.data.emailVerified == resource.data.emailVerified
-                        )
-                    )
-                    // Prevent role/provider tampering only if those fields are present in the request
-                    && (
-                        !request.resource.data.keys().hasAny(['role','provider'])
-                        || (
-                            (!request.resource.data.keys().hasAny(['role']) || request.resource.data.role == resource.data.role)
+                        // c) Prevent tampering with critical fields like role or provider (MUST be done for security)
+                        && (
+                             (!request.resource.data.keys().hasAny(['role']) || request.resource.data.role == resource.data.role)
                             && (!request.resource.data.keys().hasAny(['provider']) || request.resource.data.provider == resource.data.provider)
-                        )
-                    );
+                        );
     }
     
-    // --- 6. Default Block for ALL Other Data ---
-    match /{document=**} {
-      allow read, write: if isVerified();
+    // --- 3. Verification & Poseur Detection (Verified WRITE Access Only) ---
+    // These are the collections where WRITE access MUST be restricted to verified users.
+    match /facebook_verification_results/{docId} { 
+      allow read: if true; // Public/Guest Read
+      allow write: if isAuthenticatedAndVerified(); // Only Verified users can WRITE
     }
+    
+    match /poser_detections/{docId} { 
+      allow read: if true; // Public/Guest Read
+      allow write: if isAuthenticatedAndVerified(); // Only Verified users can WRITE
+    }
+
+    match /notifications/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if isAuthenticatedAndVerified() && request.auth.uid == request.resource.data.userId;
+    }
+
+    // --- 4. Other Public Collections ---
+    match /trends/{trendId} { 
+      allow read: if true; // Public/Guest Read
+      allow write: if isAuthenticatedAndVerified(); // Only Verified users can WRITE
+    }
+    
+    // --- 5. Private User History Collections (Verified READ and WRITE Access) ---
+    // Assuming only verified users should see or update their own pending verifications
+    match /pending_news_verification/{docId} {
+      allow read, write: if isAuthenticatedAndVerified(); 
+    }
+    
+    // --- 6. DEFAULT BLOCK ---
+    // This is the safety net. By removing the {document=**} from the block above,
+    // any other undeclared collection is completely blocked by default.
   }
 }
