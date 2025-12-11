@@ -250,6 +250,22 @@ def _check_verified_registry(url: str) -> Optional[Dict[str, Any]]:
                         f"{scheme}://{mhost}{path.rstrip('/')}",
                         f"{scheme}://{mhost}{(path.rstrip('/') + '/') if path != '/' else '/'}"
                     ])
+
+            # Derive username from URL and add canonical username-based candidates
+            try:
+                uname = extract_fbid(clean) or ''
+                uname = uname.strip()
+                if uname:
+                    username_variants = [uname, uname.lower(), uname.upper(), uname.replace('-', ''), uname.replace('-', '').lower(), uname.replace('_',''), uname.replace('_','').lower()]
+                    for uv in username_variants:
+                        candidates.extend([
+                            f"{scheme}://{host}/{uv}",
+                            f"{scheme}://{host}/{uv}/",
+                            f"{scheme}://{host2}/{uv}" if host2 else f"{scheme}://{host}/{uv}",
+                            f"{scheme}://{host2}/{uv}/" if host2 else f"{scheme}://{host}/{uv}/",
+                        ])
+            except Exception as e:
+                print(f"DEBUG: Username candidate generation error: {e}")
         except Exception as e:
             print(f"DEBUG: URL parsing error: {e}")
             pass
@@ -292,6 +308,25 @@ def _check_verified_registry(url: str) -> Optional[Dict[str, Any]]:
             except Exception as e:
                 print(f"DEBUG: Error in WHERE clause lookup: {e}")
                 continue
+
+        # 3. Check by Aliases (array_contains) if registry docs include alias usernames
+        try:
+            uname = extract_fbid(clean) or ''
+            uname = uname.strip()
+            if uname:
+                alias_candidates = [uname, uname.lower(), uname.replace('-', ''), uname.replace('_',''), uname.replace('-', '').lower(), uname.replace('_','').lower()]
+                for a in alias_candidates:
+                    try:
+                        print(f"DEBUG: Attempting alias lookup for: {a}")
+                        qs = db.collection("verified_registry").where("aliases", "array_contains", a).limit(1).get()
+                        for s in qs:
+                            print("DEBUG: REGISTRY HIT via alias match!")
+                            return s.to_dict()
+                    except Exception as e:
+                        print(f"DEBUG: Alias lookup error: {e}")
+                        continue
+        except Exception as e:
+            print(f"DEBUG: Critical error during alias search: {e}")
                 
         print("DEBUG: Registry check completed. No match found.")
 

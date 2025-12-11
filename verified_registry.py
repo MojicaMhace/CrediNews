@@ -62,6 +62,19 @@ VERIFIED_LIST = [
     "https://www.facebook.com/nikkeiasiaofficial",
     "https://www.facebook.com/ChannelNewsAsia",
     "https://www.facebook.com/straitstimes",
+    "https://www.facebook.com/GMAIntegratedNews",
+    "https://www.facebook.com/ANCALERTS",
+    "https://www.facebook.com/OneNewsPH",
+    "https://www.facebook.com/News5PH",
+    "https://www.facebook.com/dzrhnews",
+    "https://www.facebook.com/BomboRadyoPH",
+    "https://www.facebook.com/SuperRadyoDZBB",
+    "https://www.facebook.com/pnagovph",
+    "https://www.facebook.com/sunstarphilippines",
+    "https://www.facebook.com/BusinessMirrorPH",
+    "https://www.facebook.com/manilastandardph",
+    "https://www.facebook.com/CebuDailyNewsPH",
+    "https://www.facebook.com/PIAgov",
 
 
 
