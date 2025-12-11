@@ -8,6 +8,33 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
     
+    // NEW FUNCTION: Allow if verified OR if it is the Master Admin
+    function isAdminOrVerified() {
+      return request.auth != null && (
+          request.auth.token.email_verified == true || 
+          request.auth.token.email == 'admin@credinews.com' //
+      );
+    }
+    
+    // Admin & Queue Collections
+    match /pending_verifications/{docId} {
+      allow read, write: if isAdminOrVerified(); // Use new function
+    }
+
+    match /pending_news_verification/{docId} {
+      allow read, write: if isAdminOrVerified(); // Use new function
+    }
+
+    match /verified_registry/{docId} {
+      allow read: if true;
+      allow write: if isAdminOrVerified(); // Use new function
+    }
+    
+    match /facebook_verification_results/{docId} { 
+      allow read: if true; 
+      allow write: if isAdminOrVerified(); // Use new function
+    }
+    
     // --- 2. Core User/Auth Rules (The original user doc) ---
     // User must always be able to read/create their OWN profile.
     match /users/{userId} {
@@ -39,34 +66,19 @@ service cloud.firestore {
     // --- 3. Verification & Poseur Detection (Verified WRITE Access Only) ---
     // These are the collections where WRITE access MUST be restricted to verified users.
     match /facebook_verification_results/{docId} { 
-      allow read: if true;
-      allow write: if isAuthenticatedAndVerified();
-    }
-
-    match /facebook_verification_results/{docId}/votes/{voteId} {
-      allow read: if true;
-      allow write: if isAuthenticatedAndVerified() && request.auth.uid == voteId;
+      allow read: if true; // Public/Guest Read
+      allow write: if isAuthenticatedAndVerified(); // Only Verified users can WRITE
     }
     
     match /poser_detections/{docId} { 
-      allow read: if true;
-      allow write: if isAuthenticatedAndVerified();
-    }
-
-    match /analyzed_pages_cache/{docId} {
-      allow read: if true;
-      allow write: if isAuthenticatedAndVerified();
-    }
-
-    match /notifications/{docId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow write: if isAuthenticatedAndVerified() && request.auth.uid == request.resource.data.userId;
+      allow read: if true; // Public/Guest Read
+      allow write: if isAuthenticatedAndVerified(); // Only Verified users can WRITE
     }
 
     // --- 4. Other Public Collections ---
     match /trends/{trendId} { 
-      allow read: if true;
-      allow write: if isAuthenticatedAndVerified();
+      allow read: if true; // Public/Guest Read
+      allow write: if isAuthenticatedAndVerified(); // Only Verified users can WRITE
     }
     
     // --- 5. Private User History Collections (Verified READ and WRITE Access) ---
@@ -75,35 +87,29 @@ service cloud.firestore {
       allow read, write: if isAuthenticatedAndVerified(); 
     }
 
-    match /pending_verifications/{docId} {
-      allow read: if isAuthenticatedAndVerified() && request.auth.uid == resource.data.userId;
-      allow write: if isAuthenticatedAndVerified() && request.auth.uid == request.resource.data.userId;
+		match /pending_verifications/{docId} {
+      allow read, write: if isAuthenticatedAndVerified();
     }
 
-    match /facebook_verification_requests/{docId} {
-      allow read: if isAuthenticatedAndVerified();
-      allow write: if isAuthenticatedAndVerified();
+    // The Admin page reads this for "News Requests"
+    match /pending_news_verification/{docId} {
+      allow read, write: if isAuthenticatedAndVerified(); 
     }
 
-    match /verification_results/{docId} {
-      allow read: if true;
-      allow write: if isAuthenticatedAndVerified();
-    }
-
-    match /user_feedback/{docId} {
-      allow write: if isAuthenticatedAndVerified();
-    }
-
+    // The Admin page checks this to show "Verified" badges
     match /verified_registry/{docId} {
       allow read: if true;
-    }
-
-    match /login_sessions/{docId} {
-      allow write: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if isAuthenticatedAndVerified();
     }
     
-    // --- 6. DEFAULT BLOCK ---
+    // --- 6. Other System Collections ---
+    // Make sure we cache analyzed pages
+    match /analyzed_pages_cache/{docId} {
+       allow read: if true;
+       allow write: if false; // System/API only
+    }
+    
+    // --- 7. DEFAULT BLOCK ---
     // This is the safety net. By removing the {document=**} from the block above,
     // any other undeclared collection is completely blocked by default.
   }
