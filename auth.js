@@ -566,21 +566,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     checkEmailVerificationStatus();
     
-    firebase.auth().onAuthStateChanged(async (user) => {
-        if (user) {
-            await user.reload();
+    if (!(window.firebase && firebase.auth)) {
+        window.addEventListener('firebase-ready', () => {
             try {
-                if (user.emailVerified) {
-                    await firebase.firestore().collection('users').doc(user.uid).set({ emailVerified: true }, { merge: true });
+                firebase.auth().onAuthStateChanged(async (user) => {
+                    if (user) {
+                        await user.reload();
+                        try {
+                            if (user.emailVerified) {
+                                await firebase.firestore().collection('users').doc(user.uid).set({ emailVerified: true }, { merge: true });
+                            }
+                        } catch (e) {
+                            console.error('Failed to sync emailVerified on auth state:', e && e.message);
+                        }
+                        if (user.emailVerified && sessionStorage.getItem('verification_just_completed') === '1') {
+                            checkEmailVerificationStatus();
+                        }
+                    }
+                });
+            } catch(_){ }
+        });
+    } else {
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) {
+                await user.reload();
+                try {
+                    if (user.emailVerified) {
+                        await firebase.firestore().collection('users').doc(user.uid).set({ emailVerified: true }, { merge: true });
+                    }
+                } catch (e) {
+                    console.error('Failed to sync emailVerified on auth state:', e && e.message);
                 }
-            } catch (e) {
-                console.error('Failed to sync emailVerified on auth state:', e && e.message);
+                if (user.emailVerified && sessionStorage.getItem('verification_just_completed') === '1') {
+                    checkEmailVerificationStatus();
+                }
             }
-            if (user.emailVerified && sessionStorage.getItem('verification_just_completed') === '1') {
-                checkEmailVerificationStatus();
-            }
-        }
-    });
+        });
+    }
     
     window.authManager = new AuthManager();
     

@@ -1,13 +1,22 @@
 (function(){
   const firebaseConfig = {
-    apiKey: "AIzaSyCjjNo-ljRh-STMj5ZvKR8m29tAX2fRWkE",
-    authDomain: "credinews-c6433.firebaseapp.com",
-    projectId: "credinews-c6433",
-    storageBucket: "credinews-c6433.firebasestorage.app",
-    messagingSenderId: "379730284424",
-    appId: "1:379730284424:web:d3bd346663e7c3f97d743d",
-    measurementId: "G-3S77HYYH0X"
-  };
+  apiKey: "AIzaSyCjjNo-ljRh-STMj5ZvKR8m29tAX2fRWkE",
+  authDomain: "credinews-c6433.firebaseapp.com",
+  projectId: "credinews-c6433",
+  storageBucket: "credinews-c6433.firebasestorage.app",
+  messagingSenderId: "379730284424",
+  appId: "1:379730284424:web:d3bd346663e7c3f97d743d",
+  measurementId: "G-3S77HYYH0X", // Added from your latest snippet
+  
+  // 💡 FIX: Add Firestore settings here to prevent "Overriding Host" warning (logger.ts:115)
+  // This configures the network behavior during initialization, not after.
+  database: {
+    settings: {
+        experimentalForceLongPolling: true, 
+        useFetchStreams: false
+    }
+  }
+};
 
   function ensureFirebase() {
     return new Promise((resolve, reject) => {
@@ -39,7 +48,7 @@
       window.firebaseApp = firebase.app();
       window.firebaseConfig = firebaseConfig;
       try { window.firebaseDb.settings({ experimentalForceLongPolling: true, useFetchStreams: false }); } catch(_){}
-      console.log('Firebase ready');
+      try { window.dispatchEvent(new Event('firebase-ready')); } catch(_){ }
     } catch (e) {
       console.error('Firebase initialization error:', e);
     }
