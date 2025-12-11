@@ -97,15 +97,16 @@
     </div>
 
     <!-- Firebase SDK v8 (more stable) -->
-    <script src="https://www.gstatic.com/firebase/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebase/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebase/8.10.1/firebase-firestore.js"></script>
-
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <!-- Your Firebase configuration and custom scripts -->
     <script src="firebase-config.js"></script>
     <script src="auth.js"></script>
 
     <script>
     // --- Setup and Helper Functions (MUST REMAIN HERE) ---
+    // Now 'firebase' will be defined
     const auth = firebase.auth();
     const db = firebase.firestore();
 
