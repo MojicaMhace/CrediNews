@@ -45,8 +45,7 @@ service cloud.firestore {
     // User Profiles
     match /users/{userId} {
       allow create: if request.auth != null && request.auth.uid == userId;
-      // Publicly readable if the user is verified; otherwise only the owner can read
-      allow read: if (resource.data.emailVerified == true) || (request.auth != null && request.auth.uid == userId);
+      allow read: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null 
                     && request.auth.uid == userId
                     && (

@@ -545,11 +545,16 @@ async function updatePlatformStats() {
 
         let totalUsers = 0;
         try {
-            const verifiedUsersSnap = await db.collection('users').where('emailVerified', '==', true).get();
-            totalUsers = verifiedUsersSnap.size;
-        } catch (e) {
-            console.warn('Unable to count verified users:', e);
-            totalUsers = 0;
+            const usersSnap = await db.collection('users').get();
+            totalUsers = usersSnap.size;
+        } catch (_e) {
+            const uniqueUsers = new Set();
+            verifySnap.docs.forEach(doc => {
+                const d = doc.data();
+                const uid = d.userID || d.userId || d.user_id || d.uid;
+                if (uid && uid !== 'anonymous') uniqueUsers.add(uid);
+            });
+            totalUsers = uniqueUsers.size;
         }
 
         animateValue("stat-verified", 0, totalVerified, 2000);
@@ -563,32 +568,6 @@ async function updatePlatformStats() {
     }
 }
 
-async function renderVerifiedUsers() {
-    const container = document.getElementById('verified-users-list');
-    if (!container) return;
-    if (typeof firebase === 'undefined' || !firebase.firestore) { container.innerHTML = ''; return; }
-    const db = firebase.firestore();
-    try {
-        const snap = await db.collection('users').where('emailVerified', '==', true).orderBy('lastLoginAt', 'desc').limit(24).get();
-        const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (items.length === 0) {
-            container.innerHTML = '<div style="grid-column:1/-1;color:#9ca3af;">No verified users yet.</div>';
-            return;
-        }
-        const html = items.map(u => {
-            const name = u.name || u.displayName || u.email || 'User';
-            const initial = String(name).trim().charAt(0).toUpperCase() || 'U';
-            const avatar = u.profilePictureUrl || '';
-            const avatarHtml = avatar ? `<img src="${avatar}" alt="${name}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,0.15);">`
-                                      : `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#22c55e,#16a34a);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;">${initial}</div>`;
-            return `<div style="display:flex;align-items:center;gap:10px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;">${avatarHtml}<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div></div>`;
-        }).join('');
-        container.innerHTML = html;
-    } catch (e) {
-        console.error('Error loading verified users:', e);
-        container.innerHTML = '<div style="grid-column:1/-1;color:#ef4444;">Unable to load verified users.</div>';
-    }
-}
 // Utility function for debouncing
 function debounce(func, wait) {
     let timeout;
@@ -764,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
         console.error('Navbar init error:', e);
     }
-    try { renderVerifiedUsers(); } catch(_) {}
+    
     enforceAccessRules();
 });
 function enforceAccessRules() {
