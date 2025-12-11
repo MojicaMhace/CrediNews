@@ -51,8 +51,13 @@
               </div>
             </div>
             <div class="input-group full">
-              <label>Display Name</label>
-              <input type="text" id="ps_display_name" placeholder="Your display name" />
+              <label style="display:flex;align-items:center;gap:10px;">
+                <span>Display Name</span>
+                <span class="badge" style="cursor:pointer;">
+                  <input type="checkbox" id="ps_enable_display_name" style="vertical-align:middle; margin-right:6px;"> Update display name
+                </span>
+              </label>
+              <input type="text" id="ps_display_name" placeholder="Your display name" disabled />
             </div>
             <div class="input-group full">
               <label>Avatar</label>
@@ -340,10 +345,12 @@
         const user = firebase.auth().currentUser;
         if (!user) { toast('You are not signed in.', 'error'); return; }
         const nameEl = document.getElementById('ps_display_name');
+        const nameToggle = document.getElementById('ps_enable_display_name');
         const avatarEl = document.getElementById('ps_avatar');
         const btn = document.getElementById('saveProfileBtn');
         const nameVal = nameEl ? nameEl.value : '';
-        const v = validateDisplayName(nameVal);
+        const shouldUpdateName = !!(nameToggle && nameToggle.checked);
+        const v = shouldUpdateName ? validateDisplayName(nameVal) : { ok: true, value: '' };
         if (!v.ok) { toast(v.msg, 'error'); return; }
         const original = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
@@ -351,13 +358,18 @@
         let photoURL = user.photoURL || '';
         try {
             const file = avatarEl && avatarEl.files && avatarEl.files[0] ? avatarEl.files[0] : null;
+            if (!file && !shouldUpdateName) { throw new Error('No changes to save.'); }
             if (file) {
                 if (!/^image\/(png|jpeg|jpg|webp)$/.test(file.type)) { throw new Error('Invalid image type.'); }
                 if (file.size > 2 * 1024 * 1024) { throw new Error('Image must be ≤ 2MB.'); }
                 const storage = firebase.storage();
                 const ref = storage.ref();
                 const path = 'avatars/' + user.uid + '/' + Date.now() + '_' + (file.name || 'avatar');
-                const snap = await ref.child(path).put(file, { contentType: file.type, cacheControl: 'public, max-age=86400' });
+                const uploadTask = ref.child(path).put(file, { contentType: file.type, cacheControl: 'public, max-age=86400' });
+                const snap = await Promise.race([
+                    uploadTask,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Upload timed out. Please try again.')), 25000))
+                ]);
                 photoURL = await snap.ref.getDownloadURL();
             }
             const updatePayload = {};
@@ -473,7 +485,7 @@
               const emailField = document.getElementById('ps_email');
               if(emailField) emailField.value = user.email;
               const nameField = document.getElementById('ps_display_name');
-              if (nameField) nameField.value = user.displayName || '';
+              if (nameField) { nameField.value = user.displayName || ''; nameField.disabled = true; }
               const prev = document.getElementById('ps_avatar_preview');
               if (prev && user.photoURL) { prev.src = user.photoURL; prev.style.display = 'inline-block'; }
           }
@@ -500,6 +512,13 @@
       if (confirmEl) confirmEl.addEventListener('input', () => {});
       const saveBtn = document.getElementById('saveProfileBtn');
       if (saveBtn) saveBtn.addEventListener('click', handleSaveProfile);
+      const enableName = document.getElementById('ps_enable_display_name');
+      if (enableName) enableName.addEventListener('change', () => {
+        const nameEl = document.getElementById('ps_display_name');
+        if (!nameEl) return;
+        const enabled = enableName.checked;
+        nameEl.disabled = !enabled;
+      });
       const avatarInput = document.getElementById('ps_avatar');
       if (avatarInput) avatarInput.addEventListener('change', previewAvatar);
 
