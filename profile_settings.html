@@ -371,7 +371,25 @@
         reader.readAsDataURL(file);
     }
 
-    // UPDATED: ROBUST DELETE FUNCTION
+    async function deleteUserDocsFor(uid) {
+        const db = firebase.firestore();
+        async function wipe(col, field) {
+            try {
+                while (true) {
+                    const snap = await db.collection(col).where(field, '==', uid).limit(300).get();
+                    if (snap.empty) break;
+                    const batch = db.batch();
+                    snap.docs.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                }
+            } catch (_) {}
+        }
+        await wipe('poser_detections', 'userId');
+        await wipe('pending_verifications', 'userId');
+        await wipe('pending_news_verification', 'userId');
+        try { await db.collection('users').doc(uid).delete(); } catch (_) {}
+    }
+
     async function handleDeleteAccount() {
         const user = firebase.auth().currentUser;
         
@@ -394,24 +412,12 @@
         btn.disabled = true;
 
         try {
-            // 3. Re-authenticate User
             const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
             await user.reauthenticateWithCredential(credential);
+            await deleteUserDocsFor(user.uid);
 
-            // 4. Delete Firestore Data (Try to find a user doc)
-            // Note: If you use a different collection name, change 'users' below
-            try {
-                const db = firebase.firestore();
-                await db.collection('users').doc(user.uid).delete();
-                console.log("Firestore data deleted.");
-            } catch (dbErr) {
-                console.warn("Firestore delete skipped or failed:", dbErr);
-            }
-
-            // 5. Delete Auth Account
             await user.delete();
             
-            // 6. Redirect to Register
             alert("Your account has been successfully deleted.");
             window.location.href = 'register.html'; 
 
