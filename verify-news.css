@@ -127,12 +127,12 @@
 
 /* Pastel blue disabled state for Analyze (Facebook) button */
 .verify-news-page .facebook-verify-btn:disabled {
-    background: #dbeafe !important; /* blue-200 */
-    color: #1e40af !important;      /* blue-800 */
-    border: 1px solid #bfdbfe !important; /* blue-300 */
+    background: #3b82f6 !important; /* Poser Blue */
+    color: #ffffff !important;
+    border: none !important;
     cursor: not-allowed;
     box-shadow: none !important;
-    opacity: 1;
+    opacity: 0.55 !important;
 }
 
 
