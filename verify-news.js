@@ -751,7 +751,9 @@ async function handleFacebookVerification() {
                 }
             }
         } catch (e) {
-            console.warn('Poser detection failed:', e);
+            if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+                console.warn('Poser detection failed:', e);
+            }
         }
 
         showFacebookVerificationResult(analysisType, {
@@ -785,7 +787,9 @@ async function handleFacebookVerification() {
                 await firebase.firestore().collection('facebook_verification_results').doc(resultId).set({ poserDetection: poserPayload }, { merge: true });
             }
         } catch(e) {
-            console.warn('Failed to save poserDetection to facebook_verification_results:', e);
+            if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+                console.warn('Failed to save poserDetection to facebook_verification_results:', e);
+            }
         }
     } catch (error) {
         console.error('Fact check API error:', error);
@@ -1119,7 +1123,9 @@ async function showVerificationResult(type, data) {
             console.log('Verification result payload:', verificationData);
         }
     } catch (error) {
-        console.error('Error storing verification result:', error);
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(error))) {
+            console.error('Error storing verification result:', error);
+        }
     }
     
     const hasGoogle = !!data.hasGoogleClaims;
@@ -1736,8 +1742,10 @@ document.addEventListener('click', async function(e) {
         });
         showNotification('Your vote has been recorded.', 'success');
     } catch (err) {
-        console.error('Error recording vote:', err);
-        showNotification('Failed to record vote. Please try again.', 'error');
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(err))) {
+            console.error('Error recording vote:', err);
+            showNotification('Failed to record vote. Please try again.', 'error');
+        }
     }
 });
 
@@ -1768,8 +1776,10 @@ document.addEventListener('click', async function(e) {
         showNotification('Request submitted for verification review.', 'success');
         btn.disabled = true;
         btn.textContent = 'Requested';
-    } catch (_) {
-        showNotification('Failed to submit request.', 'error');
+    } catch (e) {
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+            showNotification('Failed to submit request.', 'error');
+        }
     }
 });
 

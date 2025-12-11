@@ -657,7 +657,9 @@ if (action === 'vote-agree' || action === 'vote-disagree') {
         disagreeBtn.disabled = true;
 
     } catch (e) {
-        console.error("Vote failed:", e);
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+            console.error("Vote failed:", e);
+        }
     }
   }
 });

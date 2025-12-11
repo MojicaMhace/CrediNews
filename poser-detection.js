@@ -301,8 +301,14 @@ document.addEventListener('DOMContentLoaded', () => {
       createdAt: serverTs,
       userId: user ? user.uid : 'anonymous'
     };
-    await db.collection('poser_detections').add(fullResult);
-    showNotification('Analysis saved.', 'success');
+    try {
+      await db.collection('poser_detections').add(fullResult);
+      showNotification('Analysis saved.', 'success');
+    } catch (e) {
+      if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+        console.error(e);
+      }
+    }
   }
 
   window.submitVerificationRequest = async function(urlToCheck) {
@@ -325,8 +331,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btn) btn.innerText = "Request Sent ✓";
       alert("Request submitted! Our team will review this source.");
     } catch (e) {
-      console.error("Verification Request Error:", e);
-      alert("Error sending request.");
+      if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+        console.error("Verification Request Error:", e);
+        alert("Error sending request.");
+      }
       if (btn) { btn.innerText = "Try Again"; btn.disabled = false; }
     }
   };

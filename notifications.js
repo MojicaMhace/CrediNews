@@ -71,9 +71,15 @@ async function markOneRead(e, id) {
 }
 
 async function markAsRead(id) {
-    await db.collection('notifications').doc(id).set({ 
-        readAt: firebase.firestore.FieldValue.serverTimestamp() 
-    }, { merge: true });
+    try {
+        await db.collection('notifications').doc(id).set({ 
+            readAt: firebase.firestore.FieldValue.serverTimestamp() 
+        }, { merge: true });
+    } catch (e) {
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+            console.error(e);
+        }
+    }
 }
 
 // --- MAIN LOGIC ---
@@ -103,9 +109,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Save prefs on click
     const handleToggle = async (key, checked) => {
-        await userDocRef.set({ [key]: checked }, { merge: true });
-        if (key === 'notify_verification') prefVerification = checked;
-        if (key === 'notify_announcements') prefAnnouncements = checked;
+        try {
+            await userDocRef.set({ [key]: checked }, { merge: true });
+            if (key === 'notify_verification') prefVerification = checked;
+            if (key === 'notify_announcements') prefAnnouncements = checked;
+        } catch (e) {
+            if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+                console.error(e);
+            }
+        }
     };
 
     document.getElementById('pref_verification').addEventListener('change', (e) => handleToggle('notify_verification', e.target.checked));
@@ -154,7 +166,13 @@ document.addEventListener('DOMContentLoaded', () => {
             batch.update(doc.ref, { readAt: firebase.firestore.FieldValue.serverTimestamp() });
         });
         
-        await batch.commit();
+        try {
+            await batch.commit();
+        } catch (e) {
+            if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+                console.error(e);
+            }
+        }
     });
 
     const processedKey = `processed_verifications_${user.uid}`;

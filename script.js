@@ -582,6 +582,21 @@ function debounce(func, wait) {
     };
 }
 
+function handleFirestoreWriteError(err, featureName) {
+    const c = err && err.code ? String(err.code) : '';
+    const m = err && err.message ? String(err.message) : '';
+    const d = (c && c.indexOf('permission-denied') !== -1) || (m && m.toLowerCase().indexOf('permission-denied') !== -1);
+    if (d) {
+        const t = 'Please verify your email to use this feature.';
+        try {
+            if (typeof showNotification === 'function') { showNotification(t, 'error'); }
+            else if (window.alert) { alert(t); }
+        } catch(_){ }
+        return true;
+    }
+    return false;
+}
+
 function ensureAuthLinksWork() {
     const navControls = document.querySelector('.nav-controls');
     if (!navControls) return;
