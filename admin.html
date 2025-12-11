@@ -385,35 +385,15 @@
     async function approvePoser(docId, url) {
         if(!confirm(`Verify this Profile/Page?\n${url}`)) return;
         try {
-            const extractAlias = (u) => {
-                try { const x = new URL(String(u||'')); const segs = (x.pathname||'').split('/').filter(Boolean); return segs[0] || ''; } catch(_) { return ''; }
-            };
-            const alias = extractAlias(url);
             await addDoc(collection(db, POSER_VERIFIED_COL), {
                 url: (url || '').trim(),
                 is_verified_source: true,
                 is_verified: true,
                 category: "Official Entity",
                 added_at: serverTimestamp(),
-                notes: "Manual Admin Verification",
-                aliases: alias ? [alias, alias.toLowerCase()] : []
+                notes: "Manual Admin Verification"
             });
             await deleteDoc(doc(db, POSER_PENDING_COL, docId));
-
-            try {
-                const resp = await fetch('https://credinews-poser-api.onrender.com/api/poser/admin_mark_verified', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: (url || '').trim() })
-                });
-                if (resp.ok) {
-                    console.log('✅ Backend cache updated for', url);
-                } else {
-                    console.warn('⚠️ Backend update failed:', resp.status);
-                }
-            } catch (e) {
-                console.warn('⚠️ Unable to notify backend:', e && e.message);
-            }
             loadPoserRequests();
         } catch (e) { alert(e.message); }
     }
