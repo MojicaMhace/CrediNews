@@ -48,6 +48,11 @@ service cloud.firestore {
       allow write: if isAuthenticatedAndVerified(); // Only Verified users can WRITE
     }
 
+    match /notifications/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if isAuthenticatedAndVerified() && request.auth.uid == request.resource.data.userId;
+    }
+
     // --- 4. Other Public Collections ---
     match /trends/{trendId} { 
       allow read: if true; // Public/Guest Read

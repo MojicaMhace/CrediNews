@@ -6,6 +6,7 @@
   <title>Settings // CrediNews</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="profile_settings.css" />
+  <link rel="stylesheet" href="notifications.css" />
 </head>
 <body>
 
@@ -17,6 +18,9 @@
       <nav class="nav-menu">
         <button class="nav-btn active" data-tab="security">
           <i class="fas fa-shield-halved"></i> Security
+        </button>
+        <button class="nav-btn" data-tab="notifications">
+          <i class="fas fa-bell"></i> Notifications
         </button>
         <div class="spacer" style="flex:1;"></div>
         <button class="nav-btn danger" data-tab="danger">
@@ -96,6 +100,56 @@
         </div>
       </section>
 
+      <section class="tab-content" id="tab-notifications">
+        <div class="header-animate">
+          <h1>Notifications</h1>
+          <p class="subtitle">Manage alerts and activity.</p>
+        </div>
+
+        <div class="content-panel">
+          <div class="settings-panel">
+            <div class="panel-intro">
+              <h3>Control Center</h3>
+              <p>Choose which updates you receive.</p>
+            </div>
+            <div class="toggles-container">
+              <label class="toggle-row">
+                <div class="toggle-info">
+                  <span class="emoji">🚀</span>
+                  <div class="text">
+                    <strong>Verification Alerts</strong>
+                    <small>Notify when a request is approved or rejected.</small>
+                  </div>
+                </div>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="pref_verification" checked>
+                  <span class="slider round"></span>
+                </div>
+              </label>
+
+              <label class="toggle-row">
+                <div class="toggle-info">
+                  <span class="emoji">📣</span>
+                  <div class="text">
+                    <strong>All Activity</strong>
+                    <small>Announcements, updates, and general news.</small>
+                  </div>
+                </div>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="pref_announcements" checked>
+                  <span class="slider round"></span>
+                </div>
+              </label>
+            </div>
+            <div class="header-actions" style="margin-left:auto;">
+              <button id="markAllBtn" class="btn-ghost" style="display:none;">Mark all read</button>
+            </div>
+          </div>
+
+          <ul id="activityList" class="activity-list"></ul>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -106,6 +160,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   
   <script src="firebase-config.js"></script>
+  <script src="notifications.js"></script>
   
   <script>
     /* --- JAVASCRIPT LOGIC --- */
