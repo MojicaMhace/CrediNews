@@ -728,7 +728,7 @@ nav.navbar .auth-buttons .signup-btn:hover {
     width: 300px !important;
     min-width: 300px !important;
     right: 80px !important; 
-    margin-left: -26px;
+    margin-left: -75px;
   }
   .user-avatar {
     width: 50px;
@@ -3194,7 +3194,7 @@ body[data-page='index-hero'] { --shadow: none; }
   }
 
   .user-account-btn {
-    max-width: 150px !important;   /* 1. Force a maximum width */
+    max-width: 160px !important;   /* 1. Force a maximum width */
     padding: 6px 12px !important;  /* 2. Reduce padding */
     min-width: auto !important;    /* 3. Ensure no minimum width enforces size */
   }
@@ -3204,12 +3204,12 @@ body[data-page='index-hero'] { --shadow: none; }
     white-space: nowrap;         /* Prevent text wrapping */
     overflow: hidden;            /* Hide overflow text */
     text-overflow: ellipsis;     /* Add "..." at the end */
-    font-size: 8px;             /* Slightly smaller font */
+    font-size: 8.1px;             /* Slightly smaller font */
   }
 
   .user-account-btn i.fa-user {
-        font-size: 8px !important; /* Default is likely around 14px */
-        margin-right: 3px; /* Optional: Adjust space between icon and text */
+        font-size: 9px !important; /* Default is likely around 14px */
+        margin-right: 1px; /* Optional: Adjust space between icon and text */
     }
 
 }

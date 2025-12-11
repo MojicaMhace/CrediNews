@@ -562,7 +562,7 @@
                 width: 300px !important;
                 min-width: 300px !important;
                 right: 80px !important; 
-                margin-left: -26px;
+                margin-left: -75px;
             }
             .user-avatar {
                 width: 50px;
@@ -572,6 +572,28 @@
             .user-email {
                 font-size: 13px;
             }
+            .user-account-btn { 
+                padding: 8px 12px; 
+                min-width: 0; 
+            }
+            .user-account-btn {
+                max-width: 150px !important;   /* 1. Force a maximum width */
+                padding: 6px 12px !important;  /* 2. Reduce padding */
+                min-width: auto !important;    /* 3. Ensure no minimum width enforces size */
+            }
+
+            .user-name {
+                max-width: 80px;             
+                white-space: nowrap;         
+                overflow: hidden;           
+                text-overflow: ellipsis;     
+                font-size: 8.1px;             
+            }
+
+            .user-account-btn i.fa-user {
+                    font-size: 9px !important; 
+                    margin-right: 1px;
+                }
         }
     </style>
 </head>
