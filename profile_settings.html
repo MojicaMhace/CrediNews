@@ -60,6 +60,7 @@
                 <input type="file" id="ps_avatar" accept="image/*" />
                 <img id="ps_avatar_preview" src="" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:none;margin-left:12px;" />
               </div>
+              <div class="input-note" style="color:#9ca3af; font-size:12px;">Accepted: PNG/JPEG/JPG/WebP. Max file size: 2 MB.</div>
             </div>
             <div class="action-bar">
               <button id="saveProfileBtn" class="btn-secondary">Save Profile</button>
@@ -68,7 +69,7 @@
             <div class="divider"></div>
 
             <h3 style="margin-bottom:12px; font-size:16px;">Change Password</h3>
-            <div class="input-group">
+            <div class="input-group full">
               <label>Current Password</label>
               <div class="input-with-toggle">
                 <input type="password" id="ps_current_password" placeholder="••••••••" />
@@ -88,6 +89,13 @@
                 <li id="req-num">Contains a number</li>
                 <li id="req-sym">Contains a symbol</li>
               </ul>
+            </div>
+            <div class="input-group">
+              <label>Confirm New Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_confirm_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_confirm_password"><i class="fas fa-eye"></i></button>
+              </div>
             </div>
           </div>
           <div class="action-bar">
@@ -270,14 +278,18 @@
     async function handleChangePassword() {
         const currentPassEl = document.getElementById('ps_current_password');
         const newPassEl = document.getElementById('ps_new_password');
+        const confirmPassEl = document.getElementById('ps_confirm_password');
         const btn = document.getElementById('changePasswordBtn');
         
         const currentPass = currentPassEl.value;
         const newPass = newPassEl.value;
+        const confirmPass = confirmPassEl ? confirmPassEl.value : '';
 
         if (!currentPass) return toast('Please enter your current password.', 'error');
         if (!newPass) return toast('Please enter a new password.', 'error');
         if (newPass.length < 8) return toast('New password must be at least 8 chars.', 'error');
+        if (!confirmPass) return toast('Please confirm your new password.', 'error');
+        if (newPass !== confirmPass) return toast('New and confirm password do not match.', 'error');
         
         const user = firebase.auth().currentUser;
         if (!user) return toast('You are not signed in.', 'error');
@@ -317,6 +329,7 @@
 
     function validateDisplayName(name) {
         const n = (name || '').trim();
+        if (!n) return { ok: true, value: '' };
         if (n.length < 3) return { ok: false, msg: 'Display name must be at least 3 characters.' };
         if (n.length > 30) return { ok: false, msg: 'Display name must be at most 30 characters.' };
         if (!/^[A-Za-z0-9_\-\. ]+$/.test(n)) return { ok: false, msg: 'Only letters, numbers, spaces, _ - . allowed.' };
@@ -347,9 +360,12 @@
                 const snap = await ref.child(path).put(file, { contentType: file.type, cacheControl: 'public, max-age=86400' });
                 photoURL = await snap.ref.getDownloadURL();
             }
-            await user.updateProfile({ displayName: v.value, photoURL: photoURL || user.photoURL || null });
+            const updatePayload = {};
+            if (v.value) updatePayload.displayName = v.value;
+            if (photoURL || user.photoURL) updatePayload.photoURL = photoURL || user.photoURL || null;
+            if (Object.keys(updatePayload).length) await user.updateProfile(updatePayload);
             const db = firebase.firestore();
-            await db.collection('users').doc(user.uid).set({ name: v.value, profilePictureUrl: photoURL || user.photoURL || null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            await db.collection('users').doc(user.uid).set({ name: v.value || user.displayName || null, profilePictureUrl: photoURL || user.photoURL || null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
             const prev = document.getElementById('ps_avatar_preview');
             if (prev && photoURL) { prev.src = photoURL; prev.style.display = 'inline-block'; }
             toast('Profile saved.', 'success');
@@ -365,7 +381,22 @@
         const input = document.getElementById('ps_avatar');
         const img = document.getElementById('ps_avatar_preview');
         const file = input && input.files && input.files[0] ? input.files[0] : null;
-        if (!file || !img) return;
+        if (!file) return;
+        const validType = /^image\/(png|jpeg|jpg|webp)$/.test(file.type || '');
+        if (!validType) {
+            toast('Unsupported image type. Use PNG, JPG, JPEG, or WebP.', 'error');
+            try { input.value = ''; } catch(_){}
+            if (img) { img.style.display = 'none'; img.src = ''; }
+            return;
+        }
+        const maxBytes = 2 * 1024 * 1024;
+        if (file.size > maxBytes) {
+            toast('Selected image exceeds 2 MB. Please choose a smaller file.', 'error');
+            try { input.value = ''; } catch(_){}
+            if (img) { img.style.display = 'none'; img.src = ''; }
+            return;
+        }
+        if (!img) return;
         const reader = new FileReader();
         reader.onload = function(ev){ img.src = ev.target.result; img.style.display = 'inline-block'; };
         reader.readAsDataURL(file);
@@ -465,6 +496,8 @@
 
       const changePassBtn = document.getElementById('changePasswordBtn');
       if(changePassBtn) changePassBtn.addEventListener('click', handleChangePassword);
+      const confirmEl = document.getElementById('ps_confirm_password');
+      if (confirmEl) confirmEl.addEventListener('input', () => {});
       const saveBtn = document.getElementById('saveProfileBtn');
       if (saveBtn) saveBtn.addEventListener('click', handleSaveProfile);
       const avatarInput = document.getElementById('ps_avatar');
