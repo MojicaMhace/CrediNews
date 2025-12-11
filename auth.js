@@ -108,6 +108,7 @@ class AuthManager {
             const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
             const user = userCredential.user;
             const idToken = await user.getIdToken(); 
+            try { await user.reload(); } catch(_){}
             
             if (!user.emailVerified) {
                 this.showError('Your email is not verified. Please check your inbox or resend the verification email.');
@@ -142,7 +143,11 @@ class AuthManager {
                     console.log('✅ Firestore profile re-created/repaired and updated.');
                 } else {
                     // Standard Login: Only update the dynamic fields
-                    await userRef.update(updateData);
+                    try {
+                        await userRef.update(updateData);
+                    } catch (_e) {
+                        await userRef.set(updateData, { merge: true });
+                    }
                     console.log('✅ Firestore profile updated with latest login time and verification status.');
                 }
                 
