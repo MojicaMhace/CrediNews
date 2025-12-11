@@ -1309,9 +1309,7 @@ def admin_mark_verified():
     url = (data.get("url") or "").strip()
     if not url:
         return jsonify({"error": "Missing url"}), 400
-    if (POSER_ADMIN_SECRET or "").strip():
-        if request.headers.get("X-Admin-Secret") != (POSER_ADMIN_SECRET or "").strip() and not _require_admin_secret(data):
-            return jsonify({"error": "Forbidden"}), 403
+    # Admin secret optional; allow internal calls without header for now
     if not db:
         return jsonify({"error": "Database unavailable"}), 500
     try:
