@@ -122,6 +122,7 @@ class AuthManager {
             try {
                 const userRef = this.db.collection('users').doc(user.uid);
                 const snap = await userRef.get();
+                const wasVerified = !!(snap.exists && snap.data() && snap.data().emailVerified === true);
                 
                 const updateData = {
                     lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -149,6 +150,17 @@ class AuthManager {
                         await userRef.set(updateData, { merge: true });
                     }
                     console.log('✅ Firestore profile updated with latest login time and verification status.');
+                }
+                
+                if (!wasVerified && user.emailVerified === true) {
+                    try {
+                        await this.db.collection('stats').doc('verified_users_count').set({
+                            count: firebase.firestore.FieldValue.increment(1),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                    } catch (e) {
+                        console.warn('Stats increment failed:', e && e.message);
+                    }
                 }
                 
             } catch (profileErr) {
@@ -248,6 +260,14 @@ class AuthManager {
                         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
                         preferences: { theme: 'dark', notifications: true }
                     });
+                    try {
+                        await this.db.collection('stats').doc('verified_users_count').set({
+                            count: firebase.firestore.FieldValue.increment(1),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                    } catch (e) {
+                        console.warn('Stats increment failed for Google new user:', e && e.message);
+                    }
                 } catch (err) {
                     console.error('Failed to create full Google profile:', err && err.message);
                 }
@@ -569,7 +589,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const user = firebase.auth().currentUser;
                 if (user) {
-                    await firebase.firestore().collection('users').doc(user.uid).set({ emailVerified: true }, { merge: true });
+                    const db = firebase.firestore();
+                    const userRef = db.collection('users').doc(user.uid);
+                    const snap = await userRef.get();
+                    const wasVerified = !!(snap.exists && snap.data() && snap.data().emailVerified === true);
+                    await userRef.set({ emailVerified: true }, { merge: true });
+                    if (!wasVerified) {
+                        try {
+                            await db.collection('stats').doc('verified_users_count').set({
+                                count: firebase.firestore.FieldValue.increment(1),
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+                        } catch (e) {
+                            console.warn('Stats increment failed (email verification):', e && e.message);
+                        }
+                    }
                 }
                 sessionStorage.removeItem('verification_just_completed');
             }
@@ -644,6 +678,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
                         preferences: { theme: 'dark', notifications: true }
                     });
+                    try {
+                        await db.collection('stats').doc('verified_users_count').set({
+                            count: firebase.firestore.FieldValue.increment(1),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                    } catch (e) {
+                        console.warn('Stats increment failed for Google redirect new user:', e && e.message);
+                    }
                     
                     // 2. Store minimal data and proceed to registration gate for finalization
                     sessionStorage.setItem('googleAuthPending', JSON.stringify({

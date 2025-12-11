@@ -545,16 +545,26 @@ async function updatePlatformStats() {
 
         let totalUsers = 0;
         try {
-            const usersSnap = await db.collection('users').get();
-            totalUsers = usersSnap.size;
-        } catch (_e) {
-            const uniqueUsers = new Set();
-            verifySnap.docs.forEach(doc => {
-                const d = doc.data();
-                const uid = d.userID || d.userId || d.user_id || d.uid;
-                if (uid && uid !== 'anonymous') uniqueUsers.add(uid);
-            });
-            totalUsers = uniqueUsers.size;
+            const statsDoc = await db.collection('stats').doc('verified_users_count').get();
+            const statsData = statsDoc.exists ? statsDoc.data() : null;
+            if (statsData && typeof statsData.count === 'number') {
+                totalUsers = statsData.count;
+            } else {
+                throw new Error('Stats doc missing or invalid');
+            }
+        } catch (_statsErr) {
+            try {
+                const verifiedUsersSnap = await db.collection('users').where('emailVerified', '==', true).get();
+                totalUsers = verifiedUsersSnap.size;
+            } catch (_e) {
+                const uniqueUsers = new Set();
+                verifySnap.docs.forEach(doc => {
+                    const d = doc.data();
+                    const uid = d.userID || d.userId || d.user_id || d.uid;
+                    if (uid && uid !== 'anonymous') uniqueUsers.add(uid);
+                });
+                totalUsers = uniqueUsers.size;
+            }
         }
 
         animateValue("stat-verified", 0, totalVerified, 2000);
