@@ -1254,10 +1254,10 @@ def build_response(url: str, meta: Dict[str, Any], score: Dict[str, Any], resolv
                 "Verified Registry (confirmed official)"
                 if str(meta.get("verification_source") or "").strip().lower() == "verified_registry"
                 else (
-                    "Apify public scrape (normalized)"
+                    "Graph + Apify (hybrid)"
                     if meta.get("_apify_fallback_used")
                     else (
-                        "Meta Graph API" + (" (limited access)" if meta.get("_permissions_restricted") else "")
+                        "Meta Graph API" + (" (restricted)" if meta.get("_permissions_restricted") else "")
                     )
                 )
             )
