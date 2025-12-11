@@ -317,7 +317,7 @@
         const registerForm = document.getElementById('registerForm');
         const submitBtn = registerForm ? registerForm.querySelector('button[type="submit"]') : null;
 
-        if (!registerForm || !window.authManager) return; // Exit if form or AuthManager is not found
+        if (!registerForm) return;
 
         if (isGoogleSignup && pendingData) {
             console.log('✅ Google signup flow detected. Adjusting form.');
@@ -359,8 +359,12 @@
                     return;
                 }
                 
-                // Call the consolidated method in auth.js
-                window.authManager.handleGoogleSignupSubmit(e, pendingData);
+                if (window.authManager && typeof window.authManager.handleGoogleSignupSubmit === 'function') {
+                    window.authManager.handleGoogleSignupSubmit(e, pendingData);
+                } else {
+                    e.preventDefault();
+                    showInlineMessage('System is initializing. Please try again in a moment.', 'error');
+                }
             });
             
         } else {
@@ -390,40 +394,71 @@
                     return;
                 }
                 
-                // Call the consolidated method in auth.js
                 submitting = true;
-                window.authManager.setButtonLoading(submitBtn, true);
-                
-                window.authManager.handleEmailPasswordRegister({ fullName, email, password })
-                    .then(result => {
-                        submitting = false;
-                        window.authManager.setButtonLoading(submitBtn, false);
-                        
-                        if (result.success) {
-                            showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder. Please verify your email before logging in.`, 'success');
-                            const until = Date.now() + COOLDOWN_MS;
-                            localStorage.setItem(cooldownKey, String(until));
-                            startCountdown(until);
+                if (window.authManager && typeof window.authManager.setButtonLoading === 'function') {
+                    window.authManager.setButtonLoading(submitBtn, true);
+                } else if (submitBtn) {
+                    submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+                }
+
+                if (window.authManager && typeof window.authManager.handleEmailPasswordRegister === 'function') {
+                    window.authManager.handleEmailPasswordRegister({ fullName, email, password })
+                        .then(result => {
+                            submitting = false;
+                            if (window.authManager) window.authManager.setButtonLoading(submitBtn, false);
                             
-                        } else {
-                            let msg = 'Registration failed. Please try again.';
-                            switch (result.code) {
-                                case 'auth/email-already-in-use':
-                                    msg = 'This email is already registered. Try signing in or resetting your password.';
-                                    break;
-                                case 'auth/too-many-requests':
-                                    msg = 'We have blocked requests from this device due to unusual activity. Please wait and try again later.';
-                                    const blockUntil = Date.now() + BLOCK_COOLDOWN_MS;
-                                    localStorage.setItem(BLOCK_KEY, String(blockUntil));
-                                    startCountdown(blockUntil);
-                                    break;
-                                default:
-                                    // Use the message from Firebase error if available
-                                    msg = result.message || msg; 
+                            if (result.success) {
+                                showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder. Please verify your email before logging in.`, 'success');
+                                const until = Date.now() + COOLDOWN_MS;
+                                localStorage.setItem(cooldownKey, String(until));
+                                startCountdown(until);
+                                
+                            } else {
+                                let msg = result.message || 'Registration failed. Please try again.';
+                                if (result.code === 'auth/too-many-requests') {
+                                    const bu = Date.now() + BLOCK_COOLDOWN_MS;
+                                    localStorage.setItem(BLOCK_KEY, String(bu));
+                                    startCountdown(bu);
+                                }
+                                showInlineMessage(`${msg} (${result.code || 'unknown'})`, 'error');
                             }
-                            showInlineMessage(`${msg} (${result.code || 'unknown'})`, 'error');
+                        })
+                        .catch(err => {
+                            submitting = false;
+                            if (window.authManager) window.authManager.setButtonLoading(submitBtn, false);
+                            showInlineMessage(err && err.message ? err.message : 'Registration failed.', 'error');
+                        });
+                } else {
+                    (async () => {
+                        try {
+                            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                            const user = userCredential.user;
+                            await user.updateProfile({ displayName: fullName });
+                            const origin = (window.location.origin && window.location.origin.startsWith('http')) ? window.location.origin : `${window.location.protocol}//${window.location.host}`;
+                            try { await user.sendEmailVerification({ url: `${origin}/login.html`, handleCodeInApp: true }); } catch(_){ await user.sendEmailVerification(); }
+                            await db.collection('users').doc(user.uid).set({
+                                name: fullName,
+                                email: email,
+                                profilePictureUrl: user.photoURL || null,
+                                providerId: 'password',
+                                role: 'user',
+                                emailVerified: false,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                preferences: { theme: 'dark', notifications: true }
+                            }, { merge: true });
+                            showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder. Please verify your email before logging in.`, 'success');
+                            const until = Date.now() + COOLDOWN_MS; localStorage.setItem(cooldownKey, String(until)); startCountdown(until);
+                        } catch(err) {
+                            let msg = err && err.message ? err.message : 'Registration failed. Please try again.';
+                            if (err.code === 'auth/too-many-requests') { const bu = Date.now() + BLOCK_COOLDOWN_MS; localStorage.setItem(BLOCK_KEY, String(bu)); startCountdown(bu); }
+                            showInlineMessage(`${msg} (${err.code || 'unknown'})`, 'error');
+                        } finally {
+                            submitting = false;
+                            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account'; }
                         }
-                    });
+                    })();
+                }
             });
         }
     })();
