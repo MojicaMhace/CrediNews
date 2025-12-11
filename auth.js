@@ -186,6 +186,14 @@ class AuthManager {
                 default: errorMessage = 'Login failed. Please try again.';
             }
             this.showError(errorMessage);
+            if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials') {
+                const banner = document.getElementById('loginErrorBanner');
+                if (banner) {
+                    banner.style.display = 'block';
+                    banner.innerHTML = '<div class="message-content"><i class="fas fa-exclamation-circle"></i><h3>Wrong Password</h3><p>Please check your password and try again.</p></div>';
+                    setTimeout(() => { banner.style.display = 'none'; }, 5000);
+                }
+            }
         } finally {
             this.setButtonLoading(submitBtn, false);
         }
