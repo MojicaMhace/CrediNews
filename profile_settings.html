@@ -50,6 +50,20 @@
                 <button id="changeEmailBtn" class="btn-secondary">Update</button>
               </div>
             </div>
+            <div class="input-group full">
+              <label>Display Name</label>
+              <input type="text" id="ps_display_name" placeholder="Your display name" />
+            </div>
+            <div class="input-group full">
+              <label>Avatar</label>
+              <div class="row-action">
+                <input type="file" id="ps_avatar" accept="image/*" />
+                <img id="ps_avatar_preview" src="" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:none;margin-left:12px;" />
+              </div>
+            </div>
+            <div class="action-bar">
+              <button id="saveProfileBtn" class="btn-secondary">Save Profile</button>
+            </div>
             
             <div class="divider"></div>
 
@@ -158,6 +172,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
   
   <script src="firebase-config.js"></script>
   <script src="notifications.js"></script>
@@ -275,6 +290,10 @@
             const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPass);
             await user.reauthenticateWithCredential(credential);
             await user.updatePassword(newPass);
+            try {
+                const db = firebase.firestore();
+                await db.collection('users').doc(user.uid).set({ lastPasswordChangeAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            } catch (_) {}
             toast('Password updated successfully!', 'success');
             currentPassEl.value = '';
             newPassEl.value = '';
@@ -294,6 +313,62 @@
             btn.innerHTML = originalBtnText;
             btn.disabled = false;
         }
+    }
+
+    function validateDisplayName(name) {
+        const n = (name || '').trim();
+        if (n.length < 3) return { ok: false, msg: 'Display name must be at least 3 characters.' };
+        if (n.length > 30) return { ok: false, msg: 'Display name must be at most 30 characters.' };
+        if (!/^[A-Za-z0-9_\-\. ]+$/.test(n)) return { ok: false, msg: 'Only letters, numbers, spaces, _ - . allowed.' };
+        return { ok: true, value: n };
+    }
+
+    async function handleSaveProfile() {
+        const user = firebase.auth().currentUser;
+        if (!user) { toast('You are not signed in.', 'error'); return; }
+        const nameEl = document.getElementById('ps_display_name');
+        const avatarEl = document.getElementById('ps_avatar');
+        const btn = document.getElementById('saveProfileBtn');
+        const nameVal = nameEl ? nameEl.value : '';
+        const v = validateDisplayName(nameVal);
+        if (!v.ok) { toast(v.msg, 'error'); return; }
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        btn.disabled = true;
+        let photoURL = user.photoURL || '';
+        try {
+            const file = avatarEl && avatarEl.files && avatarEl.files[0] ? avatarEl.files[0] : null;
+            if (file) {
+                if (!/^image\/(png|jpeg|jpg|webp)$/.test(file.type)) { throw new Error('Invalid image type.'); }
+                if (file.size > 2 * 1024 * 1024) { throw new Error('Image must be ≤ 2MB.'); }
+                const storage = firebase.storage();
+                const ref = storage.ref();
+                const path = 'avatars/' + user.uid + '/' + Date.now() + '_' + (file.name || 'avatar');
+                const snap = await ref.child(path).put(file, { contentType: file.type, cacheControl: 'public, max-age=86400' });
+                photoURL = await snap.ref.getDownloadURL();
+            }
+            await user.updateProfile({ displayName: v.value, photoURL: photoURL || user.photoURL || null });
+            const db = firebase.firestore();
+            await db.collection('users').doc(user.uid).set({ name: v.value, profilePictureUrl: photoURL || user.photoURL || null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            const prev = document.getElementById('ps_avatar_preview');
+            if (prev && photoURL) { prev.src = photoURL; prev.style.display = 'inline-block'; }
+            toast('Profile saved.', 'success');
+        } catch (e) {
+            toast(e.message || 'Failed to save profile.', 'error');
+        } finally {
+            btn.innerHTML = original;
+            btn.disabled = false;
+        }
+    }
+
+    function previewAvatar() {
+        const input = document.getElementById('ps_avatar');
+        const img = document.getElementById('ps_avatar_preview');
+        const file = input && input.files && input.files[0] ? input.files[0] : null;
+        if (!file || !img) return;
+        const reader = new FileReader();
+        reader.onload = function(ev){ img.src = ev.target.result; img.style.display = 'inline-block'; };
+        reader.readAsDataURL(file);
     }
 
     // UPDATED: ROBUST DELETE FUNCTION
@@ -360,6 +435,10 @@
           if (user) {
               const emailField = document.getElementById('ps_email');
               if(emailField) emailField.value = user.email;
+              const nameField = document.getElementById('ps_display_name');
+              if (nameField) nameField.value = user.displayName || '';
+              const prev = document.getElementById('ps_avatar_preview');
+              if (prev && user.photoURL) { prev.src = user.photoURL; prev.style.display = 'inline-block'; }
           }
       });
 
@@ -380,6 +459,10 @@
 
       const changePassBtn = document.getElementById('changePasswordBtn');
       if(changePassBtn) changePassBtn.addEventListener('click', handleChangePassword);
+      const saveBtn = document.getElementById('saveProfileBtn');
+      if (saveBtn) saveBtn.addEventListener('click', handleSaveProfile);
+      const avatarInput = document.getElementById('ps_avatar');
+      if (avatarInput) avatarInput.addEventListener('change', previewAvatar);
 
       const dangerBtn = document.getElementById('deleteAccountBtn');
       if(dangerBtn) dangerBtn.addEventListener('click', handleDeleteAccount);
