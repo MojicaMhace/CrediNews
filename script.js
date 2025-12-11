@@ -545,12 +545,32 @@ async function updatePlatformStats() {
 
         let totalUsers = 0;
         try {
-            const statsDoc = await db.collection('stats').doc('verified_users_count').get();
+            const statsDocRef = db.collection('stats').doc('verified_users_count');
+            const statsDoc = await statsDocRef.get();
             const statsData = statsDoc.exists ? statsDoc.data() : null;
-            if (statsData && typeof statsData.count === 'number') {
-                totalUsers = statsData.count;
+
+            const currentUser = (firebase.auth && firebase.auth().currentUser) || null;
+            const isAdmin = !!(currentUser && currentUser.email === 'admin@credinews.com');
+
+            if (!statsData || typeof statsData.count !== 'number') {
+                if (isAdmin) {
+                    try {
+                        const verifiedUsersSnap = await db.collection('users').where('emailVerified', '==', true).get();
+                        const count = verifiedUsersSnap.size;
+                        await statsDocRef.set({
+                            count,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                        totalUsers = count;
+                    } catch (adminErr) {
+                        // fallthrough to public fallback below
+                        throw adminErr;
+                    }
+                } else {
+                    throw new Error('Stats doc missing or invalid');
+                }
             } else {
-                throw new Error('Stats doc missing or invalid');
+                totalUsers = statsData.count;
             }
         } catch (_statsErr) {
             try {
@@ -753,6 +773,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
         console.error('Navbar init error:', e);
     }
+    try {
+        initAdminBackfillButton();
+    } catch (e) {
+        console.error('Admin backfill init error:', e);
+    }
     
     enforceAccessRules();
 });
@@ -834,3 +859,62 @@ try {
     try { updateAuthButton(); } catch(_) {}
   });
 } catch(_) {}
+
+// Admin-only backfill button for verified users count
+function initAdminBackfillButton() {
+    const attach = (user) => {
+        try {
+            const isAdmin = !!(user && user.email === 'admin@credinews.com' && (user.emailVerified || (Array.isArray(user.providerData) && user.providerData.some(p => p && p.providerId && p.providerId !== 'password'))));
+            const cardContent = document.querySelector('.ready-card .ready-card-content, .ready-card-content');
+            if (!cardContent) return;
+            let btn = document.getElementById('admin-backfill-btn');
+            if (!isAdmin) {
+                if (btn) btn.remove();
+                return;
+            }
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.id = 'admin-backfill-btn';
+                btn.textContent = 'Backfill Users Stat';
+                btn.style.marginTop = '12px';
+                btn.style.padding = '6px 10px';
+                btn.style.fontSize = '12px';
+                btn.style.borderRadius = '6px';
+                btn.style.border = '1px solid rgba(255,255,255,0.2)';
+                btn.style.background = 'transparent';
+                btn.style.color = 'var(--text-primary, #fff)';
+                btn.style.cursor = 'pointer';
+                btn.title = 'Admin: update verified users count';
+                const stats = cardContent.querySelector('.ready-stats') || cardContent;
+                stats.appendChild(btn);
+                btn.addEventListener('click', async () => {
+                    try {
+                        if (btn.disabled) return;
+                        btn.disabled = true;
+                        const prevText = btn.textContent;
+                        btn.textContent = 'Updating...';
+                        const db = firebase.firestore();
+                        const verifiedUsersSnap = await db.collection('users').where('emailVerified', '==', true).get();
+                        const count = verifiedUsersSnap.size;
+                        await db.collection('stats').doc('verified_users_count').set({
+                            count,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                        updatePlatformStats();
+                        btn.textContent = 'Updated ✔';
+                        setTimeout(() => { btn.textContent = prevText; btn.disabled = false; }, 1500);
+                    } catch (e) {
+                        btn.textContent = 'Failed';
+                        setTimeout(() => { btn.textContent = 'Backfill Users Stat'; btn.disabled = false; }, 1500);
+                        try { console.error('Admin backfill failed:', e); alert('Backfill failed: ' + (e && e.message ? e.message : 'Unknown error')); } catch(_) {}
+                    }
+                });
+            }
+        } catch (_e) {}
+    };
+    const current = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+    attach(current);
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        firebase.auth().onAuthStateChanged(u => attach(u));
+    }
+}
