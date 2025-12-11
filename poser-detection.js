@@ -397,7 +397,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const availability = analysis.data_availability || null;
       const availabilityNote = analysis.availability_note || '';
       const analyzedId = meta.name || meta.username || "Unknown ID";
-      const dataSourceNote = analysis.data_source_note || "Hybrid Scan";
+      const dataSourceNote = (function(){
+        if (fromRegistry) return "Verified Registry (confirmed official)";
+        const apifyUsed = !!meta._apify_fallback_used;
+        const restricted = !!meta._permissions_restricted;
+        if (apifyUsed) return "Graph + Apify";
+        return restricted ? "Graph (restricted)" : "Graph";
+      })();
       
       const hasBadge = (meta.is_verified === true || meta.verification_status === 'blue_verified');
       const fromRegistry = String(meta.verification_source || '').toLowerCase() === 'verified_registry' || !!meta.is_verified_source;

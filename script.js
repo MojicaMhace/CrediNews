@@ -14,8 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Immediately change the button to Sign Indropdown
     updateAuthButton();
     updatePlatformStats();
-    
-    // 🛑 REMOVED: enforceAccessRules() is now called inside onAuthStateChanged
+    enforceAccessRules();
     
     console.log('✅ Initialization complete!');
 });
@@ -744,6 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
         console.error('Navbar init error:', e);
     }
+    enforceAccessRules();
 });
 function enforceAccessRules() {
     const path = String(location.pathname.split('/').pop() || '').toLowerCase();
