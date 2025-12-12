@@ -579,6 +579,56 @@ async function updatePlatformStats() {
     }
 }
 
+async function renderRecentVerifications(limit = 3) {
+    try {
+        if (typeof firebase === 'undefined' || !firebase.firestore) return;
+        const db = firebase.firestore();
+        const container = document.querySelector('.ready-demo');
+        if (!container) return;
+        const titleEl = container.querySelector('.ready-demo-title');
+        container.querySelectorAll('.ready-demo-item').forEach(el => { try { el.remove(); } catch(_) {} });
+        let snap = null;
+        try {
+            snap = await db.collection('facebook_verification_results').orderBy('analyzed_at','desc').limit(20).get();
+        } catch(_){
+            snap = await db.collection('facebook_verification_results').limit(20).get();
+        }
+        const items = [];
+        if (snap && !snap.empty) {
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const label = String(d.credibilityLabel || d.label || '').toLowerCase();
+                const ok = label.includes('verified') || label.includes('credible') || (typeof d.credibilityScore === 'number' && d.credibilityScore >= 75);
+                if (ok) {
+                    const source = d.pageName || d.url || (d.analyzedText && String(d.analyzedText).slice(0,60) + '...') || 'Content';
+                    items.push({ source: String(source), badge: label.includes('credible') || label.includes('verified') ? 'Verified' : 'Likely Verified' });
+                }
+            });
+        }
+        const list = items.slice(0, limit);
+        if (list.length === 0) {
+            const fallback = [
+                { source: 'Reuters', badge: 'Verified' },
+                { source: 'AP News', badge: 'Verified' },
+                { source: 'BBC News', badge: 'Verified' }
+            ].slice(0, limit);
+            fallback.forEach(it => {
+                const row = document.createElement('div');
+                row.className = 'ready-demo-item';
+                row.innerHTML = `<span class="ready-demo-source">${it.source}</span><span class="ready-demo-badge">${it.badge}</span>`;
+                container.appendChild(row);
+            });
+            return;
+        }
+        list.forEach(it => {
+            const row = document.createElement('div');
+            row.className = 'ready-demo-item';
+            row.innerHTML = `<span class="ready-demo-source">${it.source}</span><span class="ready-demo-badge">${it.badge}</span>`;
+            container.appendChild(row);
+        });
+    } catch(_) {}
+}
+
 // Utility function for debouncing
 function debounce(func, wait) {
     let timeout;
@@ -754,6 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
         console.error('Navbar init error:', e);
     }
+    try { renderRecentVerifications(3); } catch(_) {}
     
     enforceAccessRules();
 });
