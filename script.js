@@ -4,14 +4,8 @@ console.log('🚀 Script.js loaded successfully!');
 // Basic functionality for the main page
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 DOM Content Loaded - Starting initialization...');
-    
-    // Initialize smooth scrolling for navigation links
     initializeSmoothScrolling();
-    
-    // Initialize any interactive elements
     initializeInteractiveElements();
-    
-    // Immediately change the button to Sign Indropdown
     updateAuthButton();
     updatePlatformStats();
     enforceAccessRules();
@@ -19,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Initialization complete!');
 });
 
-// Function to update the auth buttons
 function updateAuthButton() {
     const navControls = document.querySelector('.nav-controls');
     console.log('🔍 Looking for nav controls...', navControls);
@@ -35,7 +28,6 @@ function updateAuthButton() {
     const path = String(location.pathname.split('/').pop() || '').toLowerCase();
 
     const showLoggedOutUI = () => {
-        // Hide any user UI and show login/signup
         if (userAccountBtn) userAccountBtn.style.display = 'none';
         const logoutFallback = document.getElementById('logoutFallback');
         if (logoutFallback) logoutFallback.remove();
@@ -360,6 +352,25 @@ function initializeButtonRedirects() {
         console.log('✅ Verify News button redirect initialized');
     }
 
+    // Get Started Today button (green pill in Ready section) - redirect to verify-news.html
+    const getStartedBtn = document.querySelector('.btn-signup');
+    if (getStartedBtn) {
+        console.log('✅ Found Get Started button, adding redirect...');
+        const handler = function(e) {
+            try { e.preventDefault(); } catch(_) {}
+            console.log('🚀 Get Started clicked - redirecting to verify-news.html');
+            window.location.href = 'verify-news.html';
+        };
+        // Ensure robust binding without duplicates
+        if (!getStartedBtn.dataset.gsBound) {
+            getStartedBtn.addEventListener('click', handler);
+            getStartedBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') handler(e);
+            });
+            getStartedBtn.dataset.gsBound = '1';
+        }
+    }
+
     
     console.log('🎉 All button redirects initialized successfully');
     const verifyBtnFallback = document.getElementById('verifyBtn');
@@ -568,6 +579,59 @@ async function updatePlatformStats() {
     }
 }
 
+async function renderRecentVerifications(limit = 3) {
+    try {
+        if (typeof firebase === 'undefined' || !firebase.firestore) return;
+        const db = firebase.firestore();
+        const container = document.querySelector('.ready-demo');
+        if (!container) return;
+        const titleEl = container.querySelector('.ready-demo-title');
+        container.querySelectorAll('.ready-demo-item').forEach(el => { try { el.remove(); } catch(_) {} });
+        let snap = null;
+        try {
+            snap = await db.collection('facebook_verification_results').orderBy('analyzed_at','desc').limit(20).get();
+        } catch(_){
+            snap = await db.collection('facebook_verification_results').limit(20).get();
+        }
+        const items = [];
+        if (snap && !snap.empty) {
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const rawLabel = String(d.credibilityLabel || d.label || d.aiVerdict || d.verdict || '').trim();
+                const low = rawLabel.toLowerCase();
+                const score = typeof d.credibilityScore === 'number' ? d.credibilityScore : NaN;
+                const ok = low.includes('verified') || low.includes('credible') || (Number.isFinite(score) && score >= 75);
+                if (ok) {
+                    const source = d.pageName || d.url || (d.analyzedText && String(d.analyzedText).slice(0,60) + '...') || 'Content';
+                    const badge = rawLabel || (Number.isFinite(score) ? (score >= 80 ? 'Credible' : (score >= 60 ? 'Likely Credible' : (score >= 40 ? 'Mixed / Unverified' : 'Low Credibility'))) : 'Verified');
+                    items.push({ source: String(source), badge: String(badge) });
+                }
+            });
+        }
+        const list = items.slice(0, limit);
+        if (list.length === 0) {
+            const fallback = [
+                { source: 'Reuters', badge: 'Verified' },
+                { source: 'AP News', badge: 'Verified' },
+                { source: 'BBC News', badge: 'Verified' }
+            ].slice(0, limit);
+            fallback.forEach(it => {
+                const row = document.createElement('div');
+                row.className = 'ready-demo-item';
+                row.innerHTML = `<span class="ready-demo-source">${it.source}</span><span class="ready-demo-badge">${it.badge}</span>`;
+                container.appendChild(row);
+            });
+            return;
+        }
+        list.forEach(it => {
+            const row = document.createElement('div');
+            row.className = 'ready-demo-item';
+            row.innerHTML = `<span class="ready-demo-source">${it.source}</span><span class="ready-demo-badge">${it.badge}</span>`;
+            container.appendChild(row);
+        });
+    } catch(_) {}
+}
+
 // Utility function for debouncing
 function debounce(func, wait) {
     let timeout;
@@ -743,6 +807,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
         console.error('Navbar init error:', e);
     }
+    try { renderRecentVerifications(3); } catch(_) {}
+    
     enforceAccessRules();
 });
 function enforceAccessRules() {
@@ -817,3 +883,10 @@ function enforceAccessRules() {
         firebase.auth().onAuthStateChanged(user => check(user));
     }
 }
+// Refresh dropdown when profile is updated elsewhere
+try {
+  window.addEventListener('user-profile-updated', () => {
+    try { updateAuthButton(); } catch(_) {}
+  });
+} catch(_) {}
+

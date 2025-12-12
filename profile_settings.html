@@ -50,11 +50,27 @@
                 <button id="changeEmailBtn" class="btn-secondary">Update</button>
               </div>
             </div>
+            <div class="input-group full">
+              <div class="label-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                <label>Display Name</label>
+                <label class="badge" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                  <input type="checkbox" id="ps_enable_display_name"> Update
+                </label>
+              </div>
+              <div class="input-wrapper">
+                <i class="fas fa-id-badge icon"></i>
+                <input type="text" id="ps_display_name" placeholder="Your display name" disabled />
+              </div>
+            </div>
+            
+            <div class="action-bar">
+              <button id="saveProfileBtn" class="btn-secondary">Save Profile</button>
+            </div>
             
             <div class="divider"></div>
 
             <h3 style="margin-bottom:12px; font-size:16px;">Change Password</h3>
-            <div class="input-group">
+            <div class="input-group full">
               <label>Current Password</label>
               <div class="input-with-toggle">
                 <input type="password" id="ps_current_password" placeholder="••••••••" />
@@ -74,6 +90,13 @@
                 <li id="req-num">Contains a number</li>
                 <li id="req-sym">Contains a symbol</li>
               </ul>
+            </div>
+            <div class="input-group">
+              <label>Confirm New Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_confirm_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_confirm_password"><i class="fas fa-eye"></i></button>
+              </div>
             </div>
           </div>
           <div class="action-bar">
@@ -158,6 +181,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  
   
   <script src="firebase-config.js"></script>
   <script src="notifications.js"></script>
@@ -255,14 +279,18 @@
     async function handleChangePassword() {
         const currentPassEl = document.getElementById('ps_current_password');
         const newPassEl = document.getElementById('ps_new_password');
+        const confirmPassEl = document.getElementById('ps_confirm_password');
         const btn = document.getElementById('changePasswordBtn');
         
         const currentPass = currentPassEl.value;
         const newPass = newPassEl.value;
+        const confirmPass = confirmPassEl ? confirmPassEl.value : '';
 
         if (!currentPass) return toast('Please enter your current password.', 'error');
         if (!newPass) return toast('Please enter a new password.', 'error');
         if (newPass.length < 8) return toast('New password must be at least 8 chars.', 'error');
+        if (!confirmPass) return toast('Please confirm your new password.', 'error');
+        if (newPass !== confirmPass) return toast('New and confirm password do not match.', 'error');
         
         const user = firebase.auth().currentUser;
         if (!user) return toast('You are not signed in.', 'error');
@@ -275,6 +303,10 @@
             const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPass);
             await user.reauthenticateWithCredential(credential);
             await user.updatePassword(newPass);
+            try {
+                const db = firebase.firestore();
+                await db.collection('users').doc(user.uid).set({ lastPasswordChangeAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            } catch (_) {}
             toast('Password updated successfully!', 'success');
             currentPassEl.value = '';
             newPassEl.value = '';
@@ -296,7 +328,69 @@
         }
     }
 
-    // UPDATED: ROBUST DELETE FUNCTION
+    function validateDisplayName(name) {
+        const n = (name || '').trim();
+        if (!n) return { ok: true, value: '' };
+        if (n.length < 3) return { ok: false, msg: 'Display name must be at least 3 characters.' };
+        if (n.length > 30) return { ok: false, msg: 'Display name must be at most 30 characters.' };
+        if (!/^[A-Za-z0-9_\-\. ]+$/.test(n)) return { ok: false, msg: 'Only letters, numbers, spaces, _ - . allowed.' };
+        return { ok: true, value: n };
+    }
+
+    async function handleSaveProfile() {
+        const user = firebase.auth().currentUser;
+        if (!user) { toast('You are not signed in.', 'error'); return; }
+        const nameEl = document.getElementById('ps_display_name');
+        const nameToggle = document.getElementById('ps_enable_display_name');
+        const btn = document.getElementById('saveProfileBtn');
+        const nameVal = nameEl ? nameEl.value : '';
+        const shouldUpdateName = !!(nameToggle && nameToggle.checked);
+        const v = shouldUpdateName ? validateDisplayName(nameVal) : { ok: true, value: '' };
+        if (!v.ok) { toast(v.msg, 'error'); return; }
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        btn.disabled = true;
+        let photoURL = user.photoURL || '';
+        try {
+            if (!shouldUpdateName) { throw new Error('No changes to save.'); }
+            await user.updateProfile({ displayName: v.value });
+            const db = firebase.firestore();
+            await db.collection('users').doc(user.uid).set({ name: v.value || user.displayName || null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            try { await user.reload(); } catch(_){ }
+            try {
+              const detail = { displayName: v.value || user.displayName || '', photoURL: user.photoURL || '', email: user.email || '' };
+              window.dispatchEvent(new CustomEvent('user-profile-updated', { detail }));
+            } catch(_){ }
+            toast('Profile saved.', 'success');
+        } catch (e) {
+            toast(e.message || 'Failed to save profile.', 'error');
+        } finally {
+            btn.innerHTML = original;
+            btn.disabled = false;
+        }
+    }
+
+    
+
+    async function deleteUserDocsFor(uid) {
+        const db = firebase.firestore();
+        async function wipe(col, field) {
+            try {
+                while (true) {
+                    const snap = await db.collection(col).where(field, '==', uid).limit(300).get();
+                    if (snap.empty) break;
+                    const batch = db.batch();
+                    snap.docs.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                }
+            } catch (_) {}
+        }
+        await wipe('poser_detections', 'userId');
+        await wipe('pending_verifications', 'userId');
+        await wipe('pending_news_verification', 'userId');
+        try { await db.collection('users').doc(uid).delete(); } catch (_) {}
+    }
+
     async function handleDeleteAccount() {
         const user = firebase.auth().currentUser;
         
@@ -319,24 +413,12 @@
         btn.disabled = true;
 
         try {
-            // 3. Re-authenticate User
             const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
             await user.reauthenticateWithCredential(credential);
+            await deleteUserDocsFor(user.uid);
 
-            // 4. Delete Firestore Data (Try to find a user doc)
-            // Note: If you use a different collection name, change 'users' below
-            try {
-                const db = firebase.firestore();
-                await db.collection('users').doc(user.uid).delete();
-                console.log("Firestore data deleted.");
-            } catch (dbErr) {
-                console.warn("Firestore delete skipped or failed:", dbErr);
-            }
-
-            // 5. Delete Auth Account
             await user.delete();
             
-            // 6. Redirect to Register
             alert("Your account has been successfully deleted.");
             window.location.href = 'register.html'; 
 
@@ -360,6 +442,9 @@
           if (user) {
               const emailField = document.getElementById('ps_email');
               if(emailField) emailField.value = user.email;
+              const nameField = document.getElementById('ps_display_name');
+              if (nameField) { nameField.value = user.displayName || ''; nameField.disabled = true; }
+              
           }
       });
 
@@ -380,6 +465,18 @@
 
       const changePassBtn = document.getElementById('changePasswordBtn');
       if(changePassBtn) changePassBtn.addEventListener('click', handleChangePassword);
+      const confirmEl = document.getElementById('ps_confirm_password');
+      if (confirmEl) confirmEl.addEventListener('input', () => {});
+      const saveBtn = document.getElementById('saveProfileBtn');
+      if (saveBtn) saveBtn.addEventListener('click', handleSaveProfile);
+      const enableName = document.getElementById('ps_enable_display_name');
+      if (enableName) enableName.addEventListener('change', () => {
+        const nameEl = document.getElementById('ps_display_name');
+        if (!nameEl) return;
+        const enabled = enableName.checked;
+        nameEl.disabled = !enabled;
+      });
+      
 
       const dangerBtn = document.getElementById('deleteAccountBtn');
       if(dangerBtn) dangerBtn.addEventListener('click', handleDeleteAccount);

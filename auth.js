@@ -151,6 +151,7 @@ class AuthManager {
                     console.log('✅ Firestore profile updated with latest login time and verification status.');
                 }
                 
+                
             } catch (profileErr) {
                 console.warn('Firestore profile update warning:', profileErr && profileErr.message);
             }

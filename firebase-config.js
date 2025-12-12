@@ -3,7 +3,7 @@
   apiKey: "AIzaSyCjjNo-ljRh-STMj5ZvKR8m29tAX2fRWkE",
   authDomain: "credinews-c6433.firebaseapp.com",
   projectId: "credinews-c6433",
-  storageBucket: "credinews-c6433.firebasestorage.app",
+  storageBucket: "credinews-c6433.appspot.com",
   messagingSenderId: "379730284424",
   appId: "1:379730284424:web:d3bd346663e7c3f97d743d",
   measurementId: "G-3S77HYYH0X", // Added from your latest snippet
