@@ -229,7 +229,7 @@ function updateAuthButton() {
     if (typeof firebase !== 'undefined' && firebase.auth) {
         console.log('🔥 Using Firebase auth state for navbar');
         firebase.auth().onAuthStateChanged((user) => {
-            if (user && (user.emailVerified || user.providerData.some(p=>p.providerId!== 'password'))) {
+            if (user) {
                 const displayName = user.displayName || user.email || 'User';
                 showLoggedInUI(displayName, user.email || '', user.photoURL || '');
             } else {

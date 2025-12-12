@@ -355,7 +355,7 @@ function start(user) {
   // *** CRITICAL FIX: Query ONLY documents where the 'userId' field matches the current user's UID ***
   // Assuming the field storing the user ID in the results collection is named 'userId'.
   const q = db.collection('facebook_verification_results')
-              .where('userId', '==', user.uid) 
+              .where('userID', '==', user.uid) 
               .orderBy('analyzed_at', 'desc')
               .limit(50);
 
@@ -363,7 +363,7 @@ function start(user) {
     const rawDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
     // The filter below is now redundant but kept for robustness against inconsistent data:
-    allDocs = rawDocs.filter(d => d.userId === user.uid || d.user_id === user.uid || d.uid === user.uid);
+    allDocs = rawDocs.filter(d => d.userID === user.uid || d.userId === user.uid || d.user_id === user.uid || d.uid === user.uid);
 
     applyFilters();
   }, error => {
@@ -404,28 +404,28 @@ document.addEventListener('click', (e) => {
 });
 
 if (window.firebase && firebase.auth) {
-    firebase.auth().onAuthStateChanged(user => {
+    firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
-            // Check if user is verified before starting the process
+            try { await user.reload(); } catch(_) {}
             if (user.emailVerified) {
-                // If the user has completed the Auth verification, proceed to fetch data
                 if(document.getElementById('userAccountBtn')) {
                     document.getElementById('userAccountBtn').style.display = 'flex';
                     document.querySelector('.user-name').textContent = user.displayName || 'My Account';
                 }
                 start(user);
             } else {
-                // If Auth email is not verified, redirect or display a strong message
-                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ff9800; padding: 3rem;">' + 
-                                      '<i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>' +
-                                      '<p>Please verify your email address to view your history.</p>' +
-                                      '<a href="login.html" style="color: #3b82f6; text-decoration: underline;">Go to Login / Resend Verification</a>' +
-                                      '</div>';
+                if (container) {
+                    container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ff9800; padding: 3rem;">' +
+                                          '<i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>' +
+                                          '<p>Please verify your email address to view your history.</p>' +
+                                          '<button id="resendVerifyEmail" class="page-btn" style="margin-top:10px;">Resend Verification Email</button>' +
+                                          '</div>';
+                    const btn = document.getElementById('resendVerifyEmail');
+                    if (btn) btn.onclick = async function(){ try { await user.sendEmailVerification(); } catch(_) {} };
+                }
             }
-
         } else {
-            // Not logged in, redirect to login
-            window.location.href = 'login.html'; 
+            window.location.href = 'login.html';
         }
     });
 }
