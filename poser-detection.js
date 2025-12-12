@@ -397,6 +397,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const availability = analysis.data_availability || null;
       const availabilityNote = analysis.availability_note || '';
       const analyzedId = meta.name || meta.username || "Unknown ID";
+      const hasBadge = (meta.is_verified === true || meta.verification_status === 'blue_verified');
+      const fromRegistry = String(meta.verification_source || '').toLowerCase() === 'verified_registry' || !!meta.is_verified_source;
+      const audience = Math.max(Number(meta.followers_count || 0), Number(meta.fan_count || 0));
+      const postCount = meta.recent_posts_count || 0;
+      const hasPic = meta.picture?.data?.url && !meta.picture.data.is_silhouette;
+      const hasBio = !!(meta.about || meta.description);
       const dataSourceNote = (function(){
         if (fromRegistry) return "Verified Registry (confirmed official)";
         const apifyUsed = !!meta._apify_fallback_used;
@@ -404,13 +410,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (apifyUsed) return "Graph + Apify";
         return restricted ? "Graph (restricted)" : "Graph";
       })();
-      
-      const hasBadge = (meta.is_verified === true || meta.verification_status === 'blue_verified');
-      const fromRegistry = String(meta.verification_source || '').toLowerCase() === 'verified_registry' || !!meta.is_verified_source;
-      const audience = Math.max(Number(meta.followers_count || 0), Number(meta.fan_count || 0));
-      const postCount = meta.recent_posts_count || 0;
-      const hasPic = meta.picture?.data?.url && !meta.picture.data.is_silhouette;
-      const hasBio = !!(meta.about || meta.description);
 
       const trustSignals = [];
       const riskFactors = [];
