@@ -34,7 +34,7 @@ service cloud.firestore {
     }
 
     match /pending_news_verification/{docId} {
-      allow read, write: if isAuthenticatedAndVerified();
+      allow read, write: if isAdminOrVerified();
     }
 
     match /verified_registry/{docId} {
