@@ -226,13 +226,23 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 if (window.firebase && firebase.auth) {
-    firebase.auth().onAuthStateChanged(user => {
+    firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
-            // NOTE: Add your verification check here if you want to block unverified users before fetch.
-            // (e.g., if (!user.emailVerified) { display verification error message; return; })
-            fetchHistory(user);
+            try { await user.reload(); } catch(_) {}
+            if (user.emailVerified) {
+                fetchHistory(user);
+            } else {
+                if (container) {
+                    container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ff9800; padding: 3rem;">' +
+                                          '<i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>' +
+                                          '<p>Please verify your email address to view your poser detection history.</p>' +
+                                          '<button id="phResend" class="page-btn" style="margin-top:10px;">Resend Verification Email</button>' +
+                                          '</div>';
+                    const btn = document.getElementById('phResend');
+                    if (btn) btn.onclick = async function(){ try { await user.sendEmailVerification(); } catch(_) {} };
+                }
+            }
         } else {
-            // Redirect unauthenticated users
             window.location.href = 'login.html'; 
         }
     });

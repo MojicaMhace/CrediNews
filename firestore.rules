@@ -17,7 +17,7 @@ service cloud.firestore {
     // --- MISSING RULE FIX ---
     // Allow users (even anonymous ones based on your JS logic) to create verification requests
     match /facebook_verification_requests/{docId} {
-      allow create: if true; 
+      allow create: if isAuthenticatedAndVerified(); 
       allow read: if isAdminOrVerified(); 
     }
 
@@ -65,7 +65,7 @@ service cloud.firestore {
     }
     
     match /poser_detections/{docId} { 
-      allow read: if true;
+      allow read: if isAuthenticatedAndVerified() && request.auth.uid == resource.data.userId;
       allow write: if isAuthenticatedAndVerified();
     }
 
