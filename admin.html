@@ -174,7 +174,7 @@
     // 1. FIREBASE IMPORTS
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, where, updateDoc } 
+    import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, where, updateDoc, getDoc, setDoc } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // 2. CONFIG - UPDATED TO C6433
@@ -385,15 +385,29 @@
     async function approvePoser(docId, url) {
         if(!confirm(`Verify this Profile/Page?\n${url}`)) return;
         try {
+            const pendingRef = doc(db, POSER_PENDING_COL, docId);
+            const pendingSnap = await getDoc(pendingRef);
+            const pdata = pendingSnap.exists() ? (pendingSnap.data() || {}) : {};
             await addDoc(collection(db, POSER_VERIFIED_COL), {
                 url: (url || '').trim(),
                 is_verified_source: true,
                 is_verified: true,
+                verified: true,
                 category: "Official Entity",
                 added_at: serverTimestamp(),
                 notes: "Manual Admin Verification"
             });
-            await deleteDoc(doc(db, POSER_PENDING_COL, docId));
+            await deleteDoc(pendingRef);
+            if (pdata.notifyUser && pdata.userId && pdata.userId !== 'anonymous') {
+                await addDoc(collection(db, 'notifications'), {
+                    userId: pdata.userId,
+                    type: 'success',
+                    title: 'Poser request approved',
+                    message: 'Your page was marked verified by admin.',
+                    timestamp: serverTimestamp(),
+                    link: 'poser-detection.html'
+                });
+            }
             loadPoserRequests();
         } catch (e) { alert(e.message); }
     }
@@ -401,7 +415,20 @@
     async function rejectPoser(docId) {
         if(!confirm("Reject and remove this request?")) return;
         try {
-            await deleteDoc(doc(db, POSER_PENDING_COL, docId));
+            const pendingRef = doc(db, POSER_PENDING_COL, docId);
+            const pendingSnap = await getDoc(pendingRef);
+            const pdata = pendingSnap.exists() ? (pendingSnap.data() || {}) : {};
+            await deleteDoc(pendingRef);
+            if (pdata.notifyUser && pdata.userId && pdata.userId !== 'anonymous') {
+                await addDoc(collection(db, 'notifications'), {
+                    userId: pdata.userId,
+                    type: 'warning',
+                    title: 'Poser request rejected',
+                    message: 'Your poser verification request was rejected.',
+                    timestamp: serverTimestamp(),
+                    link: 'poser-detection.html'
+                });
+            }
             loadPoserRequests();
         } catch (e) { alert(e.message); }
     }
@@ -411,6 +438,9 @@
         if(!resultId) { alert("Error: Missing Link to Result ID"); return; }
         
         try {
+            const reqRef = doc(db, NEWS_PENDING_COL, reqId);
+            const reqSnap = await getDoc(reqRef);
+            const rdata = reqSnap.exists() ? (reqSnap.data() || {}) : {};
             const resultRef = doc(db, NEWS_RESULTS_COL, resultId);
             await updateDoc(resultRef, {
                 label: "Credible",
@@ -420,7 +450,17 @@
                 adminReviewed: true,
                 reviewedAt: serverTimestamp()
             });
-            await deleteDoc(doc(db, NEWS_PENDING_COL, reqId));
+            await deleteDoc(reqRef);
+            if (rdata.notifyUser && rdata.userId && rdata.userId !== 'anonymous') {
+                await addDoc(collection(db, 'notifications'), {
+                    userId: rdata.userId,
+                    type: 'success',
+                    title: 'Verification request approved',
+                    message: 'Your manual verification request was approved.',
+                    timestamp: serverTimestamp(),
+                    link: 'my-verifications.html'
+                });
+            }
             alert("Updated Status: Credible");
             loadNewsRequests();
         } catch (e) { alert("Error updating record: " + e.message); }
@@ -431,6 +471,9 @@
         if(!resultId) { alert("Error: Missing Link to Result ID"); return; }
         
         try {
+            const reqRef = doc(db, NEWS_PENDING_COL, reqId);
+            const reqSnap = await getDoc(reqRef);
+            const rdata = reqSnap.exists() ? (reqSnap.data() || {}) : {};
             const resultRef = doc(db, NEWS_RESULTS_COL, resultId);
             await updateDoc(resultRef, {
                 label: "Low Credibility",
@@ -440,7 +483,17 @@
                 adminReviewed: true,
                 reviewedAt: serverTimestamp()
             });
-            await deleteDoc(doc(db, NEWS_PENDING_COL, reqId));
+            await deleteDoc(reqRef);
+            if (rdata.notifyUser && rdata.userId && rdata.userId !== 'anonymous') {
+                await addDoc(collection(db, 'notifications'), {
+                    userId: rdata.userId,
+                    type: 'warning',
+                    title: 'Verification request rejected',
+                    message: 'Your manual verification request was rejected.',
+                    timestamp: serverTimestamp(),
+                    link: 'my-verifications.html'
+                });
+            }
             alert("Updated Status: Low Credibility");
             loadNewsRequests();
         } catch (e) { alert("Error updating record: " + e.message); }

@@ -1923,7 +1923,17 @@ window.submitNewsVerificationRequest = async function(resultId, url, type, score
 
         const user = firebase.auth().currentUser;
         const db = firebase.firestore();
-        
+        async function getNotifyOptInOnce(){
+            if (!user) { try { if (typeof showNotification === 'function') showNotification('Sign in to manage notifications in the Notifications page.', 'info'); } catch(_){} return false; }
+            const ref = db.collection('users').doc(user.uid);
+            const snap = await ref.get();
+            const data = snap.exists ? (snap.data() || {}) : {};
+            if (typeof data.notifyOptIn === 'boolean') return !!data.notifyOptIn;
+            const wants = window.confirm('Would you like to receive a notification when this request is processed?');
+            await ref.set({ notifyOptIn: !!wants }, { merge: true });
+            return !!wants;
+        }
+        const wantsNotify = await getNotifyOptInOnce();
         
         await db.collection('pending_news_verification').add({
             resultId: resultId,
@@ -1933,8 +1943,20 @@ window.submitNewsVerificationRequest = async function(resultId, url, type, score
             contentSnippet: url ? null : "Text Content Analysis",
             userId: user ? user.uid : 'anonymous',
             requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            status: 'pending'
+            status: 'pending',
+            notifyUser: !!wantsNotify
         });
+
+        if (wantsNotify && user) {
+            await db.collection('notifications').add({
+                userId: user.uid,
+                type: 'info',
+                title: 'Manual verification requested',
+                message: 'You will receive a notification when processed.',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                link: 'my-verifications.html'
+            });
+        }
 
         showNotification("Request submitted to Admin for manual review.", "success");
         if (btn) {

@@ -597,11 +597,14 @@ async function renderRecentVerifications(limit = 3) {
         if (snap && !snap.empty) {
             snap.docs.forEach(doc => {
                 const d = doc.data();
-                const label = String(d.credibilityLabel || d.label || '').toLowerCase();
-                const ok = label.includes('verified') || label.includes('credible') || (typeof d.credibilityScore === 'number' && d.credibilityScore >= 75);
+                const rawLabel = String(d.credibilityLabel || d.label || d.aiVerdict || d.verdict || '').trim();
+                const low = rawLabel.toLowerCase();
+                const score = typeof d.credibilityScore === 'number' ? d.credibilityScore : NaN;
+                const ok = low.includes('verified') || low.includes('credible') || (Number.isFinite(score) && score >= 75);
                 if (ok) {
                     const source = d.pageName || d.url || (d.analyzedText && String(d.analyzedText).slice(0,60) + '...') || 'Content';
-                    items.push({ source: String(source), badge: label.includes('credible') || label.includes('verified') ? 'Verified' : 'Likely Verified' });
+                    const badge = rawLabel || (Number.isFinite(score) ? (score >= 80 ? 'Credible' : (score >= 60 ? 'Likely Credible' : (score >= 40 ? 'Mixed / Unverified' : 'Low Credibility'))) : 'Verified');
+                    items.push({ source: String(source), badge: String(badge) });
                 }
             });
         }
