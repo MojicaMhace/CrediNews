@@ -868,6 +868,7 @@ function enforceAccessRules() {
             return;
         }
         if (restricted.has(path)) {
+            if (u == null) { return; }
             if (!ok) { doRedirect(); return; }
             removeGuestView();
             return;
