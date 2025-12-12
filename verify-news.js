@@ -612,13 +612,22 @@ async function handleFacebookVerification() {
     
     if (window.firebase && firebase.firestore) {
         try {
-            await firebase.firestore().collection('facebook_verification_requests').add({
-                url: url || null,
-                content: content || null,
-                userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
-                userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
-                requestedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            const user = firebase.auth().currentUser;
+            if (user) {
+                try { await user.reload(); } catch(_) {}
+                try { await user.getIdToken(true); } catch(_) {}
+            }
+            if (!user || !user.emailVerified) {
+                showNotification('Please verify your email before requesting analysis.', 'error');
+            } else {
+                await firebase.firestore().collection('facebook_verification_requests').add({
+                    url: url || null,
+                    content: content || null,
+                    userID: user.uid,
+                    userEmail: user.email || null,
+                    requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
         } catch (e) {
             console.error('Error writing facebook_verification request:', e);
             showNotification('Failed to log verification request. Check Firestore rules.', 'error');
