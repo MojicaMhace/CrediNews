@@ -4,14 +4,8 @@ console.log('🚀 Script.js loaded successfully!');
 // Basic functionality for the main page
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 DOM Content Loaded - Starting initialization...');
-    
-    // Initialize smooth scrolling for navigation links
     initializeSmoothScrolling();
-    
-    // Initialize any interactive elements
     initializeInteractiveElements();
-    
-    // Immediately change the button to Sign Indropdown
     updateAuthButton();
     updatePlatformStats();
     enforceAccessRules();
@@ -19,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Initialization complete!');
 });
 
-// Function to update the auth buttons
 function updateAuthButton() {
     const navControls = document.querySelector('.nav-controls');
     console.log('🔍 Looking for nav controls...', navControls);
@@ -35,7 +28,6 @@ function updateAuthButton() {
     const path = String(location.pathname.split('/').pop() || '').toLowerCase();
 
     const showLoggedOutUI = () => {
-        // Hide any user UI and show login/signup
         if (userAccountBtn) userAccountBtn.style.display = 'none';
         const logoutFallback = document.getElementById('logoutFallback');
         if (logoutFallback) logoutFallback.remove();
@@ -543,13 +535,19 @@ async function updatePlatformStats() {
 
         const avgAccuracy = 98;
 
-        const uniqueUsers = new Set();
-        verifySnap.docs.forEach(doc => {
-            const d = doc.data();
-            const uid = d.userID || d.userId || d.user_id || d.uid;
-            if (uid && uid !== 'anonymous') uniqueUsers.add(uid);
-        });
-        const totalUsers = uniqueUsers.size;
+        let totalUsers = 0;
+        try {
+            const verifiedUsersSnap = await db.collection('users').where('emailVerified', '==', true).get();
+            totalUsers = verifiedUsersSnap.size;
+        } catch (_e) {
+            const uniqueUsers = new Set();
+            verifySnap.docs.forEach(doc => {
+                const d = doc.data();
+                const uid = d.userID || d.userId || d.user_id || d.uid;
+                if (uid && uid !== 'anonymous') uniqueUsers.add(uid);
+            });
+            totalUsers = uniqueUsers.size;
+        }
 
         animateValue("stat-verified", 0, totalVerified, 2000);
         animateValue("stat-accuracy", 0, avgAccuracy, 2000, "%");
