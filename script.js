@@ -352,6 +352,25 @@ function initializeButtonRedirects() {
         console.log('✅ Verify News button redirect initialized');
     }
 
+    // Get Started Today button (green pill in Ready section) - redirect to verify-news.html
+    const getStartedBtn = document.querySelector('.btn-signup');
+    if (getStartedBtn) {
+        console.log('✅ Found Get Started button, adding redirect...');
+        const handler = function(e) {
+            try { e.preventDefault(); } catch(_) {}
+            console.log('🚀 Get Started clicked - redirecting to verify-news.html');
+            window.location.href = 'verify-news.html';
+        };
+        // Ensure robust binding without duplicates
+        if (!getStartedBtn.dataset.gsBound) {
+            getStartedBtn.addEventListener('click', handler);
+            getStartedBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') handler(e);
+            });
+            getStartedBtn.dataset.gsBound = '1';
+        }
+    }
+
     
     console.log('🎉 All button redirects initialized successfully');
     const verifyBtnFallback = document.getElementById('verifyBtn');
