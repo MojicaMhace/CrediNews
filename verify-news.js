@@ -692,7 +692,7 @@ async function handleFacebookVerification() {
             let poserSourceUrl = (url || '').trim();
             if (poserSourceUrl.includes('facebook.com/share/')) {
                 try {
-                    const r = await fetch('https://credinews-poser-detection.onrender.com/api/resolve-facebook-share', {
+                    const r = await fetch('https://credinews-poser-api.onrender.com/api/resolve-facebook-share', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: poserSourceUrl })
@@ -716,7 +716,7 @@ async function handleFacebookVerification() {
                     }
                 } catch (_) {}
                 if (!pd) {
-                    const pdResp = await fetch('https://credinews-poser-detection.onrender.com/api/poser/analyze_full', {
+                    const pdResp = await fetch('https://credinews-poser-api.onrender.com/api/poser/analyze_full', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: poserTarget })
