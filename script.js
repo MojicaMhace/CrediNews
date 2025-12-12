@@ -537,8 +537,8 @@ async function updatePlatformStats() {
 
         let totalUsers = 0;
         try {
-            const verifiedUsersSnap = await db.collection('users').where('emailVerified', '==', true).get();
-            totalUsers = verifiedUsersSnap.size;
+            const usersSnap = await db.collection('users').get();
+            totalUsers = usersSnap.size;
         } catch (_e) {
             const uniqueUsers = new Set();
             verifySnap.docs.forEach(doc => {
