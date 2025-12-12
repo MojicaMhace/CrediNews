@@ -65,6 +65,16 @@
             </div>
         </section>
         <div id="trends-feed-container" class="trends-grid"></div>
+        <div class="trends-controls" style="display:flex;gap:0.75rem;align-items:center;justify-content:flex-end;margin:12px 0;">
+            <label for="trends-category" style="color:#cbd5e1;font-size:0.9rem;">Category</label>
+            <select id="trends-category" class="sort-select">
+                <option value="all">All</option>
+                <option value="politics">Politics</option>
+                <option value="sports">Sports</option>
+                <option value="music">Music</option>
+                <option value="others">Others</option>
+            </select>
+        </div>
         <div class="pagination-controls" id="trends-pagination">
             <button class="page-btn" id="prev-page" disabled>Prev</button>
             <span class="page-info" id="page-info">Page 1</span>

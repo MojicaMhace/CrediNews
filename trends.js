@@ -10,6 +10,8 @@ const pageInfoTop = document.getElementById('page-info-top');
 let allDocs = [];
 let currentQuery = '';
 let currentSort = 'date_desc';
+const categorySelect = document.getElementById('trends-category');
+let currentCategory = 'all';
 const pageSize = 12;
 let currentPage = 1;
 let pageLastDocs = [];
@@ -85,11 +87,15 @@ function tsMillis(ts) {
 function applyFiltersAndRender(uid) {
   const q = String(currentQuery || '').trim().toLowerCase();
   let docs = allDocs.slice();
+  if (currentCategory && currentCategory !== 'all') {
+    docs = docs.filter(d => detectCategory(d).toLowerCase() === currentCategory);
+  }
   if (q) {
     docs = docs.filter(d => {
       const a = String(d.analyzedText || '').toLowerCase();
       const l = String(d.label || '').toLowerCase();
       const p = String(d.pageName || '').toLowerCase();
+      const c = detectCategory(d).toLowerCase();
       return a.includes(q) || l.includes(q) || p.includes(q);
     });
   }
@@ -158,6 +164,7 @@ function renderCards(data) {
   data.forEach(function(item){
     const score = Number(item.credibilityScore || 0);
     const labelText = String(item.label || (score >= 75 ? 'CREDIBLE' : (score >= 50 ? 'MIXED' : 'UNVERIFIED'))).toUpperCase();
+    const category = detectCategory(item);
     
     var labelClass = 'hl-neutral';
     if (labelText.includes('CREDIBLE') || labelText.includes('HIGH')) labelClass = 'hl-good';
@@ -196,6 +203,7 @@ function renderCards(data) {
       '<div class="trend-content">'
         +'<div>'
             +'<div class="trend-label '+labelClass+'">'+safeText(labelText)+'</div>'
+            +'<div class="badge badge-neutral" style="display:inline-flex;margin-bottom:8px;">'+safeText(category)+'</div>'
             +'<p class="trend-text">"'+safeText(shorten(decodeEntities(item.analyzedText || item.claim || ''), 150))+'"</p>'
         +'</div>'
         +'<div class="trend-footer">'
@@ -689,4 +697,29 @@ function getSourceName(url) {
     if (m && m[1]) return m[1].replace(/[-_]+/g, ' ');
     return 'Unknown Source';
   }
+}
+function detectCategory(item){
+  const text = String(item.analyzedText || item.claim || '').toLowerCase();
+  const page = String(item.pageName || '').toLowerCase();
+  const url = String(item.url || '').toLowerCase();
+  const politics = ['election','senate','senator','president','government','policy','bill','congress','mayor','politics','campaign'];
+  const sports = ['game','match','league','football','soccer','basketball','nba','pba','volleyball','athlete','score','goal','tournament'];
+  const music = ['song','album','concert','singer','band','music','track','release','artist','playlist'];
+  function hits(words){
+    let h=0; for(const w of words){ if(text.includes(w)||page.includes(w)||url.includes(w)) h++; } return h;
+  }
+  const hp = hits(politics), hs = hits(sports), hm = hits(music);
+  const max = Math.max(hp,hs,hm);
+  if (max===0) return 'Others';
+  if (max===hp) return 'Politics';
+  if (max===hs) return 'Sports';
+  return 'Music';
+}
+
+if (categorySelect) {
+  categorySelect.addEventListener('change', function(){
+    currentCategory = this.value || 'all';
+    const uid = getUserId();
+    applyFiltersAndRender(uid);
+  });
 }

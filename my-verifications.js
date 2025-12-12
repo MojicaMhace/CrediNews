@@ -222,6 +222,7 @@ function renderCards(docs) {
     // 1. Prepare Data
     const score = Number(d.credibilityScore || 0);
     const label = d.label || getLabelFromScore(score);
+    const category = detectCategory(d);
     const analyzedText = decodeEntities(d.analyzedText || d.url || '');
     const bodyText = shorten(analyzedText, 100);
     const sourceText = getSourceName(d.url, d.pageName);
@@ -257,6 +258,7 @@ function renderCards(docs) {
             <i class="${sourceIcon}"></i>
             <span>${safeText(sourceText)}</span>
           </div>
+          <span class="badge badge-neutral">${safeText(category)}</span>
           ${labelBadgeHtml}
         </div>
         
@@ -281,13 +283,19 @@ function renderCards(docs) {
 
 function applyFilters() {
   const q = String(currentQuery || '').trim().toLowerCase();
+  const catSel = document.getElementById('myv-category');
+  const catVal = (catSel && catSel.value) ? String(catSel.value).toLowerCase() : 'all';
   let docs = allDocs.slice();
 
+  if (catVal !== 'all') {
+    docs = docs.filter(d => detectCategory(d).toLowerCase() === catVal);
+  }
   if (q) {
     docs = docs.filter(d => {
       const text = String(d.analyzedText || '').toLowerCase();
       const labelStr = String(d.label || getLabelFromScore(d.credibilityScore)).toLowerCase();
       const source = String(d.pageName || getSourceName(d.url)).toLowerCase();
+      const cat = detectCategory(d).toLowerCase();
       return text.includes(q) || labelStr.includes(q) || source.includes(q);
     });
   }
@@ -307,6 +315,28 @@ function applyFilters() {
 
   renderCards(docs);
 }
+
+function detectCategory(d){
+  const text = String(d.analyzedText || d.url || '').toLowerCase();
+  const page = String(d.pageName || '').toLowerCase();
+  const url = String(d.url || '').toLowerCase();
+  const politics = ['election','senate','senator','president','government','policy','bill','congress','mayor','politics','campaign'];
+  const sports = ['game','match','league','football','soccer','basketball','nba','pba','volleyball','athlete','score','goal','tournament'];
+  const music = ['song','album','concert','singer','band','music','track','release','artist','playlist'];
+  function hits(words){ let h=0; for(const w of words){ if(text.includes(w)||page.includes(w)||url.includes(w)) h++; } return h; }
+  const hp = hits(politics), hs = hits(sports), hm = hits(music);
+  const max = Math.max(hp,hs,hm);
+  if (max===0) return 'Others';
+  if (max===hp) return 'Politics';
+  if (max===hs) return 'Sports';
+  return 'Music';
+}
+
+document.addEventListener('change', function(e){
+  if (e.target && e.target.id === 'myv-category') {
+    applyFilters();
+  }
+});
 
 // --- INITIALIZATION (FIXED QUERY) ---
 

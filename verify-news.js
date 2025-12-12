@@ -1,6 +1,7 @@
 // Verify News Page JavaScript
 const FACTCHECK_BASE = (typeof window !== 'undefined' && window.FACTCHECK_BASE_URL) ? window.FACTCHECK_BASE_URL : 'https://credinews-factcheck.onrender.com';
 const POSER_BASE = (typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-poser-api.onrender.com';
+
 // Firebase will be available globally after firebase-config.js loads
 
 // DOM Elements
@@ -690,19 +691,6 @@ async function handleFacebookVerification() {
         let poserPayload = null;
         try {
             let poserSourceUrl = (url || '').trim();
-            if (poserSourceUrl.includes('facebook.com/share/')) {
-                try {
-                    const r = await fetch('https://credinews-poser-api.onrender.com/api/resolve-facebook-share', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: poserSourceUrl })
-                    });
-                    if (r.ok) {
-                        const j = await r.json();
-                        if (j && j.resolved_url) poserSourceUrl = j.resolved_url;
-                    }
-                } catch (_) {}
-            }
             const pageUrl = extractFacebookPageUrl(poserSourceUrl);
             const poserTarget = pageUrl || poserSourceUrl;
             if (poserTarget && poserTarget.includes('facebook.com')) {
@@ -716,10 +704,10 @@ async function handleFacebookVerification() {
                     }
                 } catch (_) {}
                 if (!pd) {
-                    const pdResp = await fetch('https://credinews-poser-api.onrender.com/api/poser/analyze_full', {
+                    const pdResp = await fetch(`${POSER_BASE}/api/poser/analyze_full`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: poserTarget })
+                        body: JSON.stringify({ id_or_url: poserTarget })
                     });
                     if (pdResp.ok) { pd = await pdResp.json(); }
                 }
