@@ -1,7 +1,6 @@
 // Verify News Page JavaScript
 const FACTCHECK_BASE = (typeof window !== 'undefined' && window.FACTCHECK_BASE_URL) ? window.FACTCHECK_BASE_URL : 'https://credinews-factcheck.onrender.com';
-const POSER_BASE = (typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-poser-detection.onrender.com';
-
+const POSER_BASE = (typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-poser-api.onrender.com';
 // Firebase will be available globally after firebase-config.js loads
 
 // DOM Elements
