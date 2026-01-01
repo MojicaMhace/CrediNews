@@ -4,14 +4,8 @@ console.log('🚀 Script.js loaded successfully!');
 // Basic functionality for the main page
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 DOM Content Loaded - Starting initialization...');
-    
-    // Initialize smooth scrolling for navigation links
     initializeSmoothScrolling();
-    
-    // Initialize any interactive elements
     initializeInteractiveElements();
-    
-    // Immediately change the button to Sign Indropdown
     updateAuthButton();
     updatePlatformStats();
     enforceAccessRules();
@@ -19,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Initialization complete!');
 });
 
-// Function to update the auth buttons
 function updateAuthButton() {
     const navControls = document.querySelector('.nav-controls');
     console.log('🔍 Looking for nav controls...', navControls);
@@ -33,14 +26,8 @@ function updateAuthButton() {
     let userAccountBtn = document.getElementById('userAccountBtn') || navControls.querySelector('.user-account-btn');
 
     const path = String(location.pathname.split('/').pop() || '').toLowerCase();
-    if (path === 'about.html') {
-        if (userAccountBtn) userAccountBtn.style.display = 'none';
-        if (authButtons) authButtons.style.display = 'none';
-        return;
-    }
 
     const showLoggedOutUI = () => {
-        // Hide any user UI and show login/signup
         if (userAccountBtn) userAccountBtn.style.display = 'none';
         const logoutFallback = document.getElementById('logoutFallback');
         if (logoutFallback) logoutFallback.remove();
@@ -85,20 +72,6 @@ function updateAuthButton() {
         }
         ensureDropdown.style.zIndex = '9999';
         ensureDropdown.style.minWidth = ensureDropdown.style.minWidth || '140px';
-        // If the header/menu hasn't been rendered yet, inject the full dropdown.
-        // What this block does:
-        // - Defines the user account dropdown HTML.
-        // - Adds a profile header (avatar, display name, email) and the menu list.
-        // - Each `.dropdown-item` is a clickable action you can wire to pages.
-        // Menu items explained:
-        // * Verify a Post — go to the verification page.
-        // * My Verifications — show the user's verification history.
-        // * Saved Posts — open the saved posts list.
-        // * Credibility Score — show score/overview related to content.
-        // * Profile Settings — open user profile/settings.
-        // * Notifications — open alerts/updates.
-        // * FAQ — open help/guide.
-        // * About CrediNews — app information page.
         if (!ensureDropdown.querySelector('.dropdown-header')) {
             const avatarContent = photoURL
                 ? `<img src="${photoURL}" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
@@ -166,7 +139,7 @@ function updateAuthButton() {
 
                 dropdown.style.position = 'fixed';
                 dropdown.style.top = `${Math.round(btnRect.bottom + 8)}px`;
-                dropdown.style.left = `${Math.round(btnRect.left)}px`;
+                dropdown.style.left = `${Math.round(btnRect.left + -75)}px`;
                 dropdown.style.right = 'auto';
                 dropdown.style.visibility = 'visible';
                 dropdown.style.opacity = '1';
@@ -256,7 +229,7 @@ function updateAuthButton() {
     if (typeof firebase !== 'undefined' && firebase.auth) {
         console.log('🔥 Using Firebase auth state for navbar');
         firebase.auth().onAuthStateChanged((user) => {
-            if (user && (user.emailVerified || user.providerData.some(p=>p.providerId!== 'password'))) {
+            if (user) {
                 const displayName = user.displayName || user.email || 'User';
                 showLoggedInUI(displayName, user.email || '', user.photoURL || '');
             } else {
@@ -378,28 +351,28 @@ function initializeButtonRedirects() {
         });
         console.log('✅ Verify News button redirect initialized');
     }
-    
-    // Demo button - scroll to verify news section for demo
-    const demoBtn = document.getElementById('demoBtn');
-    if (demoBtn) {
-        console.log('✅ Found demoBtn, adding event listener...');
-        demoBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('🎬 Demo button clicked - scrolling to verify news section');
-            const verifySection = document.getElementById('verify-news');
-            if (verifySection) {
-                verifySection.scrollIntoView({ 
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
-        });
-        console.log('✅ Demo button functionality initialized');
+
+    // Get Started Today button (green pill in Ready section) - redirect to verify-news.html
+    const getStartedBtn = document.querySelector('.btn-signup');
+    if (getStartedBtn) {
+        console.log('✅ Found Get Started button, adding redirect...');
+        const handler = function(e) {
+            try { e.preventDefault(); } catch(_) {}
+            console.log('🚀 Get Started clicked - redirecting to verify-news.html');
+            window.location.href = 'verify-news.html';
+        };
+        // Ensure robust binding without duplicates
+        if (!getStartedBtn.dataset.gsBound) {
+            getStartedBtn.addEventListener('click', handler);
+            getStartedBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') handler(e);
+            });
+            getStartedBtn.dataset.gsBound = '1';
+        }
     }
+
     
     console.log('🎉 All button redirects initialized successfully');
-    
-    // Fallback: Add onclick handlers directly to test if buttons are responsive
     const verifyBtnFallback = document.getElementById('verifyBtn');
     const analyzeBtnFallback = document.getElementById('analyzeBtn');
     
@@ -423,8 +396,6 @@ function initializeButtonRedirects() {
 
 // Firebase initialization
 function initializeFirebase() {
-    // Firebase is already initialized in firebase-config.js
-    // This function can be used for any additional setup if needed
 }
 
 // Check authentication state and update UI
@@ -513,7 +484,7 @@ function setupUserDropdown() {
 
     // Outside click closer: bind only if not already bound globally
     if (!window.__userDropdownOutsideBound) {
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', (e) => {
             if (userDropdown && !userAccountBtn.contains(e.target) && !userDropdown.contains(e.target)) {
                 userDropdown.classList.remove('show');
                 userDropdown.style.visibility = 'hidden';
@@ -555,6 +526,11 @@ function handleLogout() {
 }
 
 async function updatePlatformStats() {
+    if (typeof firebase === 'undefined' || !firebase.firestore) {
+        console.warn('⚠️ Firebase not ready yet - skipping Platform Stats update.');
+        return;
+    }
+
     const db = firebase.firestore();
     const animateValue = (id, start, end, duration, suffix = "") => {
         const obj = document.getElementById(id);
@@ -597,9 +573,63 @@ async function updatePlatformStats() {
         animateValue("stat-users", 0, totalUsers, 2000);
 
     } catch (e) {
+        console.error('Error fetching stats:', e);
         const vEl = document.getElementById("stat-verified");
         if (vEl) vEl.innerText = "0";
     }
+}
+
+async function renderRecentVerifications(limit = 3) {
+    try {
+        if (typeof firebase === 'undefined' || !firebase.firestore) return;
+        const db = firebase.firestore();
+        const container = document.querySelector('.ready-demo');
+        if (!container) return;
+        const titleEl = container.querySelector('.ready-demo-title');
+        container.querySelectorAll('.ready-demo-item').forEach(el => { try { el.remove(); } catch(_) {} });
+        let snap = null;
+        try {
+            snap = await db.collection('facebook_verification_results').orderBy('analyzed_at','desc').limit(20).get();
+        } catch(_){
+            snap = await db.collection('facebook_verification_results').limit(20).get();
+        }
+        const items = [];
+        if (snap && !snap.empty) {
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const rawLabel = String(d.credibilityLabel || d.label || d.aiVerdict || d.verdict || '').trim();
+                const low = rawLabel.toLowerCase();
+                const score = typeof d.credibilityScore === 'number' ? d.credibilityScore : NaN;
+                const ok = low.includes('verified') || low.includes('credible') || (Number.isFinite(score) && score >= 75);
+                if (ok) {
+                    const source = d.pageName || d.url || (d.analyzedText && String(d.analyzedText).slice(0,60) + '...') || 'Content';
+                    const badge = rawLabel || (Number.isFinite(score) ? (score >= 80 ? 'Credible' : (score >= 60 ? 'Likely Credible' : (score >= 40 ? 'Mixed / Unverified' : 'Low Credibility'))) : 'Verified');
+                    items.push({ source: String(source), badge: String(badge) });
+                }
+            });
+        }
+        const list = items.slice(0, limit);
+        if (list.length === 0) {
+            const fallback = [
+                { source: 'Reuters', badge: 'Verified' },
+                { source: 'AP News', badge: 'Verified' },
+                { source: 'BBC News', badge: 'Verified' }
+            ].slice(0, limit);
+            fallback.forEach(it => {
+                const row = document.createElement('div');
+                row.className = 'ready-demo-item';
+                row.innerHTML = `<span class="ready-demo-source">${it.source}</span><span class="ready-demo-badge">${it.badge}</span>`;
+                container.appendChild(row);
+            });
+            return;
+        }
+        list.forEach(it => {
+            const row = document.createElement('div');
+            row.className = 'ready-demo-item';
+            row.innerHTML = `<span class="ready-demo-source">${it.source}</span><span class="ready-demo-badge">${it.badge}</span>`;
+            container.appendChild(row);
+        });
+    } catch(_) {}
 }
 
 // Utility function for debouncing
@@ -615,118 +645,133 @@ function debounce(func, wait) {
     };
 }
 
+function handleFirestoreWriteError(err, featureName) {
+    const c = err && err.code ? String(err.code) : '';
+    const m = err && err.message ? String(err.message) : '';
+    const d = (c && c.indexOf('permission-denied') !== -1) || (m && m.toLowerCase().indexOf('permission-denied') !== -1);
+    if (d) {
+        const t = 'Please verify your email to use this feature.';
+        try {
+            if (typeof showNotification === 'function') { showNotification(t, 'error'); }
+            else if (window.alert) { alert(t); }
+        } catch(_){ }
+        return true;
+    }
+    return false;
+}
+
 function ensureAuthLinksWork() {
-  const navControls = document.querySelector('.nav-controls');
-  if (!navControls) return;
+    const navControls = document.querySelector('.nav-controls');
+    if (!navControls) return;
 
-  // Target only the auth buttons container to avoid collisions with other elements
-  const authContainer = navControls.querySelector('#authButtons') || navControls.querySelector('.auth-buttons') || navControls;
-  const loginLink = authContainer.querySelector('#authButtons .login-btn, .auth-buttons .login-btn, .login-btn');
-  const signupLink = authContainer.querySelector('#authButtons .signup-btn, .auth-buttons .signup-btn, .signup-btn');
+    // Target only the auth buttons container to avoid collisions with other elements
+    const authContainer = navControls.querySelector('#authButtons') || navControls.querySelector('.auth-buttons') || navControls;
+    const loginLink = authContainer.querySelector('#authButtons .login-btn, .auth-buttons .login-btn, .login-btn');
+    const signupLink = authContainer.querySelector('#authButtons .signup-btn, .auth-buttons .signup-btn, .signup-btn');
 
-  const navigateTo = (url) => { window.location.href = url; };
+    const navigateTo = (url) => { window.location.href = url; };
 
-  const clearAuthStorage = () => {
-    try {
-      sessionStorage.removeItem('authData');
-      localStorage.removeItem('authData');
-      console.log('🧹 Cleared authData from storage');
-    } catch (e) {
-      console.warn('⚠️ Failed to clear auth storage:', e);
-    }
-  };
-
-  const signOutIfNeededThenNavigate = (url) => {
-    console.log('🔄 signOutIfNeededThenNavigate called for:', url);
-    const hasFirebase = typeof firebase !== 'undefined' && firebase.auth;
-    const currentUser = hasFirebase ? firebase.auth().currentUser : null;
-
-    clearAuthStorage();
-
-    if (hasFirebase && currentUser) {
-      console.log('User is authenticated, signing out before navigating to', url);
-      try {
-        const sid = sessionStorage.getItem('current_session_id');
-        if (sid && firebase.firestore) {
-          firebase.firestore().collection('login_sessions').doc(sid).set({
-            logout_time: new Date().toISOString(),
-            session_status: 'completed'
-          }, { merge: true });
-          sessionStorage.removeItem('current_session_id');
+    const clearAuthStorage = () => {
+        try {
+            sessionStorage.removeItem('authData');
+            localStorage.removeItem('authData');
+            console.log('🧹 Cleared authData from storage');
+        } catch (e) {
+            console.warn('⚠️ Failed to clear auth storage:', e);
         }
-      } catch (_e) {}
-      firebase.auth().signOut()
-        .then(() => {
-          console.log('✅ Firebase Sign Out complete');
-          clearAuthStorage();
-          // Add URL parameter to signal auth clearing to prevent redirect race condition
-          const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
-          console.log('Navigating to:', targetUrl);
-          navigateTo(targetUrl);
-        })
-        .catch((err) => {
-          console.error('❌ Firebase signOut error, proceeding anyway:', err);
-          clearAuthStorage();
-          const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
-          console.log(' Navigating to (after error):', targetUrl);
-          navigateTo(targetUrl);
+    };
+
+    const signOutIfNeededThenNavigate = (url) => {
+        console.log('🔄 signOutIfNeededThenNavigate called for:', url);
+        const hasFirebase = typeof firebase !== 'undefined' && firebase.auth;
+        const currentUser = hasFirebase ? firebase.auth().currentUser : null;
+
+        clearAuthStorage();
+
+        if (hasFirebase && currentUser) {
+            console.log('User is authenticated, signing out before navigating to', url);
+            try {
+                const sid = sessionStorage.getItem('current_session_id');
+                if (sid && firebase.firestore) {
+                    firebase.firestore().collection('login_sessions').doc(sid).set({
+                        logout_time: new Date().toISOString(),
+                        session_status: 'completed'
+                    }, { merge: true });
+                    sessionStorage.removeItem('current_session_id');
+                }
+            } catch (_e) {}
+            firebase.auth().signOut()
+                .then(() => {
+                    console.log('✅ Firebase Sign Out complete');
+                    clearAuthStorage();
+                    // Add URL parameter to signal auth clearing to prevent redirect race condition
+                    const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
+                    console.log('Navigating to:', targetUrl);
+                    navigateTo(targetUrl);
+                })
+                .catch((err) => {
+                    console.error('❌ Firebase signOut error, proceeding anyway:', err);
+                    clearAuthStorage();
+                    const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
+                    console.log(' Navigating to (after error):', targetUrl);
+                    navigateTo(targetUrl);
+                });
+        } else {
+            console.log('No authentication needed, navigating directly to:', url);
+            // Add URL parameter to signal auth clearing even for non-authenticated users
+            const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
+            navigateTo(targetUrl);
+        }
+    };
+
+    const bind = (el, url) => {
+        if (!el) return;
+        el.style.pointerEvents = 'auto';
+        el.style.cursor = 'pointer';
+        const handler = (e) => { e.preventDefault(); e.stopPropagation(); signOutIfNeededThenNavigate(url); };
+        el.addEventListener('click', handler, { capture: true });
+        el.setAttribute('tabindex', '0');
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { handler(e); }
         });
-    } else {
-      console.log('No authentication needed, navigating directly to:', url);
-      // Add URL parameter to signal auth clearing even for non-authenticated users
-      const targetUrl = url.includes('?') ? `${url}&clearAuth=1` : `${url}?clearAuth=1`;
-      navigateTo(targetUrl);
-    }
-  };
+    };
 
-  const bind = (el, url) => {
-    if (!el) return;
-    el.style.pointerEvents = 'auto';
-    el.style.cursor = 'pointer';
-    const handler = (e) => { e.preventDefault(); e.stopPropagation(); signOutIfNeededThenNavigate(url); };
-    el.addEventListener('click', handler, { capture: true });
-    el.setAttribute('tabindex', '0');
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { handler(e); }
-    });
-  };
+    bind(loginLink, 'login.html');
+    bind(signupLink, 'register.html');
 
-  bind(loginLink, 'login.html');
-  bind(signupLink, 'register.html');
-
-  // Delegated capture-phase handler scoped to auth buttons container
-  const delegatedHandler = (e) => {
-    console.log('Delegated click handler triggered on:', e.target);
-    const target = e.target.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
-    if (!target) {
-      console.log('❌ No matching target found for delegation');
-      return;
-    }
-    // Ignore clicks on logout fallback if any; ensure it does not use login-btn class
-    if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) {
-      console.log('Ignoring click on logout fallback');
-      return;
-    }
-    console.log('✅ Valid auth button clicked:', target.className);
-    e.preventDefault();
-    e.stopPropagation();
-    const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
-    console.log('Target URL determined:', url);
-    signOutIfNeededThenNavigate(url);
-  };
-  document.addEventListener('click', delegatedHandler, { capture: true });
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const active = document.activeElement;
-    if (!active) return;
-    const target = active.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
-    if (!target) return;
-    if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
-    signOutIfNeededThenNavigate(url);
-  }, { capture: true });
+    // Delegated capture-phase handler scoped to auth buttons container
+    const delegatedHandler = (e) => {
+        console.log('Delegated click handler triggered on:', e.target);
+        const target = e.target.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
+        if (!target) {
+            console.log('❌ No matching target found for delegation');
+            return;
+        }
+        // Ignore clicks on logout fallback if any; ensure it does not use login-btn class
+        if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) {
+            console.log('Ignoring click on logout fallback');
+            return;
+        }
+        console.log('✅ Valid auth button clicked:', target.className);
+        e.preventDefault();
+        e.stopPropagation();
+        const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
+        console.log('Target URL determined:', url);
+        signOutIfNeededThenNavigate(url);
+    };
+    document.addEventListener('click', delegatedHandler, { capture: true });
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const active = document.activeElement;
+        if (!active) return;
+        const target = active.closest('#authButtons .login-btn, #authButtons .signup-btn, .auth-buttons .login-btn, .auth-buttons .signup-btn');
+        if (!target) return;
+        if (target.id === 'logoutFallback' || target.classList.contains('logout-fallback')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const url = target.classList.contains('signup-btn') ? 'register.html' : 'login.html';
+        signOutIfNeededThenNavigate(url);
+    }, { capture: true });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -762,6 +807,9 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
         console.error('Navbar init error:', e);
     }
+    try { renderRecentVerifications(3); } catch(_) {}
+    
+    enforceAccessRules();
 });
 function enforceAccessRules() {
     const path = String(location.pathname.split('/').pop() || '').toLowerCase();
@@ -820,6 +868,7 @@ function enforceAccessRules() {
             return;
         }
         if (restricted.has(path)) {
+            if (u == null) { return; }
             if (!ok) { doRedirect(); return; }
             removeGuestView();
             return;
@@ -835,3 +884,10 @@ function enforceAccessRules() {
         firebase.auth().onAuthStateChanged(user => check(user));
     }
 }
+// Refresh dropdown when profile is updated elsewhere
+try {
+  window.addEventListener('user-profile-updated', () => {
+    try { updateAuthButton(); } catch(_) {}
+  });
+} catch(_) {}
+

@@ -4,9 +4,14 @@ const sortSelect = document.getElementById('trends-sort');
 const prevBtn = document.getElementById('prev-page');
 const nextBtn = document.getElementById('next-page');
 const pageInfo = document.getElementById('page-info');
+const prevBtnTop = document.getElementById('prev-page-top');
+const nextBtnTop = document.getElementById('next-page-top');
+const pageInfoTop = document.getElementById('page-info-top');
 let allDocs = [];
 let currentQuery = '';
 let currentSort = 'date_desc';
+const categorySelect = document.getElementById('trends-category');
+let currentCategory = 'all';
 const pageSize = 12;
 let currentPage = 1;
 let pageLastDocs = [];
@@ -82,11 +87,15 @@ function tsMillis(ts) {
 function applyFiltersAndRender(uid) {
   const q = String(currentQuery || '').trim().toLowerCase();
   let docs = allDocs.slice();
+  if (currentCategory && currentCategory !== 'all') {
+    docs = docs.filter(d => detectCategory(d).toLowerCase() === currentCategory);
+  }
   if (q) {
     docs = docs.filter(d => {
       const a = String(d.analyzedText || '').toLowerCase();
       const l = String(d.label || '').toLowerCase();
       const p = String(d.pageName || '').toLowerCase();
+      const c = detectCategory(d).toLowerCase();
       return a.includes(q) || l.includes(q) || p.includes(q);
     });
   }
@@ -153,10 +162,10 @@ function renderCards(data) {
   const uid = getUserId();
 
   data.forEach(function(item){
-    const dataStr = encodeURIComponent(JSON.stringify(item));
     const score = Number(item.credibilityScore || 0);
-
     const labelText = String(item.label || (score >= 75 ? 'CREDIBLE' : (score >= 50 ? 'MIXED' : 'UNVERIFIED'))).toUpperCase();
+    const category = detectCategory(item);
+    
     var labelClass = 'hl-neutral';
     if (labelText.includes('CREDIBLE') || labelText.includes('HIGH')) labelClass = 'hl-good';
     else if (labelText.includes('MIXED')) labelClass = 'hl-mixed';
@@ -166,6 +175,8 @@ function renderCards(data) {
     const fb = item.feedback || {};
     const agreeCount = fb.agreeCount || 0;
     const disagreeCount = fb.disagreeCount || 0;
+    
+    // Check votes
     var userVote = null;
     if (fb.voters && typeof fb.voters === 'object' && !Array.isArray(fb.voters)) {
       userVote = fb.voters[uid];
@@ -181,17 +192,23 @@ function renderCards(data) {
     card.className = 'trend-card';
     if (item.id) card.setAttribute('data-id', item.id);
 
-    const imageHtml = item.imageUrl ? '<div class="trend-image-container"><img src="'+safeText(item.imageUrl)+'" alt="Trend Image" loading="lazy"></div>' : '';
+    // Show Image with robust field fallback
+    const imgSrc = item.imageUrl || item.image_url || item.image || item.postImage || '';
+    const imageHtml = imgSrc
+      ? '<div class="trend-image-container"><img src="'+safeText(imgSrc)+'" alt="Trend Image" loading="lazy" style="width:100%; height:180px; object-fit:cover;"></div>'
+      : '';
 
     card.innerHTML = (
-      imageHtml+
+      imageHtml +
       '<div class="trend-content">'
         +'<div>'
             +'<div class="trend-label '+labelClass+'">'+safeText(labelText)+'</div>'
-            +'<p class="trend-text">"'+safeText(decodeEntities(item.analyzedText || item.claim || ''))+'"</p>'
+            +'<div class="badge badge-neutral" style="display:inline-flex;margin-bottom:8px;">'+safeText(category)+'</div>'
+            +'<p class="trend-text">"'+safeText(shorten(decodeEntities(item.analyzedText || item.claim || ''), 150))+'"</p>'
         +'</div>'
         +'<div class="trend-footer">'
-          +'<button class="footer-view-link" onclick="openResultModal(JSON.parse(decodeURIComponent(\''+dataStr+'\')))">View details</button>'
+          // FIX: Removed inline JSON.parse (which breaks modals). Added data-action="open".
+          +'<button class="footer-view-link" data-action="open">View details</button>'
           +'<div class="trend-actions">'
             +'<button class="'+agreeClass+'" data-action="vote-agree" '+disabledAttr+'><i class="fas fa-thumbs-up"></i><span>'+agreeCount+'</span></button>'
             +'<button class="'+disagreeClass+'" data-action="vote-disagree" '+disabledAttr+'><i class="fas fa-thumbs-down"></i><span>'+disagreeCount+'</span></button>'
@@ -202,10 +219,8 @@ function renderCards(data) {
     container.appendChild(card);
   });
 
-  if (typeof attachVoteListeners === 'function') attachVoteListeners();
-
+  // Re-attach listeners/updates if needed (Async vote check logic remains same)
   if (window.firebase && firebase.firestore) {
-    const uid = getUserId();
     const db = firebase.firestore();
     const cards = Array.from(container.querySelectorAll('.trend-card'));
     cards.forEach(async (c) => {
@@ -248,17 +263,13 @@ function getUserId() {
 function openResultModal(data) {
   const score = Number(data.credibilityScore || 0);
   const label = data.label || '';
+  const ps = styleClassByLabel(label); 
   
-  // Helper for styling based on label/score
-  const ps = styleClassByLabel(label); // returns 'high', 'medium', 'low', 'neutral'
-  
-  // 1. Determine Panel Color Class
   let textPanelClass = 'neutral';
   if (ps === 'high' || ps === 'good') textPanelClass = 'trust';
   else if (ps === 'low' || ps === 'bad') textPanelClass = 'risk';
   else if (ps === 'medium' || ps === 'mixed') textPanelClass = 'mixed';
 
-  // 2. Determine Text Highlight Class
   const hl = (function(l){
     const t = String(l||'').toLowerCase();
     if (t.includes('credible') || t.includes('high')) return 'hl-good';
@@ -275,10 +286,10 @@ function openResultModal(data) {
       return 'May contain misleading information.'; 
   })(score);
 
-  // Slang Data
   const slangList = Array.isArray(data.slang_detected) ? data.slang_detected : [];
-  const sarcasmScore = (typeof data.sarcasmPercent === 'number') ? data.sarcasmPercent : 0;
-  const riskLabel = data.sarcasmRisk || (slangList.length > 0 ? 'Medium' : 'Low – Not enough slang to indicate sarcasm.');
+  const sarcasmScore = (typeof data.sarcasmPercent === 'number') ? data.sarcasmPercent : 
+                       (typeof data.sarcasmScore === 'number') ? data.sarcasmScore : 0;
+  const riskLabel = data.sarcasmRisk || (sarcasmScore > 0 ? 'Potential sarcasm detected' : 'Low – Not enough slang to indicate sarcasm.');
 
   const slangPanelHtml = 
     '<div class="panel metrics">'
@@ -293,6 +304,37 @@ function openResultModal(data) {
   const explainText = data.explanation || data.aiExplanation || '';
   const explanationPanelHtml = explainText 
     ? '<div class="panel trust"><div class="panel-title"><span class="label">Explanation</span></div><p>'+safeText(decodeEntities(explainText))+'</p></div>' 
+    : '';
+
+  let poserHtml = '';
+  if (data.poserDetection) {
+      poserHtml = buildPoserHtmlFromSaved(data.poserDetection);
+  } else if (data.poserHtml) {
+      poserHtml = data.poserHtml;
+  }
+
+  // --- CLAIMS LOGIC FIX ---
+  // Combine all claims, ensuring Zyla claims are included
+  const rawClaims = data.reviewedClaims || [];
+  let displayClaims = [];
+  
+  if (rawClaims.length > 0) {
+      // Prioritize: Google first, then Zyla/ML
+      const googleClaims = rawClaims.filter(c => String(c.source||'').toLowerCase() === 'google');
+      const otherClaims = rawClaims.filter(c => String(c.source||'').toLowerCase() !== 'google');
+      // Show Google claims + Zyla claims (up to 6 total)
+      displayClaims = [...googleClaims, ...otherClaims].slice(0, 6);
+  }
+
+  const claimsHtml = displayClaims.length > 0
+    ? ('<div class="panel trust"><div class="panel-title"><span class="label">Reviewed Claims</span></div><ul>' +
+        displayClaims.map(function(c){ 
+            return '<li><div><strong>Claim:</strong> '+safeText(c.claim || c.text || '')+'</div>'
+                 + '<div><strong>Reviewer:</strong> '+safeText(c.reviewer || (c.publisher && c.publisher.name) || 'Unknown')+'</div>'
+                 + '<div><strong>Rating:</strong> '+safeText(c.rating || c.textualRating || 'Unrated')+'</div>' 
+                 + (c.url ? '<div><a href="'+safeText(c.url)+'" target="_blank" rel="noopener">View fact check</a></div>' : '') + '</li>'; 
+        }).join('') 
+      + '</ul></div>') 
     : '';
 
   const resultHtml = '<div class="verification-result">'
@@ -313,14 +355,15 @@ function openResultModal(data) {
     +'</div>'
 
     +'<div class="panels-row">'
-      // UPDATED: Using dynamic 'textPanelClass' here instead of hardcoded 'trust'
-      +'<div class="panel '+textPanelClass+'"><div class="panel-title"><span class="label">Analyzed Text</span></div>'+(data.analyzedText ? '<p>'+safeText(decodeEntities(data.analyzedText))+'</p>' : '<p>No text provided.</p>')+'</div>'
+      +'<div class="panel '+textPanelClass+'"><div class="panel-title"><span class="label">Analyzed Text</span></div>'
+      +(data.analyzedText ? '<div style="max-height: 200px; overflow-y: auto; white-space: pre-wrap;"><p>'+safeText(decodeEntities(data.analyzedText))+'</p></div>' : '<p>No text provided.</p>')+'</div>'
       
       +'<div class="panel metrics"><div class="panel-title"><span class="label">Metrics</span></div>'
         +'<ul>'
-          +'<li><strong>FB Page:</strong> '+safeText(data.pageName || data.sourceName || getSourceName(data.url) || '')+'</li>'
+          +'<li><strong>Source:</strong> '+safeText(data.pageName || data.sourceName || getSourceName(data.url) || '')+'</li>'
           +'<li><strong>Sources Found:</strong> '+Number(data.sourcesFound || data.sources || 0)+'</li>'
           +'<li><strong>Fact Checks:</strong> '+Number(data.factChecks || 0)+'</li>'
+          +'<li><strong>Analyzed At:</strong> '+safeText(formatTimestamp(data.analyzed_at || data.analyzedAt))+'</li>'
           +(data.url ? '<li><strong>URL:</strong> <span class="url-value">'+safeText(data.url)+'</span></li>' : '')
         +'</ul>'
       +'</div>'
@@ -328,10 +371,69 @@ function openResultModal(data) {
 
     + explanationPanelHtml
     + slangPanelHtml
-    + (Array.isArray(data.reviewedClaims) && data.reviewedClaims.length ? ('<div class="panel trust"><div class="panel-title"><span class="label">Reviewed Claims</span></div><ul>'+data.reviewedClaims.slice(0,6).map(function(c){ return '<li><div><strong>Claim:</strong> '+safeText(c.claim || c.text || '')+'</div><div><strong>Reviewer:</strong> '+safeText(c.reviewer || (c.publisher && c.publisher.name) || 'Unknown')+'</div><div><strong>Rating:</strong> '+safeText(c.rating || c.textualRating || 'Unrated')+'</div>' + (c.url ? '<div><a href="'+safeText(c.url)+'" target="_blank" rel="noopener">View fact check</a></div>' : '') + '</li>'; }).join('') + '</ul></div>') : '')
+    + claimsHtml
+    + poserHtml
+    
   +'</div>';
 
   ensureModal('Verification Result', resultHtml);
+  
+  if (!poserHtml && window.appendPoserDetectionIfAvailable) {
+      appendPoserDetectionIfAvailable(data);
+  }
+}
+
+// [ADD THIS HELPER FUNCTION to trends.js]
+function buildPoserHtmlFromSaved(pd) {
+    if (!pd) return '';
+    try {
+        // Handle structure saved in verify-news.js
+        const score = Number(pd.trustScore || pd.score || 0);
+        const verdict = pd.verdict || 'Unknown';
+        const name = pd.name || 'Unknown Page';
+        
+        // Determine Color based on score/risk logic
+        const color = (score >= 80 ? '#22c55e' : (score >= 55 ? '#f59e0b' : '#ef4444'));
+        
+        // Extract AI Explanation if available in raw data
+        let aiText = '';
+        if (pd.raw && pd.raw.analysis) {
+            const an = pd.raw.analysis;
+            // Prefer short AI explanation
+            aiText = an.ai_explanation || (an.breakdown && an.breakdown.ai_explanation) || '';
+        }
+        
+        // Extract Badge/Registry info if available
+        let subtext = name;
+        if (pd.raw && pd.raw.metadata) {
+            const m = pd.raw.metadata;
+            if (m.verification_source === 'verified_registry' || m.is_verified) {
+                subtext += ' | Verified Source';
+            } else if (m.followers_count) {
+                subtext += ` | ${Number(m.followers_count).toLocaleString()} followers`;
+            }
+        }
+
+        // Return HTML matching the CSS structure defined in trends.css
+        return `
+            <div class="source-risk-card" style="border-left-color: ${color};">
+                <h4>Source Risk (Poser Detection)</h4>
+                <div class="source-risk-body">
+                    <div class="risk-score-circle" style="background: ${color}20; color: ${color};">
+                        ${Math.round(score)}%
+                    </div>
+                    <div class="risk-details">
+                        <div class="risk-verdict">${safeText(verdict)}</div>
+                        <div class="risk-subtext">${safeText(subtext)}</div>
+                        ${aiText ? `<div class="risk-explanation">${safeText(aiText)}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        console.error("Error building poser HTML:", e);
+        return '';
+    }
 }
 
 function formatTimestamp(ts) {
@@ -433,8 +535,13 @@ async function appendPoserDetectionIfAvailable(data) {
 
 function updatePaginationUI(){
   if (pageInfo) pageInfo.textContent = 'Page ' + currentPage;
-  if (prevBtn) prevBtn.disabled = currentPage <= 1;
-  if (nextBtn) nextBtn.disabled = !hasMore;
+  if (pageInfoTop) pageInfoTop.textContent = 'Page ' + currentPage;
+  const prevDisabled = currentPage <= 1;
+  const nextDisabled = !hasMore;
+  if (prevBtn) prevBtn.disabled = prevDisabled;
+  if (nextBtn) nextBtn.disabled = nextDisabled;
+  if (prevBtnTop) prevBtnTop.disabled = prevDisabled;
+  if (nextBtnTop) nextBtnTop.disabled = nextDisabled;
 }
 
 async function fetchPage(page){
@@ -478,6 +585,16 @@ async function start() {
   }
   if (nextBtn) {
     nextBtn.addEventListener('click', function(){
+      if (hasMore) fetchPage(currentPage + 1);
+    });
+  }
+  if (prevBtnTop) {
+    prevBtnTop.addEventListener('click', function(){
+      if (currentPage > 1) fetchPage(currentPage - 1);
+    });
+  }
+  if (nextBtnTop) {
+    nextBtnTop.addEventListener('click', function(){
       if (hasMore) fetchPage(currentPage + 1);
     });
   }
@@ -548,7 +665,9 @@ if (action === 'vote-agree' || action === 'vote-disagree') {
         disagreeBtn.disabled = true;
 
     } catch (e) {
-        console.error("Vote failed:", e);
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+            console.error("Vote failed:", e);
+        }
     }
   }
 });
@@ -578,4 +697,29 @@ function getSourceName(url) {
     if (m && m[1]) return m[1].replace(/[-_]+/g, ' ');
     return 'Unknown Source';
   }
+}
+function detectCategory(item){
+  const text = String(item.analyzedText || item.claim || '').toLowerCase();
+  const page = String(item.pageName || '').toLowerCase();
+  const url = String(item.url || '').toLowerCase();
+  const politics = ['election','senate','senator','president','government','policy','bill','congress','mayor','politics','campaign'];
+  const sports = ['game','match','league','football','soccer','basketball','nba','pba','volleyball','athlete','score','goal','tournament'];
+  const music = ['song','album','concert','singer','band','music','track','release','artist','playlist'];
+  function hits(words){
+    let h=0; for(const w of words){ if(text.includes(w)||page.includes(w)||url.includes(w)) h++; } return h;
+  }
+  const hp = hits(politics), hs = hits(sports), hm = hits(music);
+  const max = Math.max(hp,hs,hm);
+  if (max===0) return 'Others';
+  if (max===hp) return 'Politics';
+  if (max===hs) return 'Sports';
+  return 'Music';
+}
+
+if (categorySelect) {
+  categorySelect.addEventListener('change', function(){
+    currentCategory = this.value || 'all';
+    const uid = getUserId();
+    applyFiltersAndRender(uid);
+  });
 }

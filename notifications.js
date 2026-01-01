@@ -71,9 +71,15 @@ async function markOneRead(e, id) {
 }
 
 async function markAsRead(id) {
-    await db.collection('notifications').doc(id).set({ 
-        readAt: firebase.firestore.FieldValue.serverTimestamp() 
-    }, { merge: true });
+    try {
+        await db.collection('notifications').doc(id).set({ 
+            readAt: firebase.firestore.FieldValue.serverTimestamp() 
+        }, { merge: true });
+    } catch (e) {
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+            console.error(e);
+        }
+    }
 }
 
 // --- MAIN LOGIC ---
@@ -86,21 +92,32 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 1. SETUP TOGGLES (Load & Save)
     const userDocRef = db.collection('users').doc(user.uid);
+    let prefVerification = true;
+    let prefAnnouncements = true;
     
     // Load existing prefs
     try {
         const docSnap = await userDocRef.get();
         if(docSnap.exists) {
             const d = docSnap.data();
-            document.getElementById('pref_verification').checked = d.notify_verification !== false;
-            document.getElementById('pref_announcements').checked = d.notify_announcements !== false;
+            prefVerification = d.notify_verification !== false;
+            prefAnnouncements = d.notify_announcements !== false;
+            document.getElementById('pref_verification').checked = prefVerification;
+            document.getElementById('pref_announcements').checked = prefAnnouncements;
         }
     } catch(e) { console.log('Error loading prefs', e); }
 
     // Save prefs on click
     const handleToggle = async (key, checked) => {
-        await userDocRef.set({ [key]: checked }, { merge: true });
-        console.log(`Saved ${key}: ${checked}`);
+        try {
+            await userDocRef.set({ [key]: checked }, { merge: true });
+            if (key === 'notify_verification') prefVerification = checked;
+            if (key === 'notify_announcements') prefAnnouncements = checked;
+        } catch (e) {
+            if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+                console.error(e);
+            }
+        }
     };
 
     document.getElementById('pref_verification').addEventListener('change', (e) => handleToggle('notify_verification', e.target.checked));
@@ -149,8 +166,51 @@ document.addEventListener('DOMContentLoaded', () => {
             batch.update(doc.ref, { readAt: firebase.firestore.FieldValue.serverTimestamp() });
         });
         
-        await batch.commit();
+        try {
+            await batch.commit();
+        } catch (e) {
+            if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+                console.error(e);
+            }
+        }
     });
+
+    const processedKey = `processed_verifications_${user.uid}`;
+    let processed = {};
+    try { processed = JSON.parse(localStorage.getItem(processedKey) || '{}'); } catch(_){ processed = {}; }
+
+    db.collection('pending_verifications')
+      .where('userId', '==', user.uid)
+      .onSnapshot(async snap => {
+        const current = new Set();
+        snap.docs.forEach(d => { if (d.data().url) current.add(String(d.data().url).trim()); });
+        const prev = new Set(Object.keys(processed));
+        for (const url of prev) {
+          if (!current.has(url)) {
+            if (prefVerification) {
+              try {
+                const regSnap = await db.collection('verified_registry').where('url','==', url).get();
+                const isApproved = !regSnap.empty;
+                const type = isApproved ? 'verified' : 'reject';
+                const title = isApproved ? 'Verification approved' : 'Verification closed';
+                const message = isApproved ? 'Your request was approved.' : 'Your request was closed.';
+                await db.collection('notifications').add({
+                  userId: user.uid,
+                  type,
+                  title,
+                  message,
+                  timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                  link: url,
+                  readAt: null
+                });
+              } catch(_){ }
+            }
+            delete processed[url];
+          }
+        }
+        snap.docs.forEach(d => { if (d.data().url) processed[String(d.data().url).trim()] = true; });
+        try { localStorage.setItem(processedKey, JSON.stringify(processed)); } catch(_){}
+      });
 
   });
 });

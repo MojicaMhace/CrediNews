@@ -11,3 +11,8 @@ models/
 *.joblib
 *.json
 *.bin
+.firebase/
+.firebaserc
+render.yaml
+
+.vercel

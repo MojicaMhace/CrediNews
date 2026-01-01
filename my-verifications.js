@@ -222,6 +222,7 @@ function renderCards(docs) {
     // 1. Prepare Data
     const score = Number(d.credibilityScore || 0);
     const label = d.label || getLabelFromScore(score);
+    const category = detectCategory(d);
     const analyzedText = decodeEntities(d.analyzedText || d.url || '');
     const bodyText = shorten(analyzedText, 100);
     const sourceText = getSourceName(d.url, d.pageName);
@@ -257,6 +258,7 @@ function renderCards(docs) {
             <i class="${sourceIcon}"></i>
             <span>${safeText(sourceText)}</span>
           </div>
+          <span class="badge badge-neutral">${safeText(category)}</span>
           ${labelBadgeHtml}
         </div>
         
@@ -281,13 +283,19 @@ function renderCards(docs) {
 
 function applyFilters() {
   const q = String(currentQuery || '').trim().toLowerCase();
+  const catSel = document.getElementById('myv-category');
+  const catVal = (catSel && catSel.value) ? String(catSel.value).toLowerCase() : 'all';
   let docs = allDocs.slice();
 
+  if (catVal !== 'all') {
+    docs = docs.filter(d => detectCategory(d).toLowerCase() === catVal);
+  }
   if (q) {
     docs = docs.filter(d => {
       const text = String(d.analyzedText || '').toLowerCase();
       const labelStr = String(d.label || getLabelFromScore(d.credibilityScore)).toLowerCase();
       const source = String(d.pageName || getSourceName(d.url)).toLowerCase();
+      const cat = detectCategory(d).toLowerCase();
       return text.includes(q) || labelStr.includes(q) || source.includes(q);
     });
   }
@@ -308,29 +316,60 @@ function applyFilters() {
   renderCards(docs);
 }
 
-// --- INITIALIZATION ---
+function detectCategory(d){
+  const text = String(d.analyzedText || d.url || '').toLowerCase();
+  const page = String(d.pageName || '').toLowerCase();
+  const url = String(d.url || '').toLowerCase();
+  const politics = ['election','senate','senator','president','government','policy','bill','congress','mayor','politics','campaign'];
+  const sports = ['game','match','league','football','soccer','basketball','nba','pba','volleyball','athlete','score','goal','tournament'];
+  const music = ['song','album','concert','singer','band','music','track','release','artist','playlist'];
+  function hits(words){ let h=0; for(const w of words){ if(text.includes(w)||page.includes(w)||url.includes(w)) h++; } return h; }
+  const hp = hits(politics), hs = hits(sports), hm = hits(music);
+  const max = Math.max(hp,hs,hm);
+  if (max===0) return 'Others';
+  if (max===hp) return 'Politics';
+  if (max===hs) return 'Sports';
+  return 'Music';
+}
+
+document.addEventListener('change', function(e){
+  if (e.target && e.target.id === 'myv-category') {
+    applyFilters();
+  }
+});
+
+// --- INITIALIZATION (FIXED QUERY) ---
 
 function start(user) {
   if (!container) return;
+  
+  // Reroute if user is null (safety check, though onAuthStateChanged should handle this)
+  if (!user || !user.uid) {
+      window.location.href = 'login.html'; 
+      return;
+  }
+  
   currentUserID = user.uid; // Store ID for voting
   const db = firebase.firestore();
   
+  // *** CRITICAL FIX: Query ONLY documents where the 'userId' field matches the current user's UID ***
+  // Assuming the field storing the user ID in the results collection is named 'userId'.
   const q = db.collection('facebook_verification_results')
+              .where('userID', '==', user.uid) 
               .orderBy('analyzed_at', 'desc')
               .limit(50);
 
   const unsubscribe = q.onSnapshot(snapshot => {
     const rawDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
-    // Filter by User ID
-    allDocs = rawDocs.filter(d => {
-        return d.userID === user.uid || d.userId === user.uid || d.user_id === user.uid || d.uid === user.uid;
-    });
+    // The filter below is now redundant but kept for robustness against inconsistent data:
+    allDocs = rawDocs.filter(d => d.userID === user.uid || d.userId === user.uid || d.user_id === user.uid || d.uid === user.uid);
 
     applyFilters();
   }, error => {
     console.error("Error fetching data:", error);
-    container.innerHTML = '<div style="color:#ef4444; padding:2rem; text-align:center;">Error loading history. Please try again later.</div>';
+    // Note: If the user is unverified, the error will happen here due to security rules.
+    container.innerHTML = '<div style="color:#ef4444; padding:2rem; text-align:center;">Error loading history. Please try again later. (Check verification status or contact support.)</div>';
   });
 
   try {
@@ -365,15 +404,28 @@ document.addEventListener('click', (e) => {
 });
 
 if (window.firebase && firebase.auth) {
-    firebase.auth().onAuthStateChanged(user => {
+    firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
-            if(document.getElementById('userAccountBtn')) {
-                document.getElementById('userAccountBtn').style.display = 'flex';
-                document.querySelector('.user-name').textContent = user.displayName || 'My Account';
+            try { await user.reload(); } catch(_) {}
+            if (user.emailVerified) {
+                if(document.getElementById('userAccountBtn')) {
+                    document.getElementById('userAccountBtn').style.display = 'flex';
+                    document.querySelector('.user-name').textContent = user.displayName || 'My Account';
+                }
+                start(user);
+            } else {
+                if (container) {
+                    container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ff9800; padding: 3rem;">' +
+                                          '<i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>' +
+                                          '<p>Please verify your email address to view your history.</p>' +
+                                          '<button id="resendVerifyEmail" class="page-btn" style="margin-top:10px;">Resend Verification Email</button>' +
+                                          '</div>';
+                    const btn = document.getElementById('resendVerifyEmail');
+                    if (btn) btn.onclick = async function(){ try { await user.sendEmailVerification(); } catch(_) {} };
+                }
             }
-            start(user);
         } else {
-            window.location.href = 'login.html'; 
+            window.location.href = 'login.html';
         }
     });
 }

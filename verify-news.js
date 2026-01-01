@@ -1,8 +1,8 @@
 // Verify News Page JavaScript
+const FACTCHECK_BASE = (typeof window !== 'undefined' && window.FACTCHECK_BASE_URL) ? window.FACTCHECK_BASE_URL : 'https://credinews-factcheck.onrender.com';
+const POSER_BASE = (typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-poser-api.onrender.com';
 
 // --- CONFIGURATION: API ENDPOINTS ---
-const FACTCHECK_BASE = (typeof window !== 'undefined' && window.FACTCHECK_BASE_URL) ? window.FACTCHECK_BASE_URL : 'https://credinews-factcheck.onrender.com';
-const POSER_BASE = (typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-poser-detection.onrender.com';
 
 // Firebase will be available globally after firebase-config.js loads
 
@@ -617,13 +617,22 @@ async function handleFacebookVerification() {
     
     if (window.firebase && firebase.firestore) {
         try {
-            await firebase.firestore().collection('facebook_verification_requests').add({
-                url: url || null,
-                content: content || null,
-                userID: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
-                userEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
-                requestedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            const user = firebase.auth().currentUser;
+            if (user) {
+                try { await user.reload(); } catch(_) {}
+                try { await user.getIdToken(true); } catch(_) {}
+            }
+            if (!user || !user.emailVerified) {
+                showNotification('Please verify your email before requesting analysis.', 'error');
+            } else {
+                await firebase.firestore().collection('facebook_verification_requests').add({
+                    url: url || null,
+                    content: content || null,
+                    userID: user.uid,
+                    userEmail: user.email || null,
+                    requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
         } catch (e) {
             console.error('Error writing facebook_verification request:', e);
             showNotification('Failed to log verification request. Check Firestore rules.', 'error');
@@ -669,25 +678,29 @@ async function handleFacebookVerification() {
             body: JSON.stringify({
                 title: 'Facebook Content',
                 content: contentForApi,
-                url: url || null,
-                fast: true
+                url: url || ''
             })
         });
+
         if (!response.ok) {
             throw new Error(`API error: ${response.status}`);
         }
-        const result = await response.json();
 
-        const analysisType = url ? 'facebook-url' : 'facebook-content';
-        const cleanPayload = createCleanDbPayload(result, url, contentForApi, 'Facebook', analysisType);
-        let resultId = null;
+        const result = await response.json();
+        console.log('Fact check API result:', result);
+        
+        // Write result to Firestore
+        let resultId = '';
+        const cleanPayload = createCleanDbPayload(result, url, contentForApi, 'Facebook', url ? 'facebook-url' : 'facebook-content');
+        
         if (window.firebase && firebase.firestore) {
             try {
-                const resultDocRef = await firebase.firestore().collection('facebook_verification_results').add(cleanPayload);
-                resultId = resultDocRef.id;
+                const docRef = await firebase.firestore().collection('facebook_verification_results').add(cleanPayload);
+                resultId = docRef.id;
             } catch (e) {
-                console.error('Error writing facebook_verification_results:', e);
-                showNotification('Failed to store analysis result. Check Firestore rules.', 'error');
+                console.error('Error writing to facebook_verification_results:', e);
+                // Fallback to local ID if write fails
+                resultId = 'local_' + Date.now();
             }
         } else {
             console.log('FB verification clean payload:', cleanPayload);
@@ -729,7 +742,7 @@ async function handleFacebookVerification() {
                     const pdResp = await fetch(`${POSER_BASE}/api/poser/analyze_full`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: poserTarget })
+                        body: JSON.stringify({ id_or_url: poserTarget })
                     });
                     if (pdResp.ok) { pd = await pdResp.json(); }
                 }
@@ -760,7 +773,9 @@ async function handleFacebookVerification() {
                 }
             }
         } catch (e) {
-            console.warn('Poser detection failed:', e);
+            if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+                console.warn('Poser detection failed:', e);
+            }
         }
 
         showFacebookVerificationResult(analysisType, {
@@ -794,7 +809,9 @@ async function handleFacebookVerification() {
                 await firebase.firestore().collection('facebook_verification_results').doc(resultId).set({ poserDetection: poserPayload }, { merge: true });
             }
         } catch(e) {
-            console.warn('Failed to save poserDetection to facebook_verification_results:', e);
+            if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+                console.warn('Failed to save poserDetection to facebook_verification_results:', e);
+            }
         }
     } catch (error) {
         console.error('Fact check API error:', error);
@@ -1006,6 +1023,8 @@ function showFacebookVerificationResult(type, data) {
             This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.
         </div>`;
 
+    const manualRequestHtml = getManualRequestButtonHtml(data, 'facebook');
+
     const resultHtml = `
         <div class="verify-result-card ${ps} verification-result facebook-result">
             <div class="result-header">
@@ -1054,6 +1073,7 @@ function showFacebookVerificationResult(type, data) {
             ${factCheckDetailsSection}
             
             ${data.poserHtml || ''} 
+            ${manualRequestHtml}
             
             ${disclaimerHtml}
 
@@ -1061,292 +1081,49 @@ function showFacebookVerificationResult(type, data) {
                  data-analysis="${type}"
                  data-platform="facebook"
                  data-url="${data.url || ''}"
-                 data-content-type="${data.contentType || 'Post'}"
-                 data-score="${data.credibilityScore}"
-                 data-label="${data.credibilityLabel || ''}"
                  data-result-id="${data.resultId || ''}">
-                <div class="feedback-controls">
-                    <button class="feedback-btn" type="button" data-feedback="agree">
-                        <i class="fas fa-thumbs-up"></i>
-                        <span>Agree</span>
-                    </button>
-                    <button class="feedback-btn" type="button" data-feedback="disagree">
-                        <i class="fas fa-thumbs-down"></i>
-                        <span>Disagree</span>
-                    </button>
-                </div>
+              <span class="feedback-label">Do you agree?</span>
+              <button class="feedback-btn" data-feedback="agree"><i class="fas fa-thumbs-up"></i> Yes</button>
+              <button class="feedback-btn" data-feedback="disagree"><i class="fas fa-thumbs-down"></i> No</button>
             </div>
         </div>
     `;
     
-    showModal('Credibility Analysis Complete', resultHtml);
+    // Remove previous result if any
+    const existing = document.querySelector('.verification-result.facebook-result');
+    if (existing) existing.remove();
+    
+    // Insert after the verify container
+    const container = document.querySelector('.verify-container');
+    container.insertAdjacentHTML('afterend', resultHtml);
 }
 
-// Get Facebook-specific score summary
-function getFacebookScoreSummary(score) {
-    if (score >= 75) {
-        return 'The content aligns with verified information and shows no signs of misinformation.';
-    } else if (score >= 55) {
-        return 'Contains mixed information. Some claims may be true while others are disputed.';
-    } else if (score >= 46) {
-        return 'We could not find sufficient evidence to verify this content. Proceed with caution.';
-    } else {
-        return 'This post may contain false or misleading information. Please verify before sharing.';
-    } 
-}
-
-// Get detailed Facebook analysis summary
-function getFacebookDetailedSummary(data) {
-    return `This Facebook content has been analyzed using our AI-powered verification system. The analysis considered content patterns, source reliability, and cross-referencing with known fact-checking databases. ${data.sources ?? 0} sources were consulted and ${data.factChecks ?? 0} fact-checking reports were reviewed.`;
-}
-
-// Show verification results
-async function showVerificationResult(type, data) {
-    // Store verification result in Firebase
-    try {
-        const pageName = data.pageName || null;
-        const verificationData = {
-            type: type, // 'text' or 'url'
-            content: type === 'text' ? articleContent.value.trim() : null,
-            url: type === 'url' ? articleUrl.value.trim() : null,
-            domain: data.domain || null,
-            credibilityScore: data.credibilityScore,
-            sourcesFound: data.sources,
-            factChecks: data.factChecks,
-            pageName: pageName || null,
-            verifiedBy: firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'anonymous',
-            verifierEmail: firebase.auth().currentUser ? firebase.auth().currentUser.email : null,
-            verifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            summary: getScoreSummary(data.credibilityScore)
-        };
+function showVerificationResult(type, data) {
+    // Re-use logic for URL results but styled similarly
+    // For now, if type=='url', just re-use the same structure but labeled 'Web Analysis'
+    if (type === 'url') {
+        // ... (Similar structure for Web URL)
+        // Simplified for this demo/merge
+        console.log('Show URL result:', data);
         
-        if (window.firebase && firebase.firestore) {
-            await firebase.firestore().collection('verification_results').add(verificationData);
-            console.log('Verification result stored in Firebase');
-        } else {
-            console.log('Verification result payload:', verificationData);
-        }
-    } catch (error) {
-        console.error('Error storing verification result:', error);
-    }
-    
-    const hasGoogle = !!data.hasGoogleClaims;
-    const googleFake = (Array.isArray(data.fakeClaims) ? data.fakeClaims : []).filter(c => (c && c.source) === 'google');
-    const googleReal = (Array.isArray(data.realClaims) ? data.realClaims : []).filter(c => (c && c.source) === 'google');
+        let ps = getPoserStyleClass(data.credibilityScore);
+        const labelLower = String(data.credibilityLabel || '').toLowerCase();
+        if (labelLower.includes('unverified') || labelLower.includes('neutral')) ps = 'neutral';
+        const hl = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-mixed'; return 'hl-bad'; })(Number(data.credibilityScore||0));
+        
+        const manualRequestHtml = getManualRequestButtonHtml(data, 'web');
 
-    const fakeClaimsSection = (!hasGoogle || googleFake.length === 0) ? '' : `
-            <div style="margin-top:0.75rem;">
-                <h4 style="margin:0 0 0.5rem 0;">Fake Claims Identified</h4>
-                <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
-                    ${googleFake.slice(0, 2).map(fc => `
-                        <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
-                            <div><strong>Claim:</strong> ${safeTextForHtml(fc.claim || 'N/A')}</div>
-                            <div><strong>Reviewer:</strong> ${safeTextForHtml(fc.reviewer || 'Unknown reviewer')}</div>
-                            <div><strong>Title:</strong> ${safeTextForHtml(fc.rating || fc.textualRating || 'Unrated')}</div>
-                            <div><strong>Explanation:</strong> ${safeTextForHtml(fc.explanation || 'No explanation')}</div>
-                            ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
-                        </li>
-                    `).join('')}
-                </ul>
-            </div>
-    `;
-
-    const realClaimsSection = (!hasGoogle || googleReal.length === 0) ? '' : `
-            <div style="margin-top:0.75rem;">
-                <h4 style="margin:0 0 0.5rem 0;">True Claims Identified</h4>
-                <ul class="claim-list" style="list-style:none; padding:0; margin:0;">
-                    ${googleReal.slice(0, 2).map(rc => `
-                        <li class="claim-item" style="padding:0.5rem; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:0.5rem; background:#fff;">
-                            <div><strong>Claim:</strong> ${safeTextForHtml(rc.claim || 'N/A')}</div>
-                            <div><strong>Reviewer:</strong> ${safeTextForHtml(rc.reviewer || 'Unknown reviewer')}</div>
-                            <div><strong>Title:</strong> ${safeTextForHtml(rc.rating || rc.textualRating || 'Unrated')}</div>
-                            <div><strong>Explanation:</strong> ${safeTextForHtml(rc.explanation || 'No explanation')}</div>
-                            ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
-                        </li>
-                    `).join('')}
-                </ul>
-            </div>
-    `;
-
-    const explanationSection = data.credibilityExplanation ? `
-        <div class="result-summary" style="margin-top:1rem;">
-            <h4 style="margin:0 0 0.5rem 0;">Explanation</h4>
-            <p>${data.credibilityExplanation}</p>
-        </div>
-    ` : '';
-
-    const mlSection = '';
-
-    const slangSection = (Array.isArray(data.slangDetected) && data.slangDetected.length) ? `
-        <div class="panel metrics">
-            <div class="panel-title"><span class="label">Slang Detection</span></div>
-            <ul class="two-col">
-                <li><strong>Slang Words Detected:</strong> ${data.slangDetected.join(', ')}</li>
-                ${(typeof data.sarcasmPercent === 'number') ? `<li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>` : ''}
-                ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
-            </ul>
-        </div>
-    ` : (typeof data.sarcasmPercent === 'number' ? `
-        <div class="panel metrics">
-            <div class="panel-title"><span class="label">Slang Detection</span></div>
-            <ul class="two-col">
-                <li><em>No slang words detected.</em></li>
-                <li><strong>Sarcasm Score:</strong> ${data.sarcasmPercent}%</li>
-                ${data.sarcasmRisk ? `<li><strong>Risk:</strong> ${data.sarcasmRisk}</li>` : ''}
-            </ul>
-        </div>
-    ` : '');
-    
-    // Build sources-only fallback if no claims
-    const combinedClaimsRaw = [
-        ...(Array.isArray(data.claimsChecked) ? data.claimsChecked : []),
-        ...(Array.isArray(data.claimAnalysis) ? data.claimAnalysis : [])
-    ];
-    const seenClaims = new Set();
-    const combinedClaims = combinedClaimsRaw
-        .map(c => ({
-            claim: (c.claim || c.text || c.statement || '').trim(),
-            explanation: c.explanation || '',
-            url: c.url || '',
-            reviewer: c.reviewer || ((c.publisher && c.publisher.name) ? c.publisher.name : ''),
-            rating: c.rating || c.textualRating || '',
-            source: c.source || ''
-        }))
-        .filter(c => c.claim)
-        .filter(c => {
-            const key = `${c.claim.toLowerCase()}|${c.url}`;
-            if (seenClaims.has(key)) return false;
-            seenClaims.add(key);
-            return true;
-        })
-        .slice(0, 4);
-
-    const label2 = (data.credibilityLabel || '').toUpperCase();
-    const googleCombined2 = combinedClaims.filter(c => c.source === 'google' || (c.url && c.reviewer && !/^(ML Model|Zyla Labs)$/i.test(c.reviewer)));
-    // Fallback to ML/Zyla when Google has no claims
-    const fallbackCombined2 = googleCombined2.length > 0 ? [] : combinedClaims.filter(c => (
-        c.source === 'ml' || c.source === 'zyla' || /^(ML Model)$/i.test(c.reviewer) || (c.url && c.reviewer)
-    ));
-    const activeCombined2 = googleCombined2.length > 0 ? googleCombined2 : fallbackCombined2;
-    // Only show Sources when Google claimReview URLs exist
-    const hasGoogleUrl2 = googleCombined2.some(c => !!c.url);
-    const claimsOrderHtml2 = hasGoogleUrl2 ? '' : `${realClaimsSection}${fakeClaimsSection}`;
-
-    const reviewedClaimsPanel2 = (activeCombined2.length > 0) ? `
-        <div class="panel">
-            <div class="panel-title"><span class="label">Reviewed Claims</span></div>
-            <ul>
-                ${activeCombined2.map(c => `
-                    <li>
-                        <div><strong>Claim:</strong> ${safeTextForHtml(c.claim || 'N/A')}</div>
-                        <div><strong>Reviewer:</strong> ${safeTextForHtml(c.reviewer || 'Unknown reviewer')}</div>
-                        <div><strong>Title:</strong> ${safeTextForHtml(c.rating || 'Unrated')}</div>
-                        <div><strong>Explanation:</strong> ${safeTextForHtml(c.explanation || 'No explanation')}</div>
-                        ${c.url ? `<div><a href="${c.url}" target="_blank">View fact check</a></div>` : (c.source === 'google' ? `<div><em>No fact-check URL available.</em></div>` : ``)}
-                    </li>
-                `).join('')}
-            </ul>
-        </div>
-    ` : '';
-
-    const realPanelHtml2 = (!hasGoogle || googleReal.length === 0) ? '' : `
-        <div class="panel trust">
-          <div class="panel-title"><span class="label">Verified Claims</span></div>
-          <ul>
-            ${googleReal.slice(0, 2).map(rc => `
-              <li>
-                <div><strong>Claim:</strong> ${safeTextForHtml(rc.claim || 'N/A')}</div>
-                <div><strong>Reviewer:</strong> ${safeTextForHtml(rc.reviewer || 'Unknown reviewer')}</div>
-                <div><strong>Title:</strong> ${safeTextForHtml(rc.rating || rc.textualRating || 'Unrated')}</div>
-                <div><strong>Explanation:</strong> ${safeTextForHtml(rc.explanation || 'No explanation')}</div>
-                ${rc.url ? `<div><a href="${rc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
-              </li>
-            `).join('')}
-          </ul>
-        </div>`;
-
-    const fakePanelHtml2 = (!hasGoogle || googleFake.length === 0) ? '' : `
-        <div class="panel risk">
-          <div class="panel-title"><span class="label">Debunked Claims</span></div>
-          <ul>
-            ${googleFake.slice(0, 2).map(fc => `
-              <li>
-                <div><strong>Claim:</strong> ${safeTextForHtml(fc.claim || 'N/A')}</div>
-                <div><strong>Reviewer:</strong> ${safeTextForHtml(fc.reviewer || 'Unknown reviewer')}</div>
-                <div><strong>Title:</strong> ${safeTextForHtml(fc.rating || fc.textualRating || 'Unrated')}</div>
-                <div><strong>Explanation:</strong> ${safeTextForHtml(fc.explanation || 'No explanation')}</div>
-                ${fc.url ? `<div><a href="${fc.url}" target="_blank">View fact check</a></div>` : `<div><em>No fact-check URL available.</em></div>`}
-              </li>
-            `).join('')}
-          </ul>
-        </div>`;
-
-    const factCheckDetailsSection = `
-        ${realPanelHtml2}
-        ${fakePanelHtml2}
-        ${(!realPanelHtml2 && !fakePanelHtml2) ? reviewedClaimsPanel2 : ''}
-        ${(!hasGoogleUrl2) ? `
-            <div class="panel">
-                <div class="panel-title"><span class="label">Sources</span></div>
-                <ul>
-                    ${googleCombined2.map(c => c.url ? `
-                        <li><a href="${c.url}" target="_blank">View fact check</a></li>
-                    ` : '').join('')}
-                </ul>
-            </div>
-        ` : ''}
-    `;
-
-    let ps2 = getPoserStyleClass(data.credibilityScore);
-    const labelLower2 = String(data.credibilityLabel || '').toLowerCase();
-    if (labelLower2.includes('unverified') || labelLower2.includes('neutral')) {
-      ps2 = 'neutral';
-    }
-    const panelStatus2 = (function(l, s) {
-      const t = String(l || '').toLowerCase();
-      // 1. Check for Neutral/Unverified labels FIRST
-      if (t.includes('unverified') || t.includes('neutral')) return 'neutral';
-      
-      // 2. Then check Trust/Risk/Mixed based on labels or score
-      if ((t.includes('credible') && !t.includes('low')) || s >= 75) return 'trust';
-      if (t.includes('low') || s < 50) return 'risk';
-      
-      // 3. Fallback for mixed score range (50-74)
-      if (t.includes('mixed') || (s >= 50 && s < 75)) return 'mixed';
-      return 'neutral';
-    })(data.credibilityLabel, Number(data.credibilityScore || 0));
-    const hl2 = (function(s){ if (s>=75) return 'hl-good'; if (s>=50) return 'hl-mixed'; return 'hl-bad'; })(Number(data.credibilityScore||0));
-    const textHL2 = (function(l, s) {
-      const t = String(l || '').toLowerCase();
-      if (t.includes('credible') && !t.includes('low')) return 'hl-good';
-      if (t.includes('mixed')) return 'hl-mixed';
-      if (t.includes('low')) return 'hl-bad';
-      if (t.includes('unverified') || t.includes('neutral')) return 'hl-neutral';
-      if (s >= 75) return 'hl-good';
-      if (s >= 50) return 'hl-mixed';
-      return 'hl-bad';
-    })(data.credibilityLabel, Number(data.credibilityScore || 0));
-    // ... inside showVerificationResult ...
-
-    // --- UPDATED DISCLAIMER: Matches Cached "Panel" Style ---
-    const disclaimerHtml2 = `
-        <div class="disclaimer-box">
-            <strong>Disclaimer:</strong> 
-            This tool uses automated analysis of public signals to estimate credibility. Always verify independently. The results are for awareness and guidance purposes only.
-        </div>`;
-
-    const resultHtml = `
-        <div class="verify-result-card ${ps2} verification-result url-result">
+        const html = `
+        <div class="verify-result-card ${ps} verification-result web-result">
             <div class="result-header">
                 <div class="platform-badge">
                     <i class="fas fa-globe"></i>
                     <span>Web Analysis</span>
                 </div>
-                <div class="content-type">${data.domain || 'Article'}</div>
+                <div class="content-type">Article URL</div>
             </div>
-            
-            <div class="summary-band ${ps2}">
-                <div class="score-donut ${ps2}" style="--pct:${data.credibilityScore}">
+             <div class="summary-band ${ps}">
+                <div class="score-donut ${ps}" style="--pct:${data.credibilityScore}">
                   <div class="inner">
                     <div class="num">${data.credibilityScore}</div>
                     <div class="pct">%</div>
@@ -1354,199 +1131,59 @@ async function showVerificationResult(type, data) {
                 </div>
                 <div class="summary-text">
                   <div class="classification-row">
-                    <span class="risk-icon ${ps2}"><i class="fas fa-shield-alt"></i></span>
-                    <h3 class="${hl2}">${data.credibilityLabel || ''}</h3>
+                    <span class="risk-icon ${ps}"><i class="fas fa-shield-alt"></i></span>
+                    <h3 class="${hl}">${data.credibilityLabel || ''}</h3>
                   </div>
-                  <div class="accent-bar ${ps2}"></div>
-                  <p>${getScoreSummary(data.credibilityScore)}</p>
+                  <div class="accent-bar ${ps}"></div>
+                  <p>${data.credibilityExplanation || 'No explanation available.'}</p>
                 </div>
             </div>
-
-            <div class="panels-row">
-               <div class="panel ${panelStatus2}">
-                <div class="panel-title"><span class="label">Analyzed Text</span></div>
-                ${data.analyzedText ? `<div style="max-height: 150px; overflow-y: auto; white-space: pre-wrap;"><p class="${textHL2}">${safeTextForHtml(data.analyzedText)}</p></div>` : `<p>No text provided.</p>`}
-              </div>
-              <div class="panel metrics">
+             <div class="panels-row">
+              <div class="panel">
                 <div class="panel-title"><span class="label">Metrics</span></div>
                 <ul>
-                  <li><strong>Web Page:</strong> ${safeTextForHtml(pageName || '')}</li>
-                  <li><strong>Sources Found:</strong> ${data.sources ?? 0}</li>
-                  <li><strong>Fact Checks:</strong> ${data.factChecks ?? 0}</li>
-                  ${type === 'url' && articleUrl && articleUrl.value ? `<li><strong>URL:</strong> <span class="url-value">${articleUrl.value}</span></li>` : ''}
+                  <li><strong>Domain:</strong> ${data.domain}</li>
+                  <li><strong>Sources:</strong> ${data.sources}</li>
+                  <li><strong>Fact Checks:</strong> ${data.factChecks}</li>
                 </ul>
               </div>
             </div>
-
-            ${explanationSection}
-            ${slangSection}
-            ${factCheckDetailsSection}
             
-            ${disclaimerHtml2} <div class="feedback-section compact" 
-                 data-analysis="${type}"
-                 data-platform="web"
-                 data-url="${type === 'url' && articleUrl && articleUrl.value ? articleUrl.value : (data.url || '')}"
-                 data-content-type="${data.domain || 'Article'}"
-                 data-score="${data.credibilityScore}"
-                 data-label="${data.credibilityLabel || ''}">
-                <div class="feedback-controls">
-                    <button class="feedback-btn" type="button" data-feedback="agree">
-                        <i class="fas fa-thumbs-up"></i>
-                        <span>Agree</span>
-                    </button>
-                    <button class="feedback-btn" type="button" data-feedback="disagree">
-                        <i class="fas fa-thumbs-down"></i>
-                        <span>Disagree</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    showModal('Credibility Analysis Complete', resultHtml);
-}
+            ${manualRequestHtml}
 
-// Get score class for styling
-function getScoreClass(score) {
-    if (score >= 70) return 'high';
-    if (score >= 50) return 'medium';
-    return 'low';
+            <div class="disclaimer-box">
+                <strong>Disclaimer:</strong> Automated analysis. Verify independently.
+            </div>
+        </div>`;
+        
+        const existing = document.querySelector('.verification-result.web-result');
+        if (existing) existing.remove();
+        const container = document.querySelector('.verify-container');
+        container.insertAdjacentHTML('afterend', html);
+    }
 }
 
 function getPoserStyleClass(score) {
     const s = Number(score || 0);
-    if (s >= 75) return 'high';
-    if (s >= 50) return 'medium';
-    return 'low';
+    if (s >= 75) return 'trust';
+    if (s < 50) return 'risk';
+    return 'mixed';
 }
 
-// Get score class based on label (requested behavior)
-function getScoreClassByLabel(label) {
-    const t = String(label || '').trim().toLowerCase();
-    if (!t) return 'neutral';
-    if (t === 'credible') return 'high';
-    if (t === 'mixed') return 'medium'; // Maps to orange/yellow usually
-    if (t.includes('unverified')) return 'neutral'; // Maps to grey/blue
-    if (t.includes('low credibility')) return 'low';
-    return 'neutral';
+function getFacebookScoreSummary(score) {
+    const s = Number(score || 0);
+    if (s >= 80) return 'High credibility detected based on available signals.';
+    if (s >= 50) return 'Mixed signals detected. Exercise caution.';
+    return 'Low credibility signals detected. Likely misinformation.';
 }
 
-// Get score summary text
-function getScoreSummary(score) {
-    if (score >= 75) {
-        return 'The content aligns with verified information and shows no signs of misinformation.';
-    } else if (score >= 55) {
-        return 'Contains mixed information. Some claims may be true while others are disputed or lack context.';
-    } else if (score >= 46) {
-        return 'We could not find sufficient evidence to verify this content. It has not been debunked, but it is not confirmed.';
-    } else {
-        return 'This post may contain false or misleading information. Please verify before sharing.';
-    }
-}
-
-// Map verdict label text to credibility color classes (CREDIBLE/MIXED/LOW CREDIBILITY)
-function getCredibilityClass(label) {
-    const t = String(label || '').trim().toLowerCase();
-    if (!t) return 'neutral-credibility';
-    if (t === 'low credibility' || t.includes('low credibility')) return 'low-credibility';
-    if (t === 'credible') return 'high-credibility';
-    if (t === 'mixed') return 'medium-credibility'; // Ensure CSS has .medium-credibility
-    if (t.includes('unverified')) return 'neutral-credibility'; // Ensure CSS has .neutral-credibility
-    return 'neutral-credibility';
-}
-
-// Highlight class for analyzed text based on label
-function getHighlightClassByLabel(label) {
-    const t = String(label || '').trim().toLowerCase();
-    if (!t) return 'highlight-neutral';
-    if (t === 'credible') return 'highlight-high';
-    if (t === 'mixed') return 'highlight-medium';
-    if (t.includes('unverified') || t.includes('neutral')) return 'highlight-neutral';
-    if (t.includes('low credibility')) return 'highlight-low';
-    return 'highlight-neutral';
-}
-
-// Decode incoming HTML entities (e.g., &quot;, &#x2019;) to plain text
-function decodeHtmlEntities(str) {
-    const t = document.createElement('textarea');
-    t.innerHTML = String(str || '');
-    return t.value;
-}
-
-// Normalize curly “smart” quotes to straight quotes for consistency
-function normalizeSmartQuotes(str) {
-    return String(str)
-        .replace(/[\u2018\u2019]/g, "'")
-        .replace(/[\u201C\u201D]/g, '"');
-}
-
-// Escape for HTML context without converting quotes, so they display correctly
-function safeTextForHtml(str) {
-    const decoded = decodeHtmlEntities(str);
-    const normalized = normalizeSmartQuotes(decoded);
-    return String(normalized)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-}
-
-// Show notification
-function showNotification(message, type = 'info') {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.textContent = message;
-    
-    // Add to page
-    document.body.appendChild(notification);
-    
-    // Remove after 3 seconds
-    setTimeout(() => {
-        notification.remove();
-    }, 3000);
-}
-
-// Show modal
-function showModal(title, content) {
-    // Create modal HTML
-    const modalHtml = `
-        <div class="modal-overlay" id="verificationModal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>${title}</h2>
-                    <button class="modal-close" onclick="closeModal()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    ${content}
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-primary" onclick="closeModal()">Close</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    // Show modal
-    document.getElementById('verificationModal').style.display = 'flex';
-}
-
-// Close modal
-function closeModal() {
-  const modal = document.getElementById('verificationModal');
-  if (modal) {
-    modal.remove();
-    // Trigger feedback popup only on first verification close
-    try {
-      if (window.Feedback && typeof window.Feedback.promptIfFirstTime === 'function') {
-        window.Feedback.promptIfFirstTime();
-      }
-    } catch (e) {
-      console.warn('Feedback prompt failed:', e);
-    }
-  }
+function safeTextForHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 // Facebook word counter (max 300 words)
@@ -1744,8 +1381,10 @@ document.addEventListener('click', async function(e) {
         });
         showNotification('Your vote has been recorded.', 'success');
     } catch (err) {
-        console.error('Error recording vote:', err);
-        showNotification('Failed to record vote. Please try again.', 'error');
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(err))) {
+            console.error('Error recording vote:', err);
+            showNotification('Failed to record vote. Please try again.', 'error');
+        }
     }
 });
 
@@ -1776,8 +1415,10 @@ document.addEventListener('click', async function(e) {
         showNotification('Request submitted for verification review.', 'success');
         btn.disabled = true;
         btn.textContent = 'Requested';
-    } catch (_) {
-        showNotification('Failed to submit request.', 'error');
+    } catch (e) {
+        if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+            showNotification('Failed to submit request.', 'error');
+        }
     }
 });
 
@@ -1899,4 +1540,97 @@ function buildPoserSummaryHtml(pd) {
     } catch (e) {
         return '';
     }
+}
+
+/* --- REQUEST MANUAL NEWS VERIFICATION --- */
+window.submitNewsVerificationRequest = async function(resultId, url, type, score) {
+    if (!resultId) {
+        showNotification("Cannot verify: Result ID missing.", "error");
+        return;
+    }
+
+    const btn = document.getElementById(`news-req-btn-${resultId}`);
+    if (btn) {
+        btn.innerHTML = '<span class="btn-spinner" style="width:14px;height:14px;border-width:2px;"></span> Sending...';
+        btn.disabled = true;
+    }
+
+    try {
+        if (typeof firebase === 'undefined' || !firebase.firestore) {
+            throw new Error("Database not connected");
+        }
+
+        const user = firebase.auth().currentUser;
+        const db = firebase.firestore();
+        async function getNotifyOptInOnce(){
+            if (!user) { try { if (typeof showNotification === 'function') showNotification('Sign in to manage notifications in the Notifications page.', 'info'); } catch(_){} return false; }
+            const ref = db.collection('users').doc(user.uid);
+            const snap = await ref.get();
+            const data = snap.exists ? (snap.data() || {}) : {};
+            if (typeof data.notifyOptIn === 'boolean') return !!data.notifyOptIn;
+            const wants = window.confirm('Would you like to receive a notification when this request is processed?');
+            await ref.set({ notifyOptIn: !!wants }, { merge: true });
+            return !!wants;
+        }
+        const wantsNotify = await getNotifyOptInOnce();
+        
+        await db.collection('pending_news_verification').add({
+            resultId: resultId,
+            url: url || null,
+            type: type || 'text',
+            currentScore: score || 0,
+            contentSnippet: url ? null : "Text Content Analysis",
+            userId: user ? user.uid : 'anonymous',
+            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'pending',
+            notifyUser: !!wantsNotify
+        });
+
+        if (wantsNotify && user) {
+            await db.collection('notifications').add({
+                userId: user.uid,
+                type: 'info',
+                title: 'Manual verification requested',
+                message: 'You will receive a notification when processed.',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                link: 'my-verifications.html'
+            });
+        }
+
+        showNotification("Request submitted to Admin for manual review.", "success");
+        if (btn) {
+            btn.innerHTML = 'Request Sent <i class="fas fa-check"></i>';
+            btn.style.borderColor = '#16a34a';
+            btn.style.color = '#16a34a';
+            btn.style.background = 'rgba(22, 163, 74, 0.1)';
+        }
+
+    } catch (e) {
+        console.error("Submission error:", e);
+        showNotification("Failed to submit request.", "error");
+        if (btn) {
+            btn.innerText = "Request Manual Verification";
+            btn.disabled = false;
+        }
+    }
+}
+
+function getManualRequestButtonHtml(data, type) {
+    const safeId = data.resultId || 'temp_' + Math.floor(Math.random() * 10000);
+    const safeUrl = (data.url || '').replace(/'/g, "\\'");
+    const safeType = type || 'facebook';
+    const safeScore = data.credibilityScore || 0;
+
+    return `
+    <div style="margin-top: 20px; padding: 16px; border-top: 1px solid rgba(148,163,184,0.15); text-align: center; background: rgba(15, 23, 42, 0.3); border-radius: 12px;">
+        <p style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px 0;">
+            Is this analysis incorrect? You can request a human review.
+        </p>
+        <button id="news-req-btn-${safeId}" 
+                onclick="window.submitNewsVerificationRequest('${safeId}', '${safeUrl}', '${safeType}', ${safeScore})" 
+                style="background: rgba(59, 130, 246, 0.15); border: 1px solid #3b82f6; color: #60a5fa; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9rem; transition: all 0.2s;">
+            Request Manual Verification
+        </button>
+    </div>
+    `;
 }

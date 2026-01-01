@@ -35,7 +35,20 @@
 .feedback-header {
   padding: 20px 22px;
   border-bottom: 1px solid var(--fb-border);
+  position: relative;
 }
+.feedback-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: transparent;
+  border: none;
+  color: var(--fb-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.feedback-close:hover { color: var(--fb-text); }
 .feedback-title {
   margin: 0;
   font-size: 18px;
@@ -132,6 +145,11 @@ textarea.feedback-textarea {
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
   animation: fbSlideIn 220ms ease-out;
   z-index: 10000;
+}
+
+.feedback-toast.error {
+  background: #dc2626;
+  border-color: #b91c1c;
 }
 
 /* Transitions */

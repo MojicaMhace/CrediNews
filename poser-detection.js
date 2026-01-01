@@ -1,3 +1,9 @@
+// Poser Detection Script
+
+const POSER_BASE = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_POSER_API_URL)
+  ? process.env.REACT_APP_POSER_API_URL
+  : ((typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'https://credinews-poser-api.onrender.com');
+
 document.addEventListener('DOMContentLoaded', () => {
   const goFacebookBtn = document.getElementById('show-facebook-verify');
   if (goFacebookBtn) goFacebookBtn.addEventListener('click', () => window.location.href = 'verify-news.html?section=facebook');
@@ -31,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const u = new URL(urlOrId);
       return /facebook\.com$/.test(u.hostname) || u.hostname.includes('fb.com');
     } catch (_) {
-      return /^\d{5,}$/.test(urlOrId);
+      return false;
     }
   }
 
@@ -237,10 +243,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => n.remove(), 2500);
   }
 
-  //api
+  // API Call - Updated to use POSER_BASE
   async function analyzePosterViaGraph(idOrUrl) {
     try {
-      let endpoint = 'http://127.0.0.1:5001/api/poser/analyze_full';
+      // 2. UPDATED: Use the dynamic POSER_BASE variable
+      let endpoint = `${POSER_BASE}/api/poser/analyze_full`;
       let payload = { id_or_url: idOrUrl };
       const resp = await fetch(endpoint, {
         method: 'POST',
@@ -273,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  //firebase
+  // Firebase Persistence
   async function persistResults(apiResponse, urlOrId) {
     const hasFirebase = typeof firebase !== 'undefined' && firebase.firestore;
     if (!hasFirebase) return;
@@ -294,8 +301,14 @@ document.addEventListener('DOMContentLoaded', () => {
       createdAt: serverTs,
       userId: user ? user.uid : 'anonymous'
     };
-    await db.collection('poser_detections').add(fullResult);
-    showNotification('Analysis saved.', 'success');
+    try {
+      await db.collection('poser_detections').add(fullResult);
+      showNotification('Analysis saved.', 'success');
+    } catch (e) {
+      if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+        console.error(e);
+      }
+    }
   }
 
   window.submitVerificationRequest = async function(urlToCheck) {
@@ -318,8 +331,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btn) btn.innerText = "Request Sent ✓";
       alert("Request submitted! Our team will review this source.");
     } catch (e) {
-      console.error("Verification Request Error:", e);
-      alert("Error sending request.");
+      if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
+        console.error("Verification Request Error:", e);
+        alert("Error sending request.");
+      }
       if (btn) { btn.innerText = "Try Again"; btn.disabled = false; }
     }
   };
@@ -365,14 +380,14 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const aiExplanation = breakdown.ai_explanation || analysis.ai_explanation || "No AI insight available.";
       const aiRiskScore = (
-         (typeof breakdown.ai_score === 'number') ? breakdown.ai_score :
-         (typeof analysis.ai_score === 'number') ? analysis.ai_score :
-         (typeof meta.ai_score === 'number') ? meta.ai_score :
-         (analysis && analysis.trust && analysis.trust.layers && typeof analysis.trust.layers.ai_risk === 'number') ? analysis.trust.layers.ai_risk :
-         (typeof breakdown.ai_risk_assessment === 'number') ? breakdown.ai_risk_assessment : null
+          (typeof breakdown.ai_score === 'number') ? breakdown.ai_score :
+          (typeof analysis.ai_score === 'number') ? analysis.ai_score :
+          (typeof meta.ai_score === 'number') ? meta.ai_score :
+          (analysis && analysis.trust && analysis.trust.layers && typeof analysis.trust.layers.ai_risk === 'number') ? analysis.trust.layers.ai_risk :
+          (typeof breakdown.ai_risk_assessment === 'number') ? breakdown.ai_risk_assessment : null
       );
       const aiVerdictText = (breakdown && breakdown.ai_verdict) ? breakdown.ai_verdict : (
-         (typeof aiRiskScore === 'number') ? (aiRiskScore >= 70 ? 'Likely Poser' : (aiRiskScore <= 30 ? 'Likely Authentic' : 'Mixed Signals')) : ''
+          (typeof aiRiskScore === 'number') ? (aiRiskScore >= 70 ? 'Likely Poser' : (aiRiskScore <= 30 ? 'Likely Authentic' : 'Mixed Signals')) : ''
       );
 
       const posterScore = analysis.final_trust_score || 0;
@@ -382,14 +397,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const availability = analysis.data_availability || null;
       const availabilityNote = analysis.availability_note || '';
       const analyzedId = meta.name || meta.username || "Unknown ID";
-      const dataSourceNote = analysis.data_source_note || "Hybrid Scan";
-      
       const hasBadge = (meta.is_verified === true || meta.verification_status === 'blue_verified');
       const fromRegistry = String(meta.verification_source || '').toLowerCase() === 'verified_registry' || !!meta.is_verified_source;
       const audience = Math.max(Number(meta.followers_count || 0), Number(meta.fan_count || 0));
       const postCount = meta.recent_posts_count || 0;
       const hasPic = meta.picture?.data?.url && !meta.picture.data.is_silhouette;
       const hasBio = !!(meta.about || meta.description);
+      const dataSourceNote = (function(){
+        if (fromRegistry) return "Verified Registry (confirmed official)";
+        const apifyUsed = !!meta._apify_fallback_used;
+        const restricted = !!meta._permissions_restricted;
+        if (apifyUsed) return "Graph + Apify";
+        return restricted ? "Graph (restricted)" : "Graph";
+      })();
 
       const trustSignals = [];
       const riskFactors = [];
@@ -446,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const trustListHtml = trustSignals.length ? trustSignals.map(t => `<li>${t}</li>`).join('') : '<li>No strong trust signals.</li>';
       const riskListHtml = riskFactors.length ? riskFactors.map(t => `<li>${t}</li>`).join('') : '<li>No critical risks detected.</li>';
 
-      //explain to yah
+      // Explanation Logic
       let detailText = "";
       const boostsStr = boostTags.length ? boostTags.join(", ") : "no major signals";
       const risksStr = riskTags.length ? riskTags.join(", ") : "no major flags";
@@ -467,14 +487,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const escapedInput = input.replace(/'/g, "\\'");
 
-      //result ui
-        const availabilityBadgeHtml = availability === 'sparse' 
-            ? '<span class="availability-badge sparse">Data Unavailable</span>' 
-            : (availability === 'partial' 
-                ? '<span class="availability-badge partial">Some Data Missing</span>' 
-                : '');
+      // Result UI
+       const availabilityBadgeHtml = availability === 'sparse' 
+           ? '<span class="availability-badge sparse">Data Unavailable</span>' 
+           : (availability === 'partial' 
+               ? '<span class="availability-badge partial">Some Data Missing</span>' 
+               : '');
 
-        const resultHtml = `
+       const resultHtml = `
        <div class="poser-result-card">
          <div class="poser-result-header">
            <h2 class="poser-result-title">Poser Detection Result</h2>

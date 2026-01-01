@@ -33,3 +33,5 @@
 /* Page-specific container width to match navbar */
 .pos-history-page .container { max-width: 1400px; padding: 0 8px; }
 .pos-history-page .poser-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Centered page title */
+.pos-history-page .section-title { text-align: center; }
