@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notifications</title>
+  <link rel="stylesheet" href="assets/css/notifications.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="activity-page">
+    
+    <header class="activity-header">
+      <div class="header-left">
+        <h2>Notifications</h2>
+        <p style="color:var(--muted); margin:0; font-size: 0.9rem;">Manage alerts and activity.</p>
+      </div>
+      <div class="header-actions">
+        <a class="btn" href="profile_settings.html">
+          <i class="fas fa-arrow-left"></i> Back to Profile
+        </a>
+      </div>
+    </header>
+
+    <div class="notifications-container">
+      <div class="control-center-card">
+        <div class="control-header">
+          <div class="control-title">
+            <h3>Control Center</h3>
+            <p>Choose which updates you receive.</p>
+          </div>
+        </div>
+        
+        <div class="control-body">
+          <div class="control-grid">
+            <label class="control-row card-like">
+              <div class="control-info">
+                <div class="icon-wrapper">🚀</div>
+                <div class="text-wrapper">
+                  <strong>Verification Alerts</strong>
+                  <small>Notify when a request is approved or rejected.</small>
+                </div>
+              </div>
+              <div class="toggle-switch">
+                <input type="checkbox" id="pref_verification" checked>
+                <span class="slider round"></span>
+              </div>
+            </label>
+
+            <label class="control-row card-like">
+              <div class="control-info">
+                <div class="icon-wrapper">📣</div>
+                <div class="text-wrapper">
+                  <strong>All Activity</strong>
+                  <small>Announcements, updates, and general news.</small>
+                </div>
+              </div>
+              <div class="toggle-switch">
+                <input type="checkbox" id="pref_announcements" checked>
+                <span class="slider round"></span>
+              </div>
+            </label>
+          </div>
+          
+          <div class="control-footer">
+            <button id="markAllBtn" class="btn-link" style="display:none;">Mark all read</button>
+          </div>
+        </div>
+      </div>
+
+      <ul id="activityList" class="activity-list"></ul>
+    </div>
+
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/notifications.js"></script>
+</body>
+</html>

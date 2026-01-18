@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Verifications - CrediNews</title>
+    
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets/css/trends.css">
+    <link rel="stylesheet" href="assets/css/my-verifications.css?v=7">
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/images/logo.png">
+</head>
+<body>
+    <div class="site-simple-nav">
+      <nav>
+          <div class="logo">
+              <img src="assets/images/shield.png" alt="CrediNews" class="brand-logo" />
+              <span class="brand-text">CREDINEWS</span>
+          </div>
+          <div class="nav-links">
+              <a href="index.html">Home</a>
+              <a href="verify-news.html">Verify News</a>
+              <a href="trends.html">Trends</a>
+              <a href="report.html">Report</a>
+              <a href="about.html">About</a>
+          </div>
+          <div class="nav-controls">
+            <div id="authButtons" class="auth-buttons">
+              <a href="login.html" class="login-btn"><i class="fas fa-sign-in-alt"></i> Login</a>
+              <a href="register.html" class="signup-btn"><i class="fas fa-user-plus"></i> Sign Up</a>
+            </div>
+            <div class="user-account-btn" id="userAccountBtn" style="display:none;">
+              <i class="fas fa-user"></i>
+              <span class="user-name">Credi News</span>
+              <i class="fas fa-chevron-down"></i>
+              <div class="user-dropdown" id="userDropdown"></div>
+            </div>
+            <button id="theme-toggle-btn" class="nav-theme-toggle" aria-label="Toggle Dark Mode">
+          <i class="fas fa-moon"></i>
+        </button>
+          </div>
+      </nav>
+    </div>
+
+    <main class="main-content">
+        <section class="latest-news-section">
+            <div class="container">
+                <h1 class="section-title">My Verification History</h1>
+                
+                <div class="my-verifications-controls">
+                    <input id="myv-search" type="text" class="search-input" placeholder="Search your analyzed text...">
+                    <select id="myv-sort" class="sort-select">
+                        <option value="date_desc">Newest</option>
+                        <option value="date_asc">Oldest</option>
+                        <option value="score_desc">Credibility: High to Low</option>
+                        <option value="score_asc">Credibility: Low to High</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <div id="myv-feed" class="my-verifications-grid">
+            <div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 2rem;">
+                <i class="fas fa-circle-notch fa-spin"></i> Loading your history...
+            </div>
+        </div>
+    </main>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <script src="assets/js/firebase-config.js"></script>
+    <script src="assets/js/script.js"></script>
+    <script src="assets/js/my-verifications.js?v=7"></script>
+</body>
+</html>

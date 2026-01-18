@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify News - CrediNews</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets/css/fact_check_styles.css">
+    <link rel="stylesheet" href="assets/css/verify-news.css">
+    <link rel="stylesheet" href="assets/css/trends.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/images/logo2.png">
+    <link rel="icon" type="image/png" href="assets/images/logo2.png">
+    <link rel="apple-touch-icon" href="assets/images/logo2.png">
+</head>
+<body class="verify-news-page">
+    <div class="site-simple-nav">
+      <nav>
+        <div class="logo">
+          <img src="assets/images/shield.png" alt="CrediNews" class="brand-logo" />
+          <span class="brand-text">CREDINEWS</span>
+        </div>
+
+        <div class="nav-links">
+          <a href="index.html">Home</a>
+          <a href="verify-news.html" class="active">Verify News</a>
+          <a href="trends.html">Trends</a>
+          <a href="report.html">Report</a>
+          <a href="about.html">About</a>
+        </div>
+
+        <div class="nav-controls">
+          <div id="authButtons" class="auth-buttons">
+            <a href="login.html" class="login-btn"><i class="fas fa-sign-in-alt"></i> Login</a>
+            <a href="register.html" class="signup-btn"><i class="fas fa-user-plus"></i> Sign Up</a>
+          </div>
+          
+          <!-- Notification Bell -->
+          <div class="notification-wrapper" id="notificationWrapper" style="display: none;">
+              <button id="notification-bell" class="notification-btn">
+                  <i class="fas fa-bell"></i>
+                  <span id="notification-badge" class="badge" style="display:none">0</span>
+              </button>
+              <div id="notification-dropdown" class="notification-dropdown">
+                  <div class="notification-header">
+                      <span>Notifications</span>
+                      <button id="mark-all-read" class="text-btn">Mark all read</button>
+                  </div>
+                  <div id="notification-list" class="notification-list">
+                      <div class="empty-state">No notifications</div>
+                  </div>
+              </div>
+          </div>
+
+          <div class="user-account-btn" id="userAccountBtn" style="display:none;">
+            <i class="fas fa-user"></i>
+            <span class="user-name">Credi News</span>
+            <i class="fas fa-chevron-down"></i>
+            <div class="user-dropdown" id="userDropdown"></div>
+          </div>
+          <button id="theme-toggle-btn" class="nav-theme-toggle" aria-label="Toggle Dark Mode">
+              <i class="fas fa-moon"></i>
+          </button>
+        </div>
+      </nav>
+    </div>
+
+
+    <main class="main-content">
+        <div class="container">
+            <div class="page-title-section">
+                <h1 class="page-title">Verify News</h1>
+                <div class="title-underline"></div>
+            </div>
+
+
+            <div class="verify-news-container">
+
+
+                <div class="toggle-buttons">
+                    <button id="show-facebook-verify" class="toggle-btn active">Verify Facebook News</button>
+                    <button id="open-poser-detection" class="toggle-btn">Poser Detection</button>
+                </div>
+
+
+                
+
+
+                <div id="facebook-verify-section">
+                    <div class="verify-card facebook-card">
+                        <div class="card-header">
+                            <i class="fab fa-facebook card-icon"></i>
+                            <h2 class="card-title">Verify Facebook News</h2>
+                        </div>
+                        <p class="card-description">Analyze Facebook posts, and shared content for credibility and misinformation.</p>
+                        
+                        <div class="form-group">
+                            <label for="facebook-url" class="form-label">Facebook Post URL</label>
+                            
+                            <input
+                                type="url"
+                                id="facebook-url"
+                                class="form-input"
+                                placeholder="Enter Facebook post URL here."
+                            >
+                            <div class="input-help">
+                                <i class="fas fa-info-circle"></i>
+                                Only support https://www.facebook.com/post-url or https://facebook.com/share/p/post-url
+                            </div>
+                        </div>
+
+
+                        <div class="form-group">
+                            <label for="facebook-content" class="form-label">Or Facebook Content</label>
+                            <textarea
+                                id="facebook-content"
+                                class="form-textarea"
+                                placeholder="Enter Facebook post content (at least 5 words)."
+                                rows="6"
+                            ></textarea>
+                            <div class="character-count">
+                                <span id="facebook-char-count">0</span>/2000 words
+                            </div>
+                        </div>
+
+
+                        <button type="button" class="verify-btn facebook-verify-btn" id="verify-facebook-btn">
+                            <i class="fab fa-facebook"></i>
+                            Analyze Facebook Content
+                        </button>
+                    </div>
+                </div>
+
+
+                <div id="poser-detection-section" style="display:none;">
+                    <div class="verify-card poser-card">
+                        <div class="card-header">
+                            <i class="fas fa-user-secret card-icon"></i>
+                            <h2 class="card-title">Poser Detection</h2>
+                        </div>
+                        <p class="card-description">Check Facebook Page/Profile URLs for signs of imposter accounts or poseurs.</p>
+                        <div class="form-group">
+                            <label for="poser-url" class="form-label">Facebook Page/Profile URL</label>
+                            <input
+                                type="url"
+                                id="poser-url"
+                                class="form-input"
+                                placeholder="Enter Facebook Page/Profile URL here."
+                            >
+                            <div class="input-help">
+                                <i class="fas fa-info-circle"></i>
+                                Only supports Facebook Page/Profile URLs.
+                            </div>
+                        </div>
+                        <button type="button" class="verify-btn poser-detection-btn" id="run-poser-btn">
+                            <i class="fas fa-user-secret"></i>
+                            Run Poser Detection
+                        </button>
+                    </div>
+                </div>
+
+
+        </div>
+<br>
+        
+
+
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-card">
+                <div class="results-header">
+                    <h3 class="results-title">Verification Results</h3>
+                    <div class="credibility-score">
+                        <span class="score-label">Credibility Score:</span>
+                        <span class="score-value" id="score-value">--</span>
+                        <span class="score-max">/100</span>
+                    </div>
+                </div>
+                
+                <div class="results-content">
+                    <div class="analysis-details" id="analysis-details">
+                        </div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </main>
+
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <script src="assets/js/firebase-config.js"></script>
+    <script src="assets/js/script.js"></script>
+    
+    <link rel="stylesheet" href="assets/css/feedback.css">
+    <script src="assets/js/feedback.js"></script>
+    
+    <script src="assets/js/verify-news.js?v=6"></script>
+</body>
+</html>

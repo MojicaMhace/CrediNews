@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+venv_/
 
 models/
 *.bin
@@ -16,3 +17,4 @@ models/
 render.yaml
 
 .vercel
+node_modules

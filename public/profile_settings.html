@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings // CrediNews</title>
+  <link rel="icon" type="image/png" href="assets/images/logo.png">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="assets/css/profile_settings.css" />
+  <link rel="stylesheet" href="assets/css/feedback.css" />
+  <link rel="stylesheet" href="assets/css/notifications.css" />
+  <link rel="stylesheet" href="assets/css/poser-history.css" />
+</head>
+<body>
+
+  <div class="layout-wrapper">
+    <aside class="sidebar-panel">
+      <div class="brand">
+        <i class="fas fa-layer-group"></i> <span>Settings</span>
+      </div>
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="security">
+          <i class="fas fa-shield-halved"></i> Security
+        </button>
+        <button class="nav-btn" data-tab="notifications">
+          <i class="fas fa-bell"></i> Notifications
+        </button>
+        <div class="spacer" style="flex:1;"></div>
+        <button class="nav-btn danger" data-tab="danger">
+          <i class="fas fa-radiation"></i> Danger Zone
+        </button>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Home</a>
+        <button id="theme-toggle-btn" class="nav-theme-toggle" aria-label="Toggle Theme">
+          <i class="fas fa-moon"></i>
+        </button>
+      </div>
+    </aside>
+
+    <main class="content-area">
+      
+      <section class="tab-content active" id="tab-security">
+        <div class="header-animate">
+          <h1>Security</h1>
+          <p class="subtitle">Protect your digital fortress.</p>
+        </div>
+
+        <div class="content-panel">
+          <div class="form-grid">
+            <div class="input-group full">
+              <div class="label-row">
+                <label>Display Name</label>
+                <div class="toggle-wrapper">
+                  <span class="toggle-label-text">Edit</span>
+                  <label class="toggle-switch small">
+                    <input type="checkbox" id="ps_enable_display_name">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="input-wrapper">
+                <i class="fas fa-id-badge icon"></i>
+                <input type="text" id="ps_display_name" placeholder="Your display name" disabled />
+              </div>
+            </div>
+            
+            <div class="action-bar">
+              <button id="saveProfileBtn" class="btn-secondary">Save Profile</button>
+            </div>
+            
+            <div class="divider"></div>
+
+            <h3 class="section-title">Change Password</h3>
+            <div class="input-group full">
+              <label>Current Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_current_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_current_password"><i class="fas fa-eye"></i></button>
+              </div>
+            </div>
+            <div class="input-group">
+              <label>New Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_new_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_new_password"><i class="fas fa-eye"></i></button>
+              </div>
+              <div id="strength-meter"><div id="strength-bar"></div></div>
+              <ul class="req-list">
+                <li id="req-len">At least 8 characters</li>
+                <li id="req-lower">Lowercase letter (a-z)</li>
+                <li id="req-sym">Special character (!@#$...)</li>
+                <li id="req-upper">Uppercase letter (A-Z)</li>
+                <li id="req-num">Number (0-9)</li>
+              </ul>
+            </div>
+            <div class="input-group">
+              <label>Confirm New Password</label>
+              <div class="input-with-toggle">
+                <input type="password" id="ps_confirm_password" placeholder="••••••••" />
+                <button type="button" class="toggle-visibility" aria-label="Show password" data-target="ps_confirm_password"><i class="fas fa-eye"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="action-bar">
+             <button id="changePasswordBtn" class="btn-primary">Update Password</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-content" id="tab-danger">
+        <div class="header-animate">
+          <h1 style="color:var(--danger);">Danger Zone</h1>
+          <p class="subtitle">Irreversible actions live here.</p>
+        </div>
+
+        <div class="content-panel danger-border">
+          
+          <div class="warning-box">
+            <div class="warning-icon">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="warning-content">
+              <strong>Warning</strong>
+              <p>Actions here are irreversible. Proceed with caution.</p>
+            </div>
+          </div>
+
+          <div class="danger-item">
+            <div class="danger-info">
+              <h4>Delete Account</h4>
+              <p>Permanently remove your data. This cannot be undone.</p>
+            </div>
+            <button id="deleteAccountBtn" class="btn-danger-solid">Delete Account</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-content" id="tab-notifications">
+        <div class="header-animate">
+          <h1>Notifications</h1>
+          <p class="subtitle">Manage alerts and activity.</p>
+        </div>
+        
+        <div class="content-panel-transparent">
+          
+          <!-- Control Center Card -->
+          <div class="control-center-card">
+            <div class="control-header">
+              <div class="control-title">
+                <h3>Control Center</h3>
+                <p>Choose which updates you receive.</p>
+              </div>
+            </div>
+
+            <div class="control-body">
+              <div class="control-grid">
+                <!-- Verification Toggle -->
+                <div class="control-row card-like">
+                  <div class="control-info">
+                     <div class="icon-wrapper">🚀</div>
+                     <div class="text-wrapper">
+                       <strong>VERIFICATION ALERTS</strong>
+                       <small>NOTIFY WHEN A REQUEST IS APPROVED OR REJECTED.</small>
+                     </div>
+                  </div>
+                  <label class="toggle-switch">
+                     <input type="checkbox" id="pref_verification" checked>
+                     <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <!-- All Activity Toggle -->
+                <div class="control-row card-like">
+                  <div class="control-info">
+                     <div class="icon-wrapper">📢</div>
+                     <div class="text-wrapper">
+                       <strong>ALL ACTIVITY</strong>
+                       <small>ANNOUNCEMENTS, UPDATES, AND GENERAL NEWS.</small>
+                     </div>
+                  </div>
+                  <label class="toggle-switch">
+                     <input type="checkbox" id="pref_announcements" checked>
+                     <span class="slider round"></span>
+                  </label>
+                </div>
+              </div>
+              
+              <div class="control-footer">
+                 <button id="markAllBtn" class="btn-link">Mark all read (0)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications List -->
+          <ul id="activityList" class="activity-list"></ul>
+          
+        </div>
+      </section>
+
+      <section class="tab-content" id="tab-history">
+        <div class="header-animate">
+          <h1>Poser History</h1>
+          <p class="subtitle">Review your past verifications.</p>
+        </div>
+        <div class="content-panel-transparent">
+          <div class="toolbar" style="display:flex; gap:12px; align-items:center; margin-bottom: 20px;">
+            <input id="ph-search" type="text" placeholder="Search by page name or input…" style="flex:1; padding:12px; border-radius:8px; border:1px solid #1f2937; background:#111827; color:#f3f4f6; outline:none;">
+            <select id="ph-sort" style="width:220px; padding:12px; border-radius:8px; border:1px solid #1f2937; background:#111827; color:#f3f4f6; outline:none;">
+              <option value="date_desc">Newest</option>
+              <option value="date_asc">Oldest</option>
+              <option value="verdict_poser">Likely Poser</option>
+              <option value="verdict_mixed">Mixed Signals</option>
+              <option value="verdict_authentic">Likely Authentic</option>
+            </select>
+          </div>
+          <div id="historyGrid" class="poser-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));"></div>
+          <div id="ph-pagination" class="pagination" style="justify-content:center; margin-top:20px;">
+            <button id="ph-prev" class="pager-btn" style="background:#111827; border:1px solid #1f2937; color:#fff;">‹ Prev</button>
+            <div class="pager-info" style="color:#9ca3af;"><span id="ph-page">1</span> / <span id="ph-pages">1</span></div>
+            <button id="ph-next" class="pager-btn" style="background:#111827; border:1px solid #1f2937; color:#fff;">Next ›</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="ps_toast" class="toast"></div>
+
+  <!-- Delete Account Modal -->
+  <div id="deleteModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Delete Account</h2>
+      </div>
+      <div class="modal-body">
+        <p>This action is <strong>irreversible</strong>. All your data, including verifications and reports, will be permanently deleted.</p>
+        <p>To confirm, please type <strong>DELETE</strong> below:</p>
+        <input type="text" id="deleteConfirmInput" class="modal-input" placeholder="Type DELETE" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button id="cancelDeleteBtn" class="btn-ghost">Cancel</button>
+        <button id="confirmDeleteBtn" class="btn-danger-solid" disabled>Delete Account</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/notifications.js"></script>
+  
+  <!-- Environment Configuration -->
+    <script src="assets/js/env.js"></script>
+
+    <!-- Auth State Listener -->
+    <script src="assets/js/feedback.js"></script>
+    <script src="assets/js/profile_settings.js"></script>
+    <script src="assets/js/poser-history.js"></script>
+    <script src="poser-history.js"></script>
+</body>
