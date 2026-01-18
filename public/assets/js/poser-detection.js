@@ -356,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       if (typeof firebase === 'undefined' || !firebase.firestore) {
-        alert("Database connection not ready.");
+        showNotification('Database connection not ready.', 'error');
         return;
       }
       const db = firebase.firestore();
@@ -376,11 +376,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (btn) btn.innerText = "Request Sent ✓";
-      alert("Request Submitted! A manual review is now in progress (Estimated: 1-2 days)");
+      showNotification('Request submitted! A manual review is now in progress (Estimated: 1–2 days).', 'success');
     } catch (e) {
       if (!(typeof handleFirestoreWriteError === 'function' && handleFirestoreWriteError(e))) {
         console.error("Verification Request Error:", e);
-        alert("Error sending request.");
+        showNotification('Error sending request.', 'error');
       }
       if (btn) { btn.innerText = "Try Again"; btn.disabled = false; }
     }
@@ -643,20 +643,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (!input) {
       setFieldError('Please enter a URL.');
-      showModal('Invalid URL', '<p>No URL provided.</p>');
+      showNotification('Please enter a Facebook Page or Profile URL.', 'error');
       return;
     }
     if (!isFacebookUrl(input) || !isAllowedPageOrProfileUrl(input)) {
       setFieldError('Invalid or Unsupported URL.');
-      const content = `
-           <div style="background:linear-gradient(135deg,#7e22ce 0%,#9333ea 60%,#a855f7 100%);color:#fff;padding:1rem;border-radius:12px;display:flex;align-items:center;gap:12px;">
-             <i class="fas fa-ban" style="font-size:2rem;color:#ef4444;"></i>
-             <div>
-               <div style="font-weight:700;">Unsupported URL</div>
-               <div style="opacity:.95;">Please enter a valid Facebook Page or Profile URL (not posts or groups).</div>
-             </div>
-           </div>`;
-      showModal('Invalid URL', content);
+      showNotification('Unsupported URL. Please enter a valid Facebook Page or Profile URL (not posts or groups).', 'error');
       return;
     }
 

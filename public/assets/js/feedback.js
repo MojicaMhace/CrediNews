@@ -17,8 +17,8 @@
   }
 
   function showToast(message, type){
-    const cls = (type === 'error') ? 'feedback-toast error' : 'feedback-toast';
-    const toast = createEl(`<div class="${cls}">${message}</div>`);
+    const kind = type === 'error' ? 'error' : (type || 'success');
+    const toast = createEl(`<div class="notification notification-${kind}">${message}</div>`);
     document.body.appendChild(toast);
     setTimeout(()=>{ toast.classList.add('fade-out'); }, 2200);
     setTimeout(()=>{ toast.remove(); }, 2600);

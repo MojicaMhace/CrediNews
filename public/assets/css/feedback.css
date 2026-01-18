@@ -132,26 +132,6 @@ textarea.feedback-textarea {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Toast */
-.feedback-toast {
-  position: fixed;
-  top: 22px;
-  right: 22px;
-  background: #10B981;
-  color: var(--fb-text);
-  border: 1px solid var(--fb-border);
-  border-radius: 12px;
-  padding: 10px 14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-  animation: fbSlideIn 220ms ease-out;
-  z-index: 10000;
-}
-
-.feedback-toast.error {
-  background: #dc2626;
-  border-color: #b91c1c;
-}
-
 /* Transitions */
 .hidden { display: none !important; }
 .fade-out { animation: fbFadeOut 220ms ease-in forwards; }
@@ -163,8 +143,4 @@ textarea.feedback-textarea {
 @keyframes fbFadeOut {
   from { opacity: 1; transform: translateY(0); }
   to { opacity: 0; transform: translateY(-6px); }
-}
-@keyframes fbSlideIn {
-  from { opacity: 0; transform: translateX(12px); }
-  to { opacity: 1; transform: translateX(0); }
 }

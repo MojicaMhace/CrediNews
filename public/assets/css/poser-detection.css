@@ -18,32 +18,6 @@
   .toggle-buttons { grid-template-columns: 1fr; }
 }
 
-/* Notification Toasts */
-.notification {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    display: inline-block;
-    padding: 10px 16px;
-    border-radius: 8px;
-    color: #fff;
-    font-weight: 600;
-    font-size: 13px;
-    line-height: 1.4;
-    max-width: 300px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    z-index: 9999;
-    animation: slideIn 0.3s ease-out;
-}
-.notification-info { background: #374151; }
-.notification-success { background: #16a34a; }
-.notification-error { background: #dc2626; }
-
-@keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-
 .verify-card.poser-card .card-header {
     display: flex;
     align-items: center;

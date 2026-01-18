@@ -513,7 +513,7 @@ class AuthManager {
         existingNotifications.forEach(notification => notification.remove());
 
         const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
+        notification.className = `notification notification-${type}`;
         notification.innerHTML = `
             <i class="fas ${this.getNotificationIcon(type)}"></i>
             <span>${message}</span>

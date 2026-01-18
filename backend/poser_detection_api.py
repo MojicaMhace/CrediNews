@@ -40,7 +40,7 @@ DEFAULT_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5001",
     "http://localhost:5500",
     "http://127.0.0.1:5500",
-    "http://192.168.18.6:5001"
+    "http://192.168.18.6:5001",
     "null" 
 ]
 
