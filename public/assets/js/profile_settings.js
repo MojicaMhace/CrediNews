@@ -252,39 +252,6 @@ async function handleSaveProfile() {
     }
 }
 
-async function handleChangeEmail() {
-  const emailEl = document.getElementById('ps_email');
-  const btn = document.getElementById('changeEmailBtn');
-  const newEmail = (emailEl && emailEl.value || '').trim();
-  if (!newEmail) { toast('Please enter a new email.', 'error'); return; }
-  const user = firebase.auth().currentUser;
-  if (!user) { toast('You are not signed in.', 'error'); return; }
-  const original = btn.innerHTML;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
-  btn.disabled = true;
-  try {
-    const password = prompt('To update your email, please enter your current password:');
-    if (!password) { toast('Email update cancelled.', 'normal'); return; }
-    const cred = firebase.auth.EmailAuthProvider.credential(user.email, password);
-    await user.reauthenticateWithCredential(cred);
-    await user.updateEmail(newEmail);
-    try { await user.sendEmailVerification(); } catch(_){}
-    try {
-      const db = firebase.firestore();
-      await db.collection('users').doc(user.uid).set({ email: newEmail, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    } catch(_){}
-    toast('Email updated. Please verify your new email.', 'success');
-    try { await logAccountActivity('update_email', user.uid); } catch(_){}
-  } catch (e) {
-    if (e && (e.code === 'auth/requires-recent-login')) toast('Please log in again and retry.', 'error');
-    else toast(e.message || 'Failed to update email.', 'error');
-  } finally {
-    btn.innerHTML = original;
-    btn.disabled = false;
-  }
-}
-
-
 async function deleteUserDocsFor(uid) {
     const db = firebase.firestore();
     async function wipe(col, field) {
@@ -390,8 +357,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (confirmEl) confirmEl.addEventListener('input', () => {});
   const saveBtn = document.getElementById('saveProfileBtn');
   if (saveBtn) saveBtn.addEventListener('click', handleSaveProfile);
-  const changeEmailBtn = document.getElementById('changeEmailBtn');
-  if (changeEmailBtn) changeEmailBtn.addEventListener('click', handleChangeEmail);
   const enableName = document.getElementById('ps_enable_display_name');
   if (enableName) enableName.addEventListener('change', () => {
     const nameEl = document.getElementById('ps_display_name');
