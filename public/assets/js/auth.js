@@ -297,7 +297,7 @@ class AuthManager {
         // Store auth state (Existing user)
         const authData = {
             uid: user.uid, email: user.email, fullName: user.displayName || 'Google User',
-            isAuthenticated: true, provider: 'google', loginTime: new Date().toISOString(), idToken: idToken
+            isAuthenticated: true, provider: 'google', emailVerified: true, loginTime: new Date().toISOString(), idToken: idToken
         };
         
         sessionStorage.setItem('authData', JSON.stringify(authData));

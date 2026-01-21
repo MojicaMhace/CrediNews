@@ -1,6 +1,4 @@
 window.isAccountDeleting = false;
-
-// Auth State Listener
 firebase.auth().onAuthStateChanged(user => {
     if (!user) {
         if (!window.isAccountDeleting) {
@@ -16,7 +14,7 @@ firebase.auth().onAuthStateChanged(user => {
     }
 });
 
-// Theme Toggle Logic
+
 const themeBtn = document.getElementById('theme-toggle-btn');
 if (themeBtn) {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -44,7 +42,6 @@ function updateThemeUI(btn, theme) {
     }
 }
 
-// Tabs Logic
 function setActiveTab(name){
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -56,7 +53,6 @@ function setActiveTab(name){
   if (content) content.classList.add('active');
 }
 
-// Toast Logic
 function toast(msg, type = 'normal'){
   try {
     if (typeof showToast === 'function') {
@@ -74,7 +70,6 @@ function toast(msg, type = 'normal'){
   } catch(_){}
 }
 
-// Activity Logging
 async function logAccountActivity(action, id) {
   try {
     const user = firebase.auth().currentUser;
@@ -101,7 +96,6 @@ async function logAccountActivity(action, id) {
   }
 }
 
-// Password Visibility Toggle
 function togglePassword(inputId, btn) {
     const input = document.getElementById(inputId);
     if (!input) return;
@@ -121,7 +115,6 @@ function togglePassword(inputId, btn) {
     }
 }
 
-// Password Strength Logic
 function checkPasswordStrength(password) {
     const bar = document.getElementById('strength-bar');
     if(!bar) return;
@@ -148,7 +141,6 @@ function checkPasswordStrength(password) {
         }
     });
 
-    // Update Bar Color & Width
     if (password.length === 0) {
         bar.style.width = '0%';
         bar.style.backgroundColor = '#ef4444'; // Red
@@ -165,8 +157,6 @@ function checkPasswordStrength(password) {
         }
     }
 }
-
-// --- FIREBASE ACTIONS ---
 
 async function handleChangePassword() {
     const currentPassEl = document.getElementById('ps_current_password');
@@ -283,7 +273,6 @@ async function deleteUserDocsFor(uid) {
     try { await db.collection('users').doc(uid).delete(); } catch (_) {}
 }
 
-// Modal Logic
 function openDeleteModal() {
     const modal = document.getElementById('deleteAccountModal');
     const passwordInput = document.getElementById('deleteAccountPassword');
@@ -319,7 +308,6 @@ async function performAccountDeletion() {
         const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
         await user.reauthenticateWithCredential(credential);
 
-        // Log account deletion activity
         try {
             await logAccountActivity('delete_account', user.uid);
         } catch (logErr) {
@@ -329,7 +317,6 @@ async function performAccountDeletion() {
         await deleteUserDocsFor(user.uid);
         
         window.isAccountDeleting = true;
-        // Clear local auth persistence to prevent auto-login on redirect
         try {
             localStorage.removeItem('authData');
             sessionStorage.removeItem('authData');
@@ -340,11 +327,9 @@ async function performAccountDeletion() {
         
         closeDeleteModal();
         
-        // Show Success Modal
         const successModal = document.getElementById('successModal');
         if (successModal) {
             successModal.classList.add('open');
-            // Bind OK button to redirect
             const okBtn = document.getElementById('successOkBtn');
             if(okBtn) {
                 okBtn.onclick = () => {
@@ -440,7 +425,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  // Password Toggles
   document.querySelectorAll('.toggle-visibility').forEach((btn) => {
     const targetId = btn.dataset.target;
     btn.addEventListener('click', (e) => {

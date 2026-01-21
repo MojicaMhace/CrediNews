@@ -157,11 +157,19 @@ else:
 # --- FIREBASE CONNECTION (LOCALHOST ONLY) ---
 if not firebase_admin._apps:
     try:
-        # Load from local serviceAccountKey.json
-        if os.path.exists("serviceAccountKey.json"):
+        # Load from local serviceAccountKey.json (Relative to this script)
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        key_path = os.path.join(base_path, "serviceAccountKey.json")
+
+        if os.path.exists(key_path):
+             cred = credentials.Certificate(key_path)
+             firebase_admin.initialize_app(cred)
+             print(f"Connected to CrediNews Firebase (via {key_path})!")
+        elif os.path.exists("serviceAccountKey.json"):
+             # Fallback to current working directory
              cred = credentials.Certificate("serviceAccountKey.json")
              firebase_admin.initialize_app(cred)
-             print("Connected to CrediNews Firebase (via serviceAccountKey.json)!")
+             print("Connected to CrediNews Firebase (via serviceAccountKey.json in CWD)!")
         else:
              print("WARNING: 'serviceAccountKey.json' not found. Firebase features will be disabled.")
             

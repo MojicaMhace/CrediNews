@@ -1,5 +1,3 @@
-// Poser Detection Script
-
 const POSER_BASE = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_POSER_API_URL)
   ? process.env.REACT_APP_POSER_API_URL
   : ((typeof window !== 'undefined' && window.POSER_BASE_URL) ? window.POSER_BASE_URL : 'http://127.0.0.1:5001');
@@ -243,10 +241,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => n.remove(), 2500);
   }
 
-  // API Call - Updated to use POSER_BASE
   async function analyzePosterViaGraph(idOrUrl) {
     try {
-      // 2. UPDATED: Use the dynamic POSER_BASE variable
       let endpoint = `${POSER_BASE}/api/poser/analyze_full`;
       let payload = { id_or_url: idOrUrl };
       let headers = { 'Content-Type': 'application/json' };
@@ -292,8 +288,6 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     }
   }
-
-  // Firebase Persistence
   async function persistResults(apiResponse, urlOrId) {
     const hasFirebase = typeof firebase !== 'undefined' && firebase.firestore;
     if (!hasFirebase) return;
@@ -313,15 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
       score: scoreVal,
       metadata: apiResponse.metadata || {},
       analysis: apiResponse.analysis || {},
-      analyzedAt: serverTs, // Always update analyzedAt
+      analyzedAt: serverTs, 
       userId: user ? user.uid : 'anonymous'
     };
 
     try {
-      // Check for existing record to prevent duplicates
       let existingDoc = null;
-      if (posterId) {
-        // [FIX] Ensure we only check for duplicates within the SAME user's history
+      if (posterId) { 
         const snapshot = await db.collection('poser_detections')
           .where('poster_id', '==', posterId)
           .where('userId', '==', fullResult.userId)
@@ -370,7 +362,6 @@ document.addEventListener('DOMContentLoaded', () => {
         userId: user ? user.uid : null
       });
 
-      // Create Notification
       if (typeof window.createVerificationNotification === 'function') {
           await window.createVerificationNotification(docRef.id);
       }
@@ -386,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Refactored Rendering Logic
+
   function renderPoserResult(apiData, input) {
       const meta = apiData.metadata || {};
       const analysis = apiData.analysis || {};
@@ -514,7 +505,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </li>
       `).join('') : '<li class="no-signals">No critical risks detected.</li>';
 
-      // Explanation Logic
       let detailText = "";
       const boostsStr = boostTags.length ? boostTags.join(", ") : "no major signals";
       const risksStr = riskTags.length ? riskTags.join(", ") : "no major flags";
@@ -574,14 +564,14 @@ document.addEventListener('DOMContentLoaded', () => {
          <div class="analysis-columns">
            <div class="analysis-col trust">
             <div class="col-header">
-                <span>TRUST SIGNALS</span>
+                <span>WHY IS IT GOOD</span>
                 <i class="fas fa-check-circle"></i>
             </div>
             <ul class="signal-list">${trustListHtml}</ul>
           </div>
           <div class="analysis-col risk">
             <div class="col-header">
-                <span>RISK FACTORS</span>
+                <span>WHY IS IT BAD</span>
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             <ul class="signal-list">${riskListHtml}</ul>
@@ -595,26 +585,30 @@ document.addEventListener('DOMContentLoaded', () => {
            </div>
            <div class="ai-insight-text">${
               (() => {
+                // Try to use real AI agent explanation if available
+                const realAiText = analysis.ai_agent?.explanation || analysis.breakdown?.ai_explanation;
+                if (realAiText && realAiText.length > 10 && realAiText !== "AI Analysis Pending") {
+                     return realAiText;
+                }
+
                 const parts = [];
                 if (hasBio) parts.push("a professional bio");
                 if (hasPic) parts.push("a custom profile image");
                 if (audience >= 100000) parts.push(`massive reach (${audience.toLocaleString()} followers)`);
                 else if (audience >= 1000) parts.push(`an established audience (${audience.toLocaleString()} followers)`);
                 if (postCount > 0) parts.push(`recent activity (${postCount} posts scanned${meta.post_time_span ? `, ${meta.post_time_span}` : ''})`);
-                const verification = fromRegistry ? "verified registry status" : (hasBadge ? "a blue badge" : "no verified badge");
-                const verdictWord = posterScore >= 80 ? "likely authentic" : (posterScore >= 50 ? "mixed in credibility" : "at higher risk");
-                const s1 = `The page is ${verdictWord}, with ${parts.join(", ")} and ${verification}.`;
-                const boostsStr = (typeof boostTags !== 'undefined' && boostTags.length) ? boostTags.join(", ") : "no major signals";
-                const risksStr = (typeof riskTags !== 'undefined' && riskTags.length) ? riskTags.join(", ") : "no major flags";
-                const s2 = (typeof riskTags !== 'undefined' && riskTags.length) ? `Flags detected: ${risksStr}.` : `Positive signals: ${boostsStr}.`;
-                return s1 + " " + s2;
+                
+                const verdictWord = posterScore >= 80 ? "appears authentic" : (posterScore >= 50 ? "shows mixed signals" : "shows high-risk indicators");
+                
+                let s1 = `The page ${verdictWord}, featuring ${parts.join(", ")}.`;
+                if (fromRegistry) s1 += " It is officially verified in our registry.";
+                
+                return s1;
               })()
            }</div>
-           <div class="ai-insight-meta">${
-              typeof aiRiskScore === 'number' 
-                ? `AI Risk: ${aiRiskScore}/100 • AI Verdict: ${aiVerdictText || 'N/A'}` 
-                : `AI Verdict: ${aiVerdictText || 'N/A'}`
-           }</div>
+           <div class="ai-insight-meta">
+              AI Assessment: <strong>${aiVerdictText || 'Pending'}</strong>
+           </div>
          </div>
 
          <div class="why-score-card">
@@ -655,7 +649,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setButtonLoading(runBtn, true, 'ANALYZING...');
     showPoserLoading();
 
-    // Check if user is authenticated and has linked Facebook account
     if (typeof firebase !== 'undefined' && firebase.auth && firebase.firestore) {
         const user = firebase.auth().currentUser;
         if (!user) {
@@ -674,7 +667,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
             const userData = userDoc.data() || {};
-            // Facebook linking removed - no longer required
         } catch (error) {
             console.error('Error checking user status:', error);
             showNotification('Error checking account status. Please try again.', 'error');

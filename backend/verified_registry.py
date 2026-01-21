@@ -1,10 +1,18 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 import hashlib
+import os
 
 # 1. Connect to Database
 if not firebase_admin._apps:
-    cred = credentials.Certificate("serviceAccountKey.json")
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    key_path = os.path.join(base_path, "serviceAccountKey.json")
+    
+    if os.path.exists(key_path):
+        cred = credentials.Certificate(key_path)
+    else:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()

@@ -159,7 +159,7 @@
     
     const profanitySet = new Set([
         'fuck','shit','bitch','asshole','damn','crap','bastard','dick','pussy','cock','cunt',
-        'tangina','gago','tarantado','bobo','tanga','ulol','pukingina','kantot','hindot','punyeta', 'inutil', 'demonyo', 'pisti', 'leche'
+        'tangina','gago','tarantado','bobo','baliw','tanga','ulol','pukingina','kantot','hindot','punyeta', 'inutil', 'demonyo', 'pisti', 'leche'
     ]);
 
     function containsProfanity(text) {
@@ -208,7 +208,7 @@
       const wcEl = document.getElementById('fbWordCount');
       if (wcEl) {
         if (hasProfanity) {
-             wcEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please keep language professional.';
+             wcEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please be mindful of your language. Profanity is not allowed to maintain a respectful community.';
              wcEl.style.color = '#EF4444';
         } else {
              wcEl.textContent = `Valid words: ${validWordCount}/6`;
