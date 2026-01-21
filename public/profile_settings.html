@@ -144,8 +144,7 @@
         </div>
         
         <div class="content-panel-transparent">
-          
-          <!-- Control Center Card -->
+        
           <div class="control-center-card">
             <div class="control-header">
               <div class="control-title">
@@ -156,7 +155,6 @@
 
             <div class="control-body">
               <div class="control-grid">
-                <!-- Verification Toggle -->
                 <div class="control-row card-like">
                   <div class="control-info">
                      <div class="icon-wrapper">🚀</div>
@@ -170,8 +168,6 @@
                      <span class="slider round"></span>
                   </label>
                 </div>
-
-                <!-- All Activity Toggle -->
                 <div class="control-row card-like">
                   <div class="control-info">
                      <div class="icon-wrapper">📢</div>
@@ -192,8 +188,6 @@
               </div>
             </div>
           </div>
-
-          <!-- Notifications List -->
           <ul id="activityList" class="activity-list"></ul>
           
         </div>
@@ -228,38 +222,45 @@
   </div>
 
   <div id="ps_toast" class="toast"></div>
+  <div id="deleteAccountModal" class="modal-overlay">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h2>Delete Account</h2>
+          </div>
+          <div class="modal-body">
+              <p id="deleteModalMessage">Are you sure you want to delete your account? This action cannot be undone.</p>
+              <div id="deleteModalInputContainer" style="display: none;">
+                  <input type="password" id="deleteAccountPassword" class="modal-input" placeholder="Enter your password to confirm">
+              </div>
+          </div>
+          <div class="modal-actions">
+              <button id="cancelDeleteBtn" class="btn-ghost">Cancel</button>
+              <button id="confirmDeleteBtn" class="btn-danger-solid">Delete Account</button>
+          </div>
+      </div>
+  </div>
 
-  <!-- Delete Account Modal -->
-  <div id="deleteModal" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Delete Account</h2>
+  <div id="successModal" class="modal-overlay">
+      <div class="modal-content" style="text-align: center;">
+          <div class="modal-header">
+              <h2 style="color: var(--success);">Success</h2>
+          </div>
+          <div class="modal-body">
+              <p>Your account has been successfully deleted.</p>
+          </div>
+          <div class="modal-actions" style="justify-content: center;">
+              <button id="successOkBtn" class="btn-primary">OK</button>
+          </div>
       </div>
-      <div class="modal-body">
-        <p>This action is <strong>irreversible</strong>. All your data, including verifications and reports, will be permanently deleted.</p>
-        <p>To confirm, please type <strong>DELETE</strong> below:</p>
-        <input type="text" id="deleteConfirmInput" class="modal-input" placeholder="Type DELETE" autocomplete="off">
-      </div>
-      <div class="modal-actions">
-        <button id="cancelDeleteBtn" class="btn-ghost">Cancel</button>
-        <button id="confirmDeleteBtn" class="btn-danger-solid" disabled>Delete Account</button>
-      </div>
-    </div>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  
   <script src="assets/js/firebase-config.js"></script>
   <script src="assets/js/notifications.js"></script>
-  
-  <!-- Environment Configuration -->
     <script src="assets/js/env.js"></script>
-
-    <!-- Auth State Listener -->
     <script src="assets/js/feedback.js"></script>
     <script src="assets/js/profile_settings.js"></script>
     <script src="assets/js/poser-history.js"></script>
-    <script src="poser-history.js"></script>
 </body>

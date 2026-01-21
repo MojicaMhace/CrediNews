@@ -1,4 +1,4 @@
-// Global variables
+
 const container = document.getElementById('historyGrid');
 const searchInput = document.getElementById('ph-search');
 const sortSelect = document.getElementById('ph-sort');
@@ -7,7 +7,7 @@ const nextBtn = document.getElementById('ph-next');
 const pageInfo = document.getElementById('ph-page');
 const totalPagesInfo = document.getElementById('ph-pages');
 
-const pageSize = 9; // 3 columns * 3 rows
+const pageSize = 9; 
 let allDocs = [];
 let currentPage = 1;
 let totalPages = 1;
@@ -15,7 +15,6 @@ let currentUserID = null;
 let currentSort = 'date_desc';
 let currentQuery = '';
 
-// --- HELPER FUNCTIONS ---
     function normalizeKey(str) {
         if (!str) return '';
         str = String(str).trim();
@@ -56,9 +55,9 @@ function getVerdictStyle(verdict) {
 
 function getScoreColor(score) {
     const s = Number(score || 0);
-    if (s >= 80) return '#22c55e'; // High Trust (Green)
-    if (s >= 55) return '#f59e0b'; // Mixed (Yellow)
-    return '#ef4444'; // Low Trust (Red)
+    if (s >= 80) return '#22c55e'; 
+    if (s >= 55) return '#f59e0b'; 
+    return '#ef4444'; 
 }
 
 function getVerdictScore(verdict) {
@@ -69,7 +68,6 @@ function getVerdictScore(verdict) {
     return 0;
 }
 
-// --- RENDERING & FILTERING ---
 
 function renderCards(docs) {
     if (!container) return;
@@ -89,20 +87,16 @@ function renderCards(docs) {
     const pageDocs = docs.slice(start, end);
 
     pageDocs.forEach(item => {
-        // Data Mapping (Support flat and nested structures)
         const analysis = item.analysis || {};
         const score = Number(item.score || item.final_trust_score || analysis.final_trust_score || 0);
         const verdict = item.verdict || analysis.verdict || 'Mixed Signals';
 
-        // Data Mapping for New Design
         let pageName = item.pageName || item.name;
         
-        // Improve Name Extraction: If pageName is missing, try to parse from Input URL
         if (!pageName && item.input && item.input.includes('http')) {
              try {
                  const urlObj = new URL(item.input);
                  const pathParts = urlObj.pathname.split('/').filter(p => p);
-                 // e.g. facebook.com/GMANetwork -> GMANetwork
                  if (pathParts.length > 0) {
                      pageName = pathParts[pathParts.length - 1];
                  } else {
@@ -113,11 +107,8 @@ function renderCards(docs) {
              }
         }
         pageName = pageName || shorten(item.input || 'No input URL', 30);
-
-        // Prioritize a clean ID (poster_id), then pageName, then fallback to input
         let displayId = item.poster_id || item.input || 'unknown';
         
-        // Helper to extract handle from URL
         const extractHandle = (url) => {
             try {
                 const urlObj = new URL(url);
@@ -127,12 +118,10 @@ function renderCards(docs) {
             return null;
         };
 
-        // If displayId is a URL, extract handle
         if (displayId.includes('http')) {
             const handle = extractHandle(displayId);
             if (handle) displayId = handle;
         } 
-        // If displayId is numeric (any length), try to find a better handle from input
         else if (/^\d+$/.test(displayId)) {
              if (item.input && item.input.includes('http')) {
                  const handle = extractHandle(item.input);
@@ -140,24 +129,18 @@ function renderCards(docs) {
              }
         }
 
-        // Detailed Scores
-        // Note: In a real scenario, these fields (ai_trust_score, rule_score) need to be saved in the DB record.
-        // We use fallback math here if they aren't explicitly saved, to populate the UI.
+
         const aiTrust = item.ai_trust_score !== undefined ? item.ai_trust_score : (score >= 80 ? 90 : (score < 55 ? 40 : 60));
         const ruleScoreVal = item.rule_score !== undefined ? item.rule_score : score;
-        const aiWeight = 60; // Backend uses 60% AI
-        const ruleWeight = 40; // Backend uses 40% Rules
-
-        // Construct Breakdown Text
+        const aiWeight = 60; 
+        const ruleWeight = 40;
         const breakdownText = `Final Score uses ${aiWeight}% AI + ${ruleWeight}% Rules: AI Trust ${aiTrust}% • Rule Score ${ruleScoreVal}% → ${score}%`;
 
-        // Explanation - Prioritize AI explanation for detailed insight, then human explanation
         const breakdown = analysis.breakdown || {};
         const aiReason = breakdown.ai_explanation || (analysis.ai_agent && analysis.ai_agent.explanation) || analysis.ai_explanation || item.ai_explanation;
         
         let explanation = aiReason;
         
-        // If AI reason is missing or generic, fall back to human explanation
         if (!explanation || explanation === "No AI insight available.") {
             explanation = item.human_explanation || analysis.human_explanation || item.verdict_explanation || item.rawExplanation;
         }
@@ -167,7 +150,6 @@ function renderCards(docs) {
         }
 
         let riskClass = 'risk-medium';
-        // 1. Try to base it on the Verdict Text (The "Poser Detection Result")
         const vLower = String(verdict).toLowerCase();
         if (vLower.includes('likely authentic') || vLower.includes('low risk') || vLower.includes('trusted')) {
             riskClass = 'risk-low';
@@ -176,7 +158,6 @@ function renderCards(docs) {
         } else if (vLower.includes('moderate risk') || vLower.includes('mixed signals') || vLower.includes('suspicious')) {
             riskClass = 'risk-medium';
         } else {
-            // 2. Fallback to Score Thresholds if verdict is unclear
             if (score >= 80) {
                 riskClass = 'risk-low';
             } else if (score < 55) {
@@ -186,16 +167,13 @@ function renderCards(docs) {
             }
         }
 
-        // Dynamic Border Color for Status Box based on risk
-        let statusBorderColor = '#fbbf24'; // Default Mixed
-        if (riskClass === 'risk-low') statusBorderColor = '#22c55e'; // Green
-        if (riskClass === 'risk-high') statusBorderColor = '#ef4444'; // Red
+        let statusBorderColor = '#fbbf24'; 
+        if (riskClass === 'risk-low') statusBorderColor = '#22c55e'; 
+        if (riskClass === 'risk-high') statusBorderColor = '#ef4444'; 
 
         const card = document.createElement('div');
         card.className = `ph-card`;
         card.setAttribute('data-id', item.id);
-        
-        // Verified Banner HTML (Conditional) - Only if verified_registry
         const meta = item.metadata || {};
         const isVerified = String(meta.verification_source || '').toLowerCase() === 'verified_registry' || !!meta.is_verified_source;
 
@@ -211,18 +189,15 @@ function renderCards(docs) {
             </div>
         ` : '';
 
-        // Determine gradient based on risk/score for the status box background
-        // Screenshot shows a green gradient for Low Risk.
         let statusGradient = '';
-        if (score >= 80) statusGradient = 'radial-gradient(circle at 15% 50%, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 40%, rgba(15, 23, 42, 0) 70%)'; // Green glow behind donut
-        else if (score < 55) statusGradient = 'radial-gradient(circle at 15% 50%, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 40%, rgba(15, 23, 42, 0) 70%)'; // Red glow
-        else statusGradient = 'radial-gradient(circle at 15% 50%, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 40%, rgba(15, 23, 42, 0) 70%)'; // Yellow glow
+        if (score >= 80) statusGradient = 'radial-gradient(circle at 15% 50%, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 40%, rgba(15, 23, 42, 0) 70%)'; 
+        else if (score < 55) statusGradient = 'radial-gradient(circle at 15% 50%, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 40%, rgba(15, 23, 42, 0) 70%)'; 
+        else statusGradient = 'radial-gradient(circle at 15% 50%, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 40%, rgba(15, 23, 42, 0) 70%)'; 
 
         card.innerHTML = `
             <div class="ph-card-inner">
                 ${verifiedBannerHtml}
 
-                <!-- Main Status Box (Container with Gradient) -->
                 <div class="ph-status-box" style="background: ${statusGradient};">
                     <div class="ph-score-donut" style="--pct:${Math.round(score)}; --ring-color:${statusBorderColor}; box-shadow: 0 0 40px ${statusBorderColor}50;">
                         <div class="inner">
@@ -244,7 +219,6 @@ function renderCards(docs) {
                 </div>
 
                 <div class="ph-card-body">
-                    <!-- Meta Bar -->
                     <div class="ph-meta-bar">
                         <span class="ph-meta-label">ID:</span>
                         <span class="ph-id-badge">${safeText(displayId)}</span>
@@ -252,7 +226,6 @@ function renderCards(docs) {
                         <span class="ph-meta-date">Analyzed: ${formatTimestamp(item.analyzedAt || item.createdAt)}</span>
                     </div>
 
-                    <!-- Why This Score Section -->
                     <div class="ph-why-section">
                         <div class="ph-why-title">WHY THIS SCORE</div>
                         <div class="ph-why-breakdown">${safeText(breakdownText)}</div>
@@ -262,7 +235,6 @@ function renderCards(docs) {
                     </div>
                 </div>
 
-                <!-- Footer Actions -->
                 <div class="ph-action-footer">
                     <div class="ph-action-prompt">
                         Is this actually a<br>legitimate official news<br>source?
@@ -299,7 +271,6 @@ function applyFiltersAndRender() {
         });
     }
 
-    // Sorting Logic
     if (currentSort === 'date_desc') {
         docs.sort((a, b) => {
             const tA = a.createdAt || a.analyzedAt;
@@ -314,17 +285,14 @@ function applyFiltersAndRender() {
         });
     } else if (currentSort.startsWith('verdict_')) {
         const targetScore = getVerdictScore(currentSort.replace('verdict_', ''));
-        // Higher scores first, then sort by proximity to target verdict score
         docs.sort((a, b) => {
             const scoreA = getVerdictScore(a.verdict);
             const scoreB = getVerdictScore(b.verdict);
-            
-            // Primary sort: closest to target verdict
+
             const diffA = Math.abs(scoreA - targetScore);
             const diffB = Math.abs(scoreB - targetScore);
             if (diffA !== diffB) return diffA - diffB;
-            
-            // Secondary sort: newest first
+
             const tA = a.createdAt || a.analyzedAt;
             const tB = b.createdAt || b.analyzedAt;
             return (tB ? tB.toMillis() : 0) - (tA ? tA.toMillis() : 0);
@@ -345,8 +313,6 @@ function updatePaginationUI(totalItems) {
     if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
 }
 
-// --- DATA FETCHING (FIXED QUERY) ---
-
 async function fetchHistory(user) {
     if (!container || !user || !user.uid) {
         if (container) container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 3rem;">Please log in to view history.</div>';
@@ -356,33 +322,24 @@ async function fetchHistory(user) {
     currentUserID = user.uid;
     const db = firebase.firestore();
     
-    // *** CRITICAL FIX: Secure Query for Poser History ***
-    // Note: We removed .orderBy('createdAt', 'desc') to avoid requiring a composite index.
-    // Sorting is handled client-side in the sort() block below.
     const q = db.collection('poser_detections')
-                .where('userId', '==', user.uid); // Filter by authenticated user's ID
+                .where('userId', '==', user.uid); 
 
     try {
         const snap = await q.get();
-        
-        // Deduplicate: Group by unique subject and keep the one with the LATEST activity (analyzedAt or createdAt)
         const groups = {};
         
         snap.docs.forEach(docSnap => {
             const data = docSnap.data();
             const doc = { id: docSnap.id, ...data };
-            
-            // Primary key: poster_id, Fallback: input (URL/ID)
             const uniqueKey = data.poster_id || data.input || ('__no_key_' + doc.id);
             
             if (!groups[uniqueKey]) {
                 groups[uniqueKey] = doc;
             } else {
-                // Compare timestamps to keep the freshest record
                 const existingDoc = groups[uniqueKey];
                 const getTs = (d) => {
                     const t = d.analyzedAt || d.createdAt;
-                    // Handle Firestore Timestamp or Date object
                     if (t && typeof t.toMillis === 'function') return t.toMillis();
                     if (t && t.seconds) return t.seconds * 1000;
                     return 0;
@@ -394,10 +351,7 @@ async function fetchHistory(user) {
             }
         });
         
-        // Convert back to array
-        allDocs = Object.values(groups);
-        
-        // Re-sort in memory by Date Descending (since the query sort might be mixed up by the grouping)
+        allDocs = Object.values(groups);      
         allDocs.sort((a, b) => {
              const tA = a.analyzedAt || a.createdAt;
              const tB = b.analyzedAt || b.createdAt;
@@ -406,14 +360,11 @@ async function fetchHistory(user) {
              return msB - msA;
         });
         
-        // Ensure that client-side sorting/filtering runs on the full dataset
-        // and only the current page is rendered.
         applyFiltersAndRender();
 
     } catch (e) {
         console.error("Error fetching poser history:", e);
         
-        // This usually indicates the user is UNVERIFIED or the Index is MISSING/BUILDING
         container.innerHTML = `
             <div style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 3rem;">
                 <i class="fas fa-exclamation-circle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
@@ -423,7 +374,6 @@ async function fetchHistory(user) {
     }
 }
 
-// --- EVENT LISTENERS & INIT ---
 
 document.addEventListener('DOMContentLoaded', () => {
     if (searchInput) searchInput.addEventListener('input', (e) => {
@@ -448,7 +398,6 @@ document.addEventListener('DOMContentLoaded', () => {
             applyFiltersAndRender();
         }
     });
-    // Add listener for View Details modal if needed (requires a modal function definition)
 });
 
 if (window.firebase && firebase.auth) {
@@ -469,12 +418,12 @@ if (window.firebase && firebase.auth) {
                 }
             }
         } else {
-            window.location.href = 'login.html'; 
+            if (!window.isAccountDeleting) {
+                window.location.href = 'login.html'; 
+            }
         }
     });
 }
-
-// --- ACTIONS ---
 
 window.deleteItem = async function(docId) {
     if (!confirm('Are you sure you want to delete this record? This cannot be undone.')) return;
@@ -483,7 +432,6 @@ window.deleteItem = async function(docId) {
         const db = firebase.firestore();
         await db.collection('poser_detections').doc(docId).delete();
         
-        // Remove from local list and re-render
         allDocs = allDocs.filter(d => d.id !== docId);
         applyFiltersAndRender();
         
@@ -510,7 +458,6 @@ window.requestManualVerification = async function(posterId, pageName) {
         const db = firebase.firestore();
         const user = firebase.auth().currentUser;
         
-        // Add to pending_verifications collection for admin review
         await db.collection('pending_verifications').add({
             posterId: posterId,
             pageName: pageName || '',
@@ -519,8 +466,6 @@ window.requestManualVerification = async function(posterId, pageName) {
             source: "history_request",
             userId: user ? user.uid : null
         });
-
-        // Create user notification using shared logic
         if (typeof window.createVerificationNotification === 'function') {
             await window.createVerificationNotification(posterId);
         }

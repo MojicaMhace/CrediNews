@@ -1,7 +1,11 @@
+window.isAccountDeleting = false;
+
 // Auth State Listener
 firebase.auth().onAuthStateChanged(user => {
     if (!user) {
-        window.location.href = 'login.html?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
+        if (!window.isAccountDeleting) {
+            window.location.href = 'login.html?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
+        }
     } else {
         const emailInput = document.getElementById('ps_email');
         if (emailInput) emailInput.value = user.email;
@@ -9,7 +13,6 @@ firebase.auth().onAuthStateChanged(user => {
         const nameInput = document.getElementById('ps_display_name');
         if (nameInput) nameInput.value = user.displayName || '';
         
-        // Facebook linking feature removed
     }
 });
 
@@ -77,12 +80,21 @@ async function logAccountActivity(action, id) {
     const user = firebase.auth().currentUser;
     if (!user) return;
     const db = firebase.firestore();
-    await db.collection('account_activity').add({
+    const activityData = {
       userId: user.uid,
+      userEmail: user.email || 'unknown',
+      userName: user.displayName || 'No Name',
       action: String(action),
-      details: { id: String(id || user.uid) },
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    });
+      details: { id: String(id || user.uid) }
+    };
+
+    if (String(action).includes('delete')) {
+      activityData.deletedAt = firebase.firestore.FieldValue.serverTimestamp();
+    } else {
+      activityData.timestamp = firebase.firestore.FieldValue.serverTimestamp();
+    }
+
+    await db.collection('account_activity').add(activityData);
   } catch (e) { 
     try { console.error('Account activity log failed:', e); } catch(_) {}
     try { toast('Failed to record activity. Please retry.', 'error'); } catch(_) {}
@@ -271,43 +283,89 @@ async function deleteUserDocsFor(uid) {
     try { await db.collection('users').doc(uid).delete(); } catch (_) {}
 }
 
-async function handleDeleteAccount() {
-    const user = firebase.auth().currentUser;
+// Modal Logic
+function openDeleteModal() {
+    const modal = document.getElementById('deleteAccountModal');
+    const passwordInput = document.getElementById('deleteAccountPassword');
+    const inputContainer = document.getElementById('deleteModalInputContainer');
     
-    if (!user) {
-        return toast('System not ready. Please refresh.', 'error');
+    if (modal) {
+        modal.classList.add('open');
+        if (passwordInput) passwordInput.value = '';
+        if (inputContainer) inputContainer.style.display = 'block';
+        if (passwordInput) passwordInput.focus();
     }
+}
 
-    // 1. Confirm Intent
-    if(!confirm('CRITICAL: This will permanently delete your account and all data. You will have to register again. Are you sure?')) return;
+function closeDeleteModal() {
+    const modal = document.getElementById('deleteAccountModal');
+    if (modal) modal.classList.remove('open');
+}
 
-    // 2. Force Re-authentication via Prompt (Fixes "Requires Recent Login")
-    const password = prompt("To confirm deletion, please type your password:");
-    if (!password) {
-        return toast("Deletion cancelled (Password required).", "normal");
-    }
+async function performAccountDeletion() {
+    const user = firebase.auth().currentUser;
+    const passwordEl = document.getElementById('deleteAccountPassword');
+    const password = passwordEl ? passwordEl.value : '';
+    const btn = document.getElementById('confirmDeleteBtn');
 
-    const btn = document.getElementById('deleteAccountBtn');
+    if (!user) return toast('System not ready.', 'error');
+    if (!password) return toast('Please enter your password to confirm.', 'error');
+
     const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     btn.disabled = true;
 
     try {
         const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
         await user.reauthenticateWithCredential(credential);
+
+        // Log account deletion activity
+        try {
+            await logAccountActivity('delete_account', user.uid);
+        } catch (logErr) {
+            console.warn('Failed to log account deletion:', logErr);
+        }
+
         await deleteUserDocsFor(user.uid);
+        
+        window.isAccountDeleting = true;
+        // Clear local auth persistence to prevent auto-login on redirect
+        try {
+            localStorage.removeItem('authData');
+            sessionStorage.removeItem('authData');
+            localStorage.removeItem('remember_email');
+        } catch(e) {}
 
         await user.delete();
         
-        alert("Your account has been successfully deleted.");
-        window.location.href = 'register.html'; 
+        closeDeleteModal();
+        
+        // Show Success Modal
+        const successModal = document.getElementById('successModal');
+        if (successModal) {
+            successModal.classList.add('open');
+            // Bind OK button to redirect
+            const okBtn = document.getElementById('successOkBtn');
+            if(okBtn) {
+                okBtn.onclick = () => {
+                    window.location.href = 'index.html';
+                };
+            } else {
+                // Fallback if button missing
+                setTimeout(() => window.location.href = 'index.html', 2000);
+            }
+        } else {
+             // Fallback if modal missing
+             alert("Your account has been successfully deleted.");
+             window.location.href = 'index.html';
+        }
 
     } catch (error) {
         console.error(error);
         if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials') {
-            alert("Incorrect password. Account was NOT deleted.");
+            toast('Incorrect password.', 'error');
         } else {
-            alert("Error deleting account: " + error.message);
+            toast(error.message || 'Deletion failed.', 'error');
         }
     } finally {
         btn.innerHTML = originalText;
@@ -315,9 +373,10 @@ async function handleDeleteAccount() {
     }
 }
 
-// --- BIND CLICK EVENTS ---
+function handleDeleteAccount() {
+    openDeleteModal();
+}
 document.addEventListener('DOMContentLoaded', () => {
-  // Check auth state
   firebase.auth().onAuthStateChanged(async (user) => {
       if (user) {
           const emailField = document.getElementById('ps_email');
@@ -325,11 +384,9 @@ document.addEventListener('DOMContentLoaded', () => {
           const nameField = document.getElementById('ps_display_name');
           if (nameField) { nameField.value = user.displayName || ''; nameField.disabled = true; }
           
-          // Facebook linking removed
       }
   });
 
-  // Check for tab parameter or hash
   const params = new URLSearchParams(window.location.search);
   const hash = window.location.hash.replace('#', '');
   const initialTab = params.get('tab') || hash || 'security';
@@ -351,7 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const changePassBtn = document.getElementById('changePasswordBtn');
   if(changePassBtn) changePassBtn.addEventListener('click', handleChangePassword);
   
-  // Facebook linking removed
   
   const confirmEl = document.getElementById('ps_confirm_password');
   if (confirmEl) confirmEl.addEventListener('input', () => {});
@@ -366,13 +422,25 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
 
-  // Bind Delete Account Button
   const deleteAccountBtn = document.getElementById('deleteAccountBtn');
   if (deleteAccountBtn) {
       deleteAccountBtn.addEventListener('click', handleDeleteAccount);
   }
 
-  // Bind Password Toggles
+  const cancelBtn = document.getElementById('cancelDeleteBtn');
+  if(cancelBtn) cancelBtn.addEventListener('click', closeDeleteModal);
+  
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+  if(confirmBtn) confirmBtn.addEventListener('click', performAccountDeletion);
+  
+  const modal = document.getElementById('deleteAccountModal');
+  if(modal) {
+      modal.addEventListener('click', (e) => {
+          if(e.target === modal) closeDeleteModal();
+      });
+  }
+
+  // Password Toggles
   document.querySelectorAll('.toggle-visibility').forEach((btn) => {
     const targetId = btn.dataset.target;
     btn.addEventListener('click', (e) => {
@@ -381,7 +449,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Bind Strength Meter
   const newPassEl = document.getElementById('ps_new_password');
   if (newPassEl) {
     newPassEl.addEventListener('input', () => checkPasswordStrength(newPassEl.value));

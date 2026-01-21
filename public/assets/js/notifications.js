@@ -85,7 +85,12 @@ async function markAsRead(id) {
 // --- MAIN LOGIC ---
 document.addEventListener('DOMContentLoaded', () => {
   firebase.auth().onAuthStateChanged(async user => {
-    if (!user) { window.location.href = 'login.html'; return; }
+    if (!user) { 
+      if (!window.isAccountDeleting) {
+        window.location.href = 'login.html'; 
+      }
+      return; 
+    }
 
     const list = document.getElementById('activityList');
     const markAllBtn = document.getElementById('markAllBtn');

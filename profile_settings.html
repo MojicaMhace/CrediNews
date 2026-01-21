@@ -179,7 +179,26 @@
   <script src="firebase-config.js"></script>
   <script src="notifications.js"></script>
   
-  <script>
+  <!-- Delete Account Modal -->
+    <div id="deleteAccountModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Delete Account</h2>
+            </div>
+            <div class="modal-body">
+                <p id="deleteModalMessage">Are you sure you want to delete your account? This action cannot be undone.</p>
+                <div id="deleteModalInputContainer" style="display: none;">
+                    <input type="password" id="deleteAccountPassword" class="modal-input" placeholder="Enter your password to confirm">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="cancelDeleteBtn" class="btn-ghost">Cancel</button>
+                <button id="confirmDeleteBtn" class="btn-danger-solid">Delete Account</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
     /* --- JAVASCRIPT LOGIC --- */
 
     // Tabs Logic
