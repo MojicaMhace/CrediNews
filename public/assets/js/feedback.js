@@ -152,32 +152,46 @@
 
     const submitBtn = step2.querySelector('#fbSubmit');
     const msgEl = step2.querySelector('#fbMessage');
-    // Initial state: disable until content passes validation
+    
     if (submitBtn) submitBtn.disabled = true;
 
-    // Stronger validation helpers
     const gibberishSet = new Set(['asdf','qwerty','qwe','zxc','zxcv','lorem','ipsum','test','xxx','aaaa','bbbb','cccc']);
+    
+    const profanitySet = new Set([
+        'fuck','shit','bitch','asshole','damn','crap','bastard','dick','pussy','cock','cunt',
+        'tangina','gago','tarantado','bobo','tanga','ulol','pukingina','kantot','hindot','punyeta', 'inutil', 'demonyo', 'pisti', 'leche'
+    ]);
+
+    function containsProfanity(text) {
+        if (!text) return false;
+        const words = text.toLowerCase().split(/[\s.,!?]+/);
+        for (const w of words) {
+            const cleanW = w.replace(/[^a-z]/g, '');
+            if (profanitySet.has(cleanW)) return true;
+        }
+        return false;
+    }
+
     function isValidWord(w){
       if (!w) return false;
       const s = w.toLowerCase();
-      if (/[^a-z]/i.test(s)) return false; // letters only
+      if (/[^a-z]/i.test(s)) return false;
       if (s.length < 3) return false;
       if (gibberishSet.has(s)) return false;
-      if (/^([a-z])\1{2,}$/i.test(s)) return false; // same char repeated
-      if (!/[aeiou]/i.test(s)) return false; // must contain a vowel
+      if (/^([a-z])\1{2,}$/i.test(s)) return false;
+      if (!/[aeiou]/i.test(s)) return false;
       return true;
     }
     function countValidWords(text){
       const words = (text || '').trim().split(/\s+/).filter(Boolean);
       let valid = 0;
-      const seen = new Map(); // word -> count
+      const seen = new Map();
       for (const raw of words){
         const w = raw.replace(/[^a-z]/gi,'');
         if (!isValidWord(w)) continue;
         const key = w.toLowerCase();
         const cnt = (seen.get(key) || 0) + 1;
         seen.set(key, cnt);
-        // Penalize heavy repetition: count only first 2 occurrences
         if (cnt <= 2) valid++;
       }
       return valid;
@@ -185,32 +199,44 @@
 
     function updateSubmitDisabled(){
       const val = (msgEl || {}).value || '';
+      const hasProfanity = containsProfanity(val);
       const validWordCount = countValidWords(val);
-      const valid = validWordCount >= 6 && isMeaningfulFeedbackContent(val);
+      const isMeaningful = isMeaningfulFeedbackContent(val);
+      
+      const valid = validWordCount >= 6 && isMeaningful && !hasProfanity;
+      
       const wcEl = document.getElementById('fbWordCount');
       if (wcEl) {
-        wcEl.textContent = `Valid words: ${validWordCount}/6`;
-        wcEl.style.color = valid ? '#10B981' : '#9CA3AF';
+        if (hasProfanity) {
+             wcEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please keep language professional.';
+             wcEl.style.color = '#EF4444';
+        } else {
+             wcEl.textContent = `Valid words: ${validWordCount}/6`;
+             wcEl.style.color = valid ? '#10B981' : '#9CA3AF';
+        }
       }
       if (submitBtn) submitBtn.disabled = !valid;
     }
 
     if (msgEl) {
       msgEl.addEventListener('input', updateSubmitDisabled);
-      // Run once in case of prefill
       updateSubmitDisabled();
     }
 
-    // Submit
     submitBtn.addEventListener('click', async () => {
       const msg = (document.getElementById('fbMessage') || {}).value || '';
+      
+      if (containsProfanity(msg)) {
+          showToast('Please remove inappropriate language before submitting.', 'error');
+          return;
+      }
+
       if (!isMeaningfulFeedbackContent(msg)){
         showToast('Please enter a meaningful message (no random letters/numbers).');
         return;
       }
       const category = (document.getElementById('fbCategory') || {}).value || 'Suggestion';
 
-      // Attach user identity (uid and email) when available
       let userId = null;
       let userEmail = null;
       try {
@@ -239,14 +265,9 @@
           return;
         }
 
-        // Check for Trusted Status (Facebook Linked) - REMOVED
         const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
         const userData = userDoc.data() || {};
         
-        // Facebook linking no longer required
-
-
-
         if (user.emailVerified !== true) {
           showToast('Please verify your email address to submit feedback.');
           return;
@@ -254,7 +275,7 @@
 
         await firebase.firestore().collection('user_feedback').add(payload);
         showToast('Your Feedback has been submitted.');
-        // Mark submitted only on success
+        
         try {
           sessionStorage.setItem(S_SUBMITTED_THIS_SESSION, '1');
           localStorage.setItem(KEY_SUBMITTED_EVER, '1');
