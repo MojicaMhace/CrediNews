@@ -415,19 +415,23 @@
                             if (window.authManager) window.authManager.setButtonLoading(submitBtn, false);
                             
                             if (result.success) {
-                                showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder. Please verify your email before logging in.`, 'success');
+                                showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder to verify your email.`, 'success');
                                 const until = Date.now() + COOLDOWN_MS;
                                 localStorage.setItem(cooldownKey, String(until));
                                 startCountdown(until);
                                 
                             } else {
-                                let msg = result.message || 'Registration failed. Please try again.';
-                                if (result.code === 'auth/too-many-requests') {
-                                    const bu = Date.now() + BLOCK_COOLDOWN_MS;
-                                    localStorage.setItem(BLOCK_KEY, String(bu));
-                                    startCountdown(bu);
+                                if (result.code === 'auth/email-already-in-use') {
+                                    showInlineMessage('The email address is already in use by another account.', 'error');
+                                } else {
+                                    let msg = result.message || 'Registration failed. Please try again.';
+                                    if (result.code === 'auth/too-many-requests') {
+                                        const bu = Date.now() + BLOCK_COOLDOWN_MS;
+                                        localStorage.setItem(BLOCK_KEY, String(bu));
+                                        startCountdown(bu);
+                                    }
+                                    showInlineMessage(`${msg} (${result.code || 'unknown'})`, 'error');
                                 }
-                                showInlineMessage(`${msg} (${result.code || 'unknown'})`, 'error');
                             }
                         })
                         .catch(err => {
@@ -454,12 +458,16 @@
                                 lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
                                 preferences: { theme: 'dark', notifications: true }
                             }, { merge: true });
-                            showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder. Please verify your email before logging in.`, 'success');
+                            showInlineMessage(`Verification email sent to ${email}. Check your Spam/Junk folder to verify your email.`, 'success');
                             const until = Date.now() + COOLDOWN_MS; localStorage.setItem(cooldownKey, String(until)); startCountdown(until);
                         } catch(err) {
-                            let msg = err && err.message ? err.message : 'Registration failed. Please try again.';
-                            if (err.code === 'auth/too-many-requests') { const bu = Date.now() + BLOCK_COOLDOWN_MS; localStorage.setItem(BLOCK_KEY, String(bu)); startCountdown(bu); }
-                            showInlineMessage(`${msg} (${err.code || 'unknown'})`, 'error');
+                            if (err.code === 'auth/email-already-in-use') {
+                                showInlineMessage('The email address is already in use by another account.', 'error');
+                            } else {
+                                let msg = err && err.message ? err.message : 'Registration failed. Please try again.';
+                                if (err.code === 'auth/too-many-requests') { const bu = Date.now() + BLOCK_COOLDOWN_MS; localStorage.setItem(BLOCK_KEY, String(bu)); startCountdown(bu); }
+                                showInlineMessage(`${msg} (${err.code || 'unknown'})`, 'error');
+                            }
                         } finally {
                             submitting = false;
                             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account'; }

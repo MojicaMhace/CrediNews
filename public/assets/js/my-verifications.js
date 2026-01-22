@@ -170,24 +170,35 @@ function styleClassByLabel(label) {
   return 'neutral';
 }
 
-function buildExplanationItems(explanation, details) {
-  const items = [];
-  try {
-    const s = String(explanation || '').trim();
-    const parts = s.split(/Details:\s*/i);
-    const main = (parts[0] || '').trim();
-    if (main) items.push(main);
-    let extra = Array.isArray(details) ? details.slice() : [];
-    if (extra.length === 0 && parts.length > 1) {
-      extra = parts[1].split(/\s*\.\s+|\s*[\n\-•]\s*/).map(function(x){ return x.trim(); }).filter(Boolean);
+function renderVerificationExplanation(data) {
+    const label = (data.label || data.credibilityLabel || '').toLowerCase();
+    // For Mixed label page name display
+    const pageName = data.pageName || data.domain || 'this page';
+    const safePageName = safeText(pageName);
+
+    let explanationHTML = '';
+
+    if (label.includes('credible') && !label.includes('low')) {
+        explanationHTML = `This content is labeled <strong>Credible</strong>, meaning it matches reliable information based on fact-checking results. The result comes from an external verification service used by the system. Some services may not always provide source links.`;
+    } else if (label.includes('mixed')) {
+        explanationHTML = `This content is labeled <strong>Mixed</strong>, which means some parts appear accurate while others may be unclear or incomplete. A clear result was not returned by the fact-checking service, but the source comes from a known and generally reliable page (<strong>${safePageName}</strong>).`;
+    } else if (label.includes('unverified')) {
+        explanationHTML = `This content is labeled <strong>Unverified</strong> because the system could not get enough information to check it properly. The fact-checking services did not return usable results for this content.`;
+    } else if (label.includes('low')) {
+        explanationHTML = `This content is labeled <strong>Low Credibility</strong>, meaning it may contain misleading or inaccurate information based on fact-checking results. The assessment was provided by an external verification service. Some services may not include detailed explanations or sources.`;
+    } else {
+        // Fallback for neutral or other labels
+        explanationHTML = `The content analysis resulted in a <strong>${safeText(label)}</strong> rating based on available data from the verification service.`;
     }
-    for (var i = 0; i < extra.length; i++) {
-      var t = String(extra[i] || '').trim();
-      if (!t) continue;
-      if (!/(^|\b)Verified source\b/i.test(t)) items.push(t);
-    }
-  } catch (_) {}
-  return items;
+
+    return `
+        <div class="panel metrics">
+            <div class="panel-title"><span class="label">Verification Explanation</span></div>
+            <ul>
+                <li>${explanationHTML}</li>
+            </ul>
+        </div>
+    `;
 }
 
 function buildPoserHtmlFromSaved(pd) {
@@ -363,11 +374,7 @@ function openResultModal(data) {
       +'</ul>'
     +'</div>';
 
-  const explainText = data.explanation || data.aiExplanation || '';
-  const explanationItems = buildExplanationItems(explainText, data && data.details);
-  const explanationPanelHtml = explanationItems.length
-    ? '<div class="panel metrics"><div class="panel-title"><span class="label">Explanation</span></div><ul>' + explanationItems.map(function(i){ return '<li>'+safeText(decodeEntities(i))+'</li>'; }).join('') + '</ul></div>'
-    : '';
+  const explanationPanelHtml = renderVerificationExplanation(data);
 
   let poserHtml = '';
   if (data.poserDetection) {

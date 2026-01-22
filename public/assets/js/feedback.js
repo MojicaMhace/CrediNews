@@ -274,6 +274,19 @@
         }
 
         await firebase.firestore().collection('user_feedback').add(payload);
+
+        // Add notification
+        try {
+          await firebase.firestore().collection('notifications').add({
+             userId: user.uid,
+             type: 'success',
+             title: 'Feedback Submitted',
+             message: 'Thanks for your feedback! We appreciate your input.',
+             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+             readAt: null
+          });
+        } catch(err){ console.error('Failed to create notification', err); }
+
         showToast('Your Feedback has been submitted.');
         
         try {

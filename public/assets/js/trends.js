@@ -49,6 +49,37 @@ function statusClass(label) {
   return 'status-medium';
 }
 
+function renderVerificationExplanation(data) {
+    const label = (data.label || data.credibilityLabel || '').toLowerCase();
+    // For Mixed label page name display
+    const pageName = data.pageName || data.domain || 'this page';
+    const safePageName = safeText(pageName);
+
+    let explanationHTML = '';
+
+    if (label.includes('credible') && !label.includes('low')) {
+        explanationHTML = `This content is labeled <strong>Credible</strong>, meaning it matches reliable information based on fact-checking results. The result comes from an external verification service used by the system. Some services may not always provide source links.`;
+    } else if (label.includes('mixed')) {
+        explanationHTML = `This content is labeled <strong>Mixed</strong>, which means some parts appear accurate while others may be unclear or incomplete. A clear result was not returned by the fact-checking service, but the source comes from a known and generally reliable page (<strong>${safePageName}</strong>).`;
+    } else if (label.includes('unverified')) {
+        explanationHTML = `This content is labeled <strong>Unverified</strong> because the system could not get enough information to check it properly. The fact-checking services did not return usable results for this content.`;
+    } else if (label.includes('low')) {
+        explanationHTML = `This content is labeled <strong>Low Credibility</strong>, meaning it may contain misleading or inaccurate information based on fact-checking results. The assessment was provided by an external verification service. Some services may not include detailed explanations or sources.`;
+    } else {
+        // Fallback for neutral or other labels
+        explanationHTML = `The content analysis resulted in a <strong>${safeText(label)}</strong> rating based on available data from the verification service.`;
+    }
+
+    return `
+        <div class="panel metrics">
+            <div class="panel-title"><span class="label">Verification Explanation</span></div>
+            <ul>
+                <li>${explanationHTML}</li>
+            </ul>
+        </div>
+    `;
+}
+
 function getPoserStyleClass(score) {
   const s = Number(score || 0);
   if (s >= 75) return 'high';
@@ -296,6 +327,41 @@ function getUserId() {
   }
 }
 
+function getFactCheckedByHtml(data) {
+  const sources = [];
+  const claims = data.reviewedClaims || [];
+
+  // 1. Zyla Labs
+  const hasZylaClaims = claims.some(c => String(c.source||'').toLowerCase() === 'zyla') || 
+                        (Array.isArray(data.claimAnalysis) && data.claimAnalysis.some(c => c.source === 'zyla'));
+  
+  if (hasZylaClaims || (data.zylaExplanation && data.zylaExplanation.trim().length > 0)) {
+       sources.push('Zyla Labs');
+  }
+
+  // 2. Google Fact Check Tool
+  const hasGoogle = claims.some(c => String(c.source||'').toLowerCase() === 'google') ||
+                    data.hasGoogleClaims || 
+                    (Array.isArray(data.fakeClaims) && data.fakeClaims.some(c => c.source === 'google')) || 
+                    (Array.isArray(data.realClaims) && data.realClaims.some(c => c.source === 'google'));
+                    
+  if (hasGoogle) {
+      sources.push('Google Fact Check Tool');
+  }
+
+  // 3. Admin
+  if (data.adminReviewed === true || data.aiVerdict === 'Verified by Admin') {
+      sources.push('Admin');
+  }
+
+  // Fallback
+  if (sources.length === 0) {
+      sources.push('CrediNews AI');
+  }
+  
+  return '<li><strong>Fact-Checked by:</strong> '+sources.join(', ')+'</li>';
+}
+
 function openResultModal(data) {
   const score = Number(data.credibilityScore || 0);
   const label = data.label || '';
@@ -337,30 +403,7 @@ function openResultModal(data) {
       +'</ul>'
     +'</div>';
 
-  const explainText = data.explanation || data.aiExplanation || '';
-  function buildExplanationItems(explanation, details) {
-    const items = [];
-    try {
-      const s = String(explanation || '').trim();
-      const parts = s.split(/Details:\s*/i);
-      const main = (parts[0] || '').trim();
-      if (main) items.push(main);
-      let extra = Array.isArray(details) ? details.slice() : [];
-      if (extra.length === 0 && parts.length > 1) {
-        extra = parts[1].split(/\s*\.\s+|\s*[\n\-•]\s*/).map(function(x){ return x.trim(); }).filter(Boolean);
-      }
-      for (var i = 0; i < extra.length; i++) {
-        var t = String(extra[i] || '').trim();
-        if (!t) continue;
-        if (!/(^|\b)Verified source\b/i.test(t)) items.push(t);
-      }
-    } catch (_) {}
-    return items;
-  }
-  const explanationItems = buildExplanationItems(explainText, data && data.details);
-  const explanationPanelHtml = explanationItems.length
-    ? '<div class="panel metrics"><div class="panel-title"><span class="label">Explanation</span></div><ul>' + explanationItems.map(function(i){ return '<li>'+safeText(decodeEntities(i))+'</li>'; }).join('') + '</ul></div>'
-    : '';
+  const explanationPanelHtml = renderVerificationExplanation(data);
 
   let poserHtml = '';
   if (data.poserDetection) {
@@ -417,14 +460,13 @@ function openResultModal(data) {
       +'<div class="panel '+textPanelClass+'"><div class="panel-title"><span class="label">Analyzed Text</span></div>'
       +(data.analyzedText ? '<div style="max-height: 200px; overflow-y: auto; white-space: pre-wrap;"><p>'+safeText(decodeEntities(data.analyzedText))+'</p></div>' : '<p>No text provided.</p>')+'</div>'
       
-      +'<div class="panel metrics"><div class="panel-title"><span class="label">Metrics</span></div>'
+      +'<div class="panel metrics"><div class="panel-title"><span class="label">Verification Summary</span></div>'
         +'<ul>'
-          +'<li><strong>Source:</strong> '+safeText(data.pageName || data.sourceName || getSourceName(data.url) || '')+'</li>'
-          +'<li><strong>Sources Found:</strong> '+Number(data.sourcesFound || data.sources || 0)+'</li>'
-          +'<li><strong>Fact Checks:</strong> '+Number(data.factChecks || 0)+'</li>'
+          +'<li><strong>FB Page:</strong> '+safeText(data.pageName || data.sourceName || getSourceName(data.url) || '')+'</li>'
+          +'<li><strong>Fact-Check Sources:</strong> '+(data.sources && Number(data.sources) > 0 ? Number(data.sources) : 'None provided.')+'</li>'
+          + getFactCheckedByHtml(data)
           +'<li><strong>Times Verified:</strong> '+Number(data.verificationCount || 1)+'</li>'
-          +'<li><strong>Analyzed At:</strong> '+safeText(formatTimestamp(data.analyzed_at || data.analyzedAt))+'</li>'
-          +(data.url ? '<li><strong>URL:</strong> <a href="'+safeText(data.url)+'" target="_blank" rel="noopener" style="color:#60a5fa; text-decoration:underline; word-break:break-all;">'+safeText(data.url)+'</a></li>' : '')
+          +(data.url ? '<li><strong>URL:</strong> <div style="display:inline-block; max-width:100%; vertical-align:top;"><a href="'+safeText(data.url)+'" target="_blank" rel="noopener" style="display:inline-block; padding:2px 8px; background:rgba(255,255,255,0.05); border-radius:4px; font-size:0.85em; color:#cbd5e1; text-decoration:none; word-break:break-all;">'+safeText(data.url)+'</a></div></li>' : '')
         +'</ul>'
       +'</div>'
     +'</div>'

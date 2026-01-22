@@ -1466,6 +1466,7 @@ def fact_check_endpoint():
     claim_analysis = []
     fake_claims = []
     real_claims = []
+    domain_boost_applied = False
 
     # ... inside fact_check_endpoint ...
 
@@ -1490,6 +1491,18 @@ def fact_check_endpoint():
         
         claim_analysis.append(info)
         fact_checks_count += 1
+        
+        # Add Zyla sources to the 'Sources Found' set
+        try:
+            z_sources = zyla.get('sources')
+            if isinstance(z_sources, list):
+                for z_src in z_sources:
+                    if z_src and isinstance(z_src, str):
+                        z_sname = _credible_source_name(z_src)
+                        if z_sname:
+                            sources_set.add(z_sname)
+        except Exception:
+            pass
         
         # Logic to append score
         conf_val = zyla.get('confidence', 1.0)
@@ -1637,11 +1650,13 @@ def fact_check_endpoint():
         # Logic for Credible Boost (bumping up score if source is trusted and no fake claims)
         if boost > 0 and not has_negative_evidence and overall_score < CREDIBILITY_THRESHOLDS["unverified_upper"]:
             overall_score = max(overall_score, CREDIBILITY_THRESHOLDS["unverified_upper"])
+            domain_boost_applied = True
         
         if boost > 0 and not has_negative_evidence and (
             overall_score >= CREDIBILITY_THRESHOLDS["unverified_upper"] and overall_score < CREDIBILITY_THRESHOLDS["high"]
         ):
             overall_score = min(1.0, overall_score + boost)
+            domain_boost_applied = True
             # Cap credible boost at 0.74 if no explicit fact check confirmed it
             if overall_score >= CREDIBILITY_THRESHOLDS["high"]:
                 overall_score = 0.74 
@@ -1665,6 +1680,7 @@ def fact_check_endpoint():
             # Apply boost to baseline, capped at 0.74 (Mixed)
             overall_score = max(CREDIBILITY_THRESHOLDS["unverified_upper"], min(0.74, _neutral_score() + bval))
             _has_fact_data = True
+            domain_boost_applied = True
             try:
                 source_name = _credible_source_name(url or '')
                 explanations.insert(0, f"Credible domain baseline applied (+{bval:.2f}) for {source_name}.")
@@ -1708,7 +1724,8 @@ def fact_check_endpoint():
         "label": overall_label,
         "explanation": overall_explanation,
         "sources": len(sources_set),
-        "factChecks": fact_checks_count
+        "factChecks": fact_checks_count,
+        "domain_boost_applied": domain_boost_applied
     }
 
     image_url = final_image_url

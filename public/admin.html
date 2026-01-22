@@ -14,6 +14,7 @@
         /* Dashboard Tabs/Panels */
         .dashboard-panels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
         .panel-card { 
+            position: relative;
             background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; 
             cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 15px;
         }
@@ -99,6 +100,164 @@
         .feedback-message { color: #e5e7eb; line-height: 1.5; font-size: 0.95rem; }
         .feedback-category { display: inline-block; padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.1); font-size: 0.75rem; margin-bottom: 8px; color: #cbd5e1; }
         .feedback-rating { color: #fbbf24; font-size: 0.9rem; margin-top: 8px; }
+
+        /* Notification Badge */
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            min-width: 24px;
+            height: 24px;
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border: 2px solid #0f172a;
+        }
+        .notification-badge.show {
+            display: flex;
+            animation: fadeInBadge 0.3s ease;
+        }
+        @keyframes fadeInBadge { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+
+        /* --- GLOBAL NOTIFICATION DROPDOWN STYLES --- */
+        .notification-wrapper { position: relative; display: inline-block; margin-right: 20px; }
+        .notification-btn {
+            background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 8px; position: relative; transition: color 0.2s;
+        }
+        .notification-btn:hover { color: #f3f4f6; }
+        .notification-dropdown {
+            position: absolute; top: 120%; right: 0; width: 320px;
+            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 100;
+            display: none; flex-direction: column; max-height: 400px; overflow: hidden;
+        }
+        .notification-dropdown.show { display: flex; animation: fadeIn 0.2s ease; }
+        .notification-header {
+            padding: 12px 16px; border-bottom: 1px solid #334155;
+            font-weight: 600; color: #f3f4f6; font-size: 0.9rem;
+        }
+        .notification-list { overflow-y: auto; max-height: 350px; }
+        .notification-item {
+            padding: 12px 16px; border-bottom: 1px solid #334155; cursor: pointer; transition: background 0.2s;
+            display: flex; gap: 12px; align-items: start;
+        }
+        .notification-item:hover { background: rgba(255,255,255,0.05); }
+        .notification-item:last-child { border-bottom: none; }
+        .notification-item .icon { color: #3b82f6; margin-top: 2px; }
+        .notification-item .content { flex: 1; }
+        .notification-item .title { font-size: 0.85rem; font-weight: 600; color: #f3f4f6; margin-bottom: 4px; display: block; }
+        .notification-item .message { font-size: 0.8rem; color: #94a3b8; line-height: 1.4; display: block; }
+        .notification-item .time { font-size: 0.7rem; color: #64748b; margin-top: 6px; display: block; }
+        
+        .bell-badge {
+            position: absolute; top: 4px; right: 4px;
+            width: 8px; height: 8px; background: #ef4444; border-radius: 50%;
+            display: none; border: 2px solid #0f172a;
+        }
+        .bell-badge.show { display: block; }
+
+        /* --- CUSTOM MODAL STYLES --- */
+        :root {
+            --fb-bg: #0F1625;
+            --fb-card: #111827;
+            --fb-border: #1f2937;
+            --fb-text: #F9FAFB;
+            --fb-muted: #9CA3AF;
+            --fb-accent: #3b82f6;
+        }
+
+        .feedback-overlay {
+            position: fixed; inset: 0; background: rgba(15, 22, 37, 0.75); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .feedback-container {
+            width: 450px; max-width: 90vw; background: var(--fb-card);
+            border: 1px solid var(--fb-border); border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.5); overflow: hidden; color: var(--fb-text);
+            animation: fbFadeIn 0.3s ease-out;
+        }
+        .feedback-header {
+            padding: 20px 24px; border-bottom: 1px solid var(--fb-border);
+            display: flex; justify-content: space-between; align-items: center; background: #1e293b;
+        }
+        .feedback-title { margin: 0; font-size: 1.1rem; font-weight: 600; color: #fff; }
+        .feedback-close {
+            background: transparent; border: none; color: var(--fb-muted); font-size: 1.5rem; cursor: pointer; transition: color 0.2s;
+        }
+        .feedback-close:hover { color: #fff; }
+        .feedback-body { padding: 24px; font-size: 1rem; color: #cbd5e1; line-height: 1.6; }
+        .feedback-actions {
+            padding: 16px 24px; border-top: 1px solid var(--fb-border);
+            display: flex; gap: 12px; justify-content: flex-end; background: #111827;
+        }
+        .fb-btn {
+            padding: 10px 20px; border-radius: 8px; border: 1px solid var(--fb-border);
+            background: #1f2937; color: var(--fb-text); cursor: pointer; font-weight: 600; transition: all 0.2s;
+        }
+        .fb-btn:hover { background: #374151; }
+        .fb-btn.primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb); border: none; color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        .fb-btn.primary:hover { filter: brightness(1.1); }
+        .fb-btn.success {
+            background: linear-gradient(135deg, #10b981, #059669); border: none; color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        .fb-btn.success:hover { filter: brightness(1.1); }
+        .fb-btn.danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626); border: none; color: white;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+        }
+        .fb-btn.danger:hover { filter: brightness(1.1); }
+        @keyframes fbFadeIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        /* Toast Notification - Global Style Match */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .notification.success,
+        .notification-success {
+            background: #22c55e;
+        }
+
+        .notification.error,
+        .notification-error {
+            background: #ef4444;
+        }
+
+        .notification.fade-out {
+            animation: fadeOut 0.3s forwards;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-10px); }
+        }
     </style>
 </head>
 <body>
@@ -124,24 +283,41 @@
 <div class="container" id="mainContainer">
     <div class="header-title">
         <h1 style="margin:0;">Admin Verification Console</h1>
-        <button id="logoutBtn" class="btn btn-logout">Logout <i class="fas fa-sign-out-alt"></i></button>
+        <div style="display: flex; align-items: center; gap: 15px;">
+             <!-- Global Notification Dropdown -->
+             <div class="notification-wrapper">
+                <button id="notification-bell" class="notification-btn">
+                    <i class="fas fa-bell"></i>
+                    <div id="bell-badge" class="bell-badge"></div>
+                </button>
+                <div id="notification-dropdown" class="notification-dropdown">
+                    <div class="notification-header">Notifications</div>
+                    <div id="notification-list" class="notification-list">
+                        <div class="empty-state" style="padding:20px; text-align:center; color:#64748b;">No recent activity</div>
+                    </div>
+                </div>
+            </div>
+            <button id="logoutBtn" class="btn btn-logout">Logout</button>
+        </div>
     </div>
-    
+
     <div class="dashboard-panels">
         <div class="panel-card active" onclick="switchTab('poser')">
             <div class="panel-icon"><i class="fas fa-user-check"></i></div>
             <div class="panel-info">
-                <h3>Poser Verification</h3>
-                <p>Profile & Page requests</p>
+                <h3>Poser Detection</h3>
+                <p>Review profile check requests</p>
             </div>
+            <div class="notification-badge" id="badge-poser">0</div>
         </div>
-        
+
         <div class="panel-card" onclick="switchTab('news')">
             <div class="panel-icon"><i class="fas fa-newspaper"></i></div>
             <div class="panel-info">
-                <h3>News Content Verification</h3>
-                <p>Article & Post analysis reviews</p>
+                <h3>News Content</h3>
+                <p>Verify news credibility</p>
             </div>
+            <div class="notification-badge" id="badge-news">0</div>
         </div>
 
         <div class="panel-card" onclick="switchTab('feedback')">
@@ -150,11 +326,18 @@
                 <h3>User Feedbacks</h3>
                 <p>Review user submitted feedback</p>
             </div>
+            <div class="notification-badge" id="badge-feedback">0</div>
         </div>
     </div>
 
     <div id="poser-queue" class="queue-section active">
-        <h2 style="margin-top:0;">Poser Detection Requests</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0;">Poser Detection Requests</h2>
+            <select id="sortPoser" onchange="loadPoserRequests()" style="padding:8px; border-radius:6px; background:#1e293b; color:#e5e7eb; border:1px solid #334155;">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+            </select>
+        </div>
         <table>
             <thead>
                 <tr>
@@ -171,7 +354,13 @@
     </div>
 
     <div id="news-queue" class="queue-section">
-        <h2 style="margin-top:0;">News Content Verification Requests</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0;">News Content Verification Requests</h2>
+            <select id="sortNews" onchange="loadNewsRequests()" style="padding:8px; border-radius:6px; background:#1e293b; color:#e5e7eb; border:1px solid #334155;">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+            </select>
+        </div>
         <table>
             <thead>
                 <tr>
@@ -188,7 +377,13 @@
     </div>
 
     <div id="feedback-queue" class="queue-section">
-        <h2 style="margin-top:0;">User Feedbacks</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0;">User Feedbacks</h2>
+            <select id="sortFeedback" onchange="loadFeedbacks()" style="padding:8px; border-radius:6px; background:#1e293b; color:#e5e7eb; border:1px solid #334155;">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+            </select>
+        </div>
         <div id="feedback-grid" class="feedback-grid">
             <p>Loading feedbacks...</p>
         </div>
@@ -198,8 +393,8 @@
 <script type="module">
     // 1. FIREBASE IMPORTS
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, where, updateDoc, getDoc, setDoc } 
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, where, updateDoc, getDoc, setDoc, onSnapshot } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // 2. CONFIG - UPDATED TO C6433
@@ -215,8 +410,20 @@
 
     console.log("🔥 Admin Panel Connecting to:", firebaseConfig.projectId);
 
-    const app = initializeApp(firebaseConfig);
+    // USE NAMED APP INSTANCE FOR TOTAL ISOLATION
+    // This ensures the admin session is stored separately from the main website (default app)
+    const app = initializeApp(firebaseConfig, "AdminPanel");
     const auth = getAuth(app);
+    
+    // FORCE SESSION PERSISTENCE (Fixes admin login affecting main site)
+    setPersistence(auth, browserSessionPersistence)
+        .then(() => {
+             console.log("✅ Admin Persistence set to SESSION (isolated).");
+        })
+        .catch((error) => {
+             console.error("Persistence Error:", error);
+        });
+
     const db = getFirestore(app);
 
     const POSER_PENDING_COL = "pending_verifications";
@@ -248,13 +455,28 @@
     // Listener: Check if user is logged in
     onAuthStateChanged(auth, (user) => {
         if (user) {
-            // User is signed in.
+            // STRICT CHECK: Ensure only admin@credinews.com can access
+            if (user.email !== "admin@credinews.com") {
+                console.warn("⛔ Unauthorized access attempt by:", user.email);
+                
+                // Force logout immediately
+                signOut(auth).then(() => {
+                    loginError.textContent = "Access Denied: This area is restricted to admin@credinews.com only.";
+                    loginError.style.display = 'block';
+                    loginOverlay.style.display = 'flex';
+                    mainContainer.style.display = 'none';
+                });
+                return;
+            }
+
+            // User is signed in and IS the admin.
             console.log("✅ Admin Logged In:", user.email);
             loginOverlay.style.display = 'none';
             mainContainer.style.display = 'block';
             
             // Load Initial Data
             loadPoserRequests();
+            setupBadgeListeners();
         } else {
             // User is signed out.
             console.log("No user logged in.");
@@ -271,6 +493,14 @@
         const btn = document.querySelector('.login-btn-submit');
         
         loginError.style.display = 'none';
+
+        // Pre-validation: Check email before even sending to Firebase
+        if (email !== "admin@credinews.com") {
+            loginError.textContent = "Access Denied: Only admin account is allowed.";
+            loginError.style.display = 'block';
+            return;
+        }
+
         btn.textContent = 'Signing in...';
         btn.disabled = true;
 
@@ -293,13 +523,132 @@
     });
 
     // Handle Logout
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        if(confirm("Are you sure you want to logout?")) {
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if(await showConfirmation("Logout", "Are you sure you want to logout?", 'danger')) {
             signOut(auth).then(() => {
                 location.reload();
             });
         }
     });
+
+    // --- MODAL UTILS ---
+    window.showToast = function(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `notification ${type === 'error' ? 'error' : 'success'}`;
+        
+        const icon = type === 'error' ? '<i class="fas fa-exclamation-circle"></i>' : '<i class="fas fa-check-circle"></i>';
+        toast.innerHTML = `${icon} <span>${message}</span>`;
+        
+        document.body.appendChild(toast);
+        
+        // Remove after delay
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+            setTimeout(() => toast.remove(), 300); 
+        }, 3000);
+    };
+
+    window.showConfirmation = function(title, message, type = 'primary') {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('admin-modal-overlay');
+            const titleEl = document.getElementById('modal-title');
+            const msgEl = document.getElementById('modal-message');
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            const cancelBtn = document.getElementById('modal-cancel-btn');
+            const closeBtn = document.getElementById('modal-close-x');
+
+            if(!modal || !titleEl || !msgEl || !confirmBtn || !cancelBtn) {
+                // Fallback if modal elements missing
+                resolve(confirm(message)); 
+                return;
+            }
+
+            titleEl.textContent = title;
+            msgEl.innerHTML = message.replace(/\n/g, '<br>');
+            
+            // Setup Confirm Button
+            let btnClass = 'primary';
+            if(type === 'danger') btnClass = 'danger';
+            if(type === 'success') btnClass = 'success';
+            confirmBtn.className = `fb-btn ${btnClass}`;
+            
+            // Determine label
+            let label = 'Confirm';
+            if(title.includes('Reject') || type === 'danger') label = 'Yes, Reject';
+            if(title.includes('Verify') || title.includes('Credible')) label = 'Yes, Verify';
+            if(title.includes('Logout')) label = 'Yes, Logout';
+            
+            confirmBtn.textContent = label;
+            cancelBtn.style.display = 'inline-block';
+
+            // Clone to remove old listeners
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+            const newCloseBtn = closeBtn.cloneNode(true);
+            closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+
+            newConfirmBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                resolve(true);
+            });
+            
+            newCancelBtn.addEventListener('click', () => {
+                 modal.style.display = 'none';
+                 resolve(false);
+            });
+
+            newCloseBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                resolve(false);
+            });
+            
+            modal.style.display = 'flex';
+        });
+    };
+
+    window.showAlert = function(title, message) {
+         return new Promise((resolve) => {
+            const modal = document.getElementById('admin-modal-overlay');
+            if(!modal) { alert(message); resolve(true); return; }
+            
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').innerHTML = message.replace(/\n/g, '<br>');
+            
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            confirmBtn.className = 'fb-btn primary';
+            confirmBtn.textContent = 'OK';
+            
+            document.getElementById('modal-cancel-btn').style.display = 'none';
+            
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            
+            newConfirmBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                document.getElementById('modal-cancel-btn').style.display = 'inline-block';
+                resolve(true);
+            });
+            
+            // Close X also resolves true for alerts
+            const closeBtn = document.getElementById('modal-close-x');
+            const newCloseBtn = closeBtn.cloneNode(true);
+            closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+            newCloseBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                document.getElementById('modal-cancel-btn').style.display = 'inline-block';
+                resolve(true);
+            });
+
+            modal.style.display = 'flex';
+        });
+    };
+
+    // --- GLOBAL VARIABLES ---
+    let currentFeedbackCount = 0;
 
     // --- TAB SWITCHING ---
     window.switchTab = function(tab) {
@@ -317,15 +666,203 @@
         } else if(tab === 'feedback') {
             document.querySelector('.panel-card:nth-child(3)').classList.add('active');
             document.getElementById('feedback-queue').classList.add('active');
+            
+            // Mark feedback as read (dissolve badge)
+            const badge = document.getElementById('badge-feedback');
+            badge.classList.remove('show');
+            localStorage.setItem('admin_feedback_read_count', currentFeedbackCount);
+            
             loadFeedbacks();
         }
     }
 
+    // --- EXPOSE FUNCTIONS TO WINDOW FOR HTML HANDLERS ---
+    window.loadPoserRequests = loadPoserRequests;
+    window.loadNewsRequests = loadNewsRequests;
+    window.loadFeedbacks = loadFeedbacks;
+
     // --- DATA LOADING ---
+    function getTimestampDate(val) {
+        if (!val) return new Date(0);
+        if (typeof val.toDate === 'function') return val.toDate();
+        return new Date(val);
+    }
+    
+    // --- NOTIFICATION DROPDOWN LOGIC ---
+    const notifBell = document.getElementById('notification-bell');
+    const notifDropdown = document.getElementById('notification-dropdown');
+    const notifList = document.getElementById('notification-list');
+    const bellBadge = document.getElementById('bell-badge');
+
+    if (notifBell) {
+        notifBell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notifDropdown.classList.toggle('show');
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (notifDropdown && notifBell && !notifDropdown.contains(e.target) && !notifBell.contains(e.target)) {
+            notifDropdown.classList.remove('show');
+        }
+    });
+
+    window.handleNotificationClick = function(type) {
+        if(type === 'poser') switchTab('poser');
+        if(type === 'news') switchTab('news');
+        if(type === 'feedback') switchTab('feedback');
+        if(notifDropdown) notifDropdown.classList.remove('show');
+    };
+
+    let poserNotifs = [];
+    let newsNotifs = [];
+    let feedbackNotifs = [];
+
+    function refreshGlobalNotifications() {
+        const all = [...poserNotifs, ...newsNotifs, ...feedbackNotifs];
+        const sorted = all.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+        
+        if (sorted.length === 0) {
+            if(notifList) notifList.innerHTML = '<div class="empty-state" style="padding:20px; text-align:center; color:#64748b;">No recent activity</div>';
+            if(bellBadge) bellBadge.classList.remove('show');
+            return;
+        }
+
+        if(bellBadge) bellBadge.classList.add('show');
+        if(notifList) {
+            notifList.innerHTML = sorted.map(item => `
+                <div class="notification-item" onclick="handleNotificationClick('${item.type}')">
+                    <div class="icon"><i class="${item.icon}"></i></div>
+                    <div class="content">
+                        <span class="title">${item.title}</span>
+                        <span class="message">${item.message}</span>
+                        <span class="time">${item.timeStr}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    function timeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + " years ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + " months ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + " days ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + " hours ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + " minutes ago";
+        return "Just now";
+    }
+
     function escapeHtml(str) {
         if (!str) return '';
         return String(str).replace(/[&<>"']/g, function(ch) {
             return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+        });
+    }
+
+    // --- BADGE UPDATES (Real-time) ---
+    function setupBadgeListeners() {
+        // Poser Badge & Notifs
+        onSnapshot(collection(db, POSER_PENDING_COL), (snap) => {
+            const count = snap.size;
+            const badge = document.getElementById('badge-poser');
+            if(badge) {
+                if(count > 0) {
+                    badge.textContent = count > 99 ? '99+' : count;
+                    badge.classList.add('show');
+                } else {
+                    badge.classList.remove('show');
+                }
+            }
+            
+            // Update Global Notifs
+            poserNotifs = snap.docs.map(doc => {
+                const data = doc.data();
+                const ts = getTimestampDate(data.requestedAt || data.timestamp);
+                return {
+                    type: 'poser',
+                    icon: 'fas fa-user-check',
+                    title: 'Profile Check Request',
+                    message: 'A user requested to check a profile.', // Non-technical message
+                    timestamp: ts,
+                    timeStr: timeAgo(ts)
+                };
+            });
+            refreshGlobalNotifications();
+        });
+
+        // News Badge & Notifs
+        onSnapshot(collection(db, NEWS_PENDING_COL), (snap) => {
+            const count = snap.size;
+            const badge = document.getElementById('badge-news');
+            if(badge) {
+                if(count > 0) {
+                    badge.textContent = count > 99 ? '99+' : count;
+                    badge.classList.add('show');
+                } else {
+                    badge.classList.remove('show');
+                }
+            }
+
+            // Update Global Notifs
+            newsNotifs = snap.docs.map(doc => {
+                const data = doc.data();
+                const ts = getTimestampDate(data.requestedAt || data.timestamp);
+                return {
+                    type: 'news',
+                    icon: 'fas fa-newspaper',
+                    title: 'News Verification',
+                    message: 'New content is waiting for review.', // Non-technical message
+                    timestamp: ts,
+                    timeStr: timeAgo(ts)
+                };
+            });
+            refreshGlobalNotifications();
+        });
+
+        // Feedback Badge & Notifs
+        onSnapshot(collection(db, FEEDBACK_COL), (snap) => {
+            currentFeedbackCount = snap.size; 
+            
+            const readCount = parseInt(localStorage.getItem('admin_feedback_read_count') || '0');
+            let unread = currentFeedbackCount - readCount;
+            if (unread < 0) unread = 0; 
+            
+            const isFeedbackTabActive = document.getElementById('feedback-queue').classList.contains('active');
+            if (isFeedbackTabActive) {
+                localStorage.setItem('admin_feedback_read_count', currentFeedbackCount);
+                unread = 0;
+            }
+
+            const badge = document.getElementById('badge-feedback');
+            if(badge) {
+                if(unread > 0) {
+                    badge.textContent = unread > 99 ? '99+' : unread;
+                    badge.classList.add('show');
+                } else {
+                    badge.classList.remove('show');
+                }
+            }
+
+            // Update Global Notifs
+            feedbackNotifs = snap.docs.map(doc => {
+                const data = doc.data();
+                const ts = getTimestampDate(data.timestamp || data.submitted_at);
+                return {
+                    type: 'feedback',
+                    icon: 'fas fa-comments',
+                    title: 'New Feedback',
+                    message: 'A user sent a new message.', // Non-technical message
+                    timestamp: ts,
+                    timeStr: timeAgo(ts)
+                };
+            });
+            refreshGlobalNotifications();
         });
     }
 
@@ -340,11 +877,20 @@
                 return;
             }
 
+            // Client-side Sorting
+            const sortOrder = document.getElementById('sortPoser').value;
+            const docs = [...querySnapshot.docs];
+            docs.sort((a, b) => {
+                const da = getTimestampDate(a.data().timestamp);
+                const db = getTimestampDate(b.data().timestamp);
+                return sortOrder === 'newest' ? db - da : da - db;
+            });
+
             tableBody.innerHTML = "";
-            for (const docSnap of querySnapshot.docs) {
+            for (const docSnap of docs) {
                 const data = docSnap.data();
                 const row = document.createElement('tr');
-                const dateStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : "N/A";
+                const dateStr = getTimestampDate(data.timestamp).toLocaleDateString();
                 const normalizedUrl = (data.url || '').trim();
                 const displayLabelRaw = normalizedUrl || data.pageName || data.posterId || 'Unknown';
                 const displayLabel = escapeHtml(displayLabelRaw);
@@ -410,16 +956,40 @@
                 return;
             }
 
+            // Client-side Sorting
+            const sortOrder = document.getElementById('sortNews').value;
+            const docs = [...querySnapshot.docs];
+            docs.sort((a, b) => {
+                const da = getTimestampDate(a.data().requestedAt);
+                const db = getTimestampDate(b.data().requestedAt);
+                return sortOrder === 'newest' ? db - da : da - db;
+            });
+
             tableBody.innerHTML = "";
-            for (const docSnap of querySnapshot.docs) {
+            for (const docSnap of docs) {
                 const data = docSnap.data();
                 const row = document.createElement('tr');
-                let dateStr = data.requestedAt ? new Date(data.requestedAt.toDate()).toLocaleDateString() : "N/A";
+                let dateStr = getTimestampDate(data.requestedAt).toLocaleDateString();
                 
                 // Content preview: URL or Snippet
-                let contentDisplay = data.url 
-                    ? `<a href="${data.url}" target="_blank" class="link-item">${data.url}</a>`
-                    : `<span title="${data.contentSnippet}">${(data.contentSnippet || '').substring(0, 50)}...</span>`;
+                let contentDisplay = '';
+                if(data.url) {
+                    contentDisplay += `<div style="margin-bottom:4px;"><a href="${data.url}" target="_blank" class="link-item"><i class="fas fa-link"></i> ${data.url}</a></div>`;
+                }
+
+                if(data.content) {
+                    const fullText = escapeHtml(data.content);
+                    const maxLength = 50;
+                    const snippet = fullText.length > maxLength ? fullText.substring(0, maxLength) + '...' : fullText;
+                    
+                    contentDisplay += `
+                        <div style="font-size:0.9rem; color:#cbd5e1; margin-top:4px;">
+                            ${snippet}${fullText.length > maxLength ? `<a href="#" onclick="showAlert('Full Content', '${fullText.replace(/'/g, "\\'")}')" style="color:#3b82f6; font-size:0.8rem; margin-left:6px; text-decoration:underline; white-space:nowrap;">Read More</a>` : ''}
+                        </div>
+                    `;
+                } else if(data.contentSnippet) {
+                    contentDisplay += `<span title="${data.contentSnippet}">${(data.contentSnippet || '').substring(0, 50)}...</span>`;
+                }
 
                 row.innerHTML = `
                     <td>${contentDisplay} <span class="badge badge-news" style="margin-left:8px;">${data.type || 'Content'}</span></td>
@@ -431,8 +1001,9 @@
                     </td>
                 `;
                 
-                row.querySelector('.btn-approve').onclick = () => acceptNews(docSnap.id, data.resultId);
-                row.querySelector('.btn-reject').onclick = () => rejectNews(docSnap.id, data.resultId);
+                const newsUrl = data.url || '';
+                row.querySelector('.btn-approve').onclick = () => acceptNews(docSnap.id, data.resultId, newsUrl);
+                row.querySelector('.btn-reject').onclick = () => rejectNews(docSnap.id, data.resultId, newsUrl);
                 tableBody.appendChild(row);
             }
         } catch (error) {
@@ -457,11 +1028,12 @@
                 feedbacks.push({ id: doc.id, ...doc.data() });
             });
 
-            // Sort newest first
+            // Sort logic
+            const sortOrder = document.getElementById('sortFeedback').value;
             feedbacks.sort((a, b) => {
-                const da = a.submitted_at ? new Date(a.submitted_at) : new Date(0);
-                const db = b.submitted_at ? new Date(b.submitted_at) : new Date(0);
-                return db - da; 
+                const da = getTimestampDate(a.submitted_at);
+                const db = getTimestampDate(b.submitted_at);
+                return sortOrder === 'newest' ? db - da : da - db; 
             });
 
             container.innerHTML = "";
@@ -479,7 +1051,8 @@
 
                 const card = document.createElement('div');
                 card.className = 'feedback-card';
-                const dateStr = fb.submitted_at ? new Date(fb.submitted_at).toLocaleDateString() + ' ' + new Date(fb.submitted_at).toLocaleTimeString() : 'N/A';
+                const dateObj = getTimestampDate(fb.submitted_at);
+                const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString();
                 
                 // Stars for rating
                 let stars = '';
@@ -511,7 +1084,7 @@
 
     // --- ACTIONS ---
     async function approvePoser(docId, url) {
-        if(!confirm(`Verify this Profile/Page?\n${url}`)) return;
+        if(!await showConfirmation("Verify Profile", `Verify this Profile/Page?\n${url}`, 'success')) return;
         try {
             const pendingRef = doc(db, POSER_PENDING_COL, docId);
             const pendingSnap = await getDoc(pendingRef);
@@ -536,12 +1109,13 @@
                     link: 'poser-detection.html'
                 });
             }
+            showToast("Profile Verified Successfully");
             loadPoserRequests();
-        } catch (e) { alert(e.message); }
+        } catch (e) { showAlert("Error", e.message); }
     }
 
     async function rejectPoser(docId) {
-        if(!confirm("Reject and remove this request?")) return;
+        if(!await showConfirmation("Reject Request", "Reject and remove this request?", 'danger')) return;
         try {
             const pendingRef = doc(db, POSER_PENDING_COL, docId);
             const pendingSnap = await getDoc(pendingRef);
@@ -557,28 +1131,55 @@
                     link: 'poser-detection.html'
                 });
             }
+            showToast("Request Rejected Successfully");
             loadPoserRequests();
-        } catch (e) { alert(e.message); }
+        } catch (e) { showAlert("Error", e.message); }
     }
 
-    async function acceptNews(reqId, resultId) {
-        if(!confirm("Mark this content as CREDIBLE?")) return;
-        if(!resultId) { alert("Error: Missing Link to Result ID"); return; }
+    async function acceptNews(reqId, resultId, url) {
+        if(!await showConfirmation("Verify Content", `Mark this content as CREDIBLE?\n${url || ''}`, 'success')) return;
         
         try {
             const reqRef = doc(db, NEWS_PENDING_COL, reqId);
             const reqSnap = await getDoc(reqRef);
-            const rdata = reqSnap.exists() ? (reqSnap.data() || {}) : {};
-            const resultRef = doc(db, NEWS_RESULTS_COL, resultId);
-            await updateDoc(resultRef, {
-                label: "Credible",
-                credibilityLabel: "Credible",
-                credibilityScore: 100,
-                aiVerdict: "Verified by Admin",
-                adminReviewed: true,
-                reviewedAt: serverTimestamp(),
-                analyzed_at: serverTimestamp() // Bump to top of trends feed
-            });
+            
+            if (!reqSnap.exists()) {
+                await showAlert("Error", "Request not found (already processed?)");
+                loadNewsRequests();
+                return;
+            }
+
+            const rdata = reqSnap.data() || {};
+            
+            if (resultId) {
+                const resultRef = doc(db, NEWS_RESULTS_COL, resultId);
+                await updateDoc(resultRef, {
+                    label: "Credible",
+                    credibilityLabel: "Credible",
+                    credibilityScore: 100,
+                    aiVerdict: "Verified by Admin",
+                    adminReviewed: true,
+                    reviewedAt: serverTimestamp(),
+                    analyzed_at: serverTimestamp() // Bump to top of trends feed
+                });
+            } else {
+                // Create new result if missing
+                await addDoc(collection(db, NEWS_RESULTS_COL), {
+                    url: rdata.url || null,
+                    content: rdata.content || null,
+                    contentSnippet: rdata.contentSnippet || (rdata.content ? rdata.content.substring(0, 100) : ''),
+                    type: rdata.type || 'Content',
+                    label: "Credible",
+                    credibilityLabel: "Credible",
+                    credibilityScore: 100,
+                    aiVerdict: "Verified by Admin",
+                    adminReviewed: true,
+                    reviewedAt: serverTimestamp(),
+                    analyzed_at: serverTimestamp(),
+                    timestamp: serverTimestamp()
+                });
+            }
+
             await deleteDoc(reqRef);
             if (rdata.notifyUser && rdata.userId && rdata.userId !== 'anonymous') {
                 await addDoc(collection(db, 'notifications'), {
@@ -590,29 +1191,55 @@
                     link: 'my-verifications.html'
                 });
             }
-            alert("Updated Status: Credible");
+            showToast("Updated Status: Credible");
             loadNewsRequests();
-        } catch (e) { alert("Error updating record: " + e.message); }
+        } catch (e) { showAlert("Error", "Error updating record: " + e.message); }
     }
 
-    async function rejectNews(reqId, resultId) {
-        if(!confirm("Mark this content as LOW CREDIBILITY?")) return;
-        if(!resultId) { alert("Error: Missing Link to Result ID"); return; }
+    async function rejectNews(reqId, resultId, url) {
+        if(!await showConfirmation("Reject Content", `Mark this content as LOW CREDIBILITY?\n${url || ''}`, 'danger')) return;
         
         try {
             const reqRef = doc(db, NEWS_PENDING_COL, reqId);
             const reqSnap = await getDoc(reqRef);
-            const rdata = reqSnap.exists() ? (reqSnap.data() || {}) : {};
-            const resultRef = doc(db, NEWS_RESULTS_COL, resultId);
-            await updateDoc(resultRef, {
-                label: "Low Credibility",
-                credibilityLabel: "Low Credibility",
-                credibilityScore: 0,
-                aiVerdict: "Flagged by Admin",
-                adminReviewed: true,
-                reviewedAt: serverTimestamp(),
-                analyzed_at: serverTimestamp() // Bump to top of trends feed
-            });
+
+            if (!reqSnap.exists()) {
+                await showAlert("Error", "Request not found (already processed?)");
+                loadNewsRequests();
+                return;
+            }
+
+            const rdata = reqSnap.data() || {};
+
+            if (resultId) {
+                const resultRef = doc(db, NEWS_RESULTS_COL, resultId);
+                await updateDoc(resultRef, {
+                    label: "Low Credibility",
+                    credibilityLabel: "Low Credibility",
+                    credibilityScore: 0,
+                    aiVerdict: "Flagged by Admin",
+                    adminReviewed: true,
+                    reviewedAt: serverTimestamp(),
+                    analyzed_at: serverTimestamp() // Bump to top of trends feed
+                });
+            } else {
+                 // Create new result if missing
+                 await addDoc(collection(db, NEWS_RESULTS_COL), {
+                    url: rdata.url || null,
+                    content: rdata.content || null,
+                    contentSnippet: rdata.contentSnippet || (rdata.content ? rdata.content.substring(0, 100) : ''),
+                    type: rdata.type || 'Content',
+                    label: "Low Credibility",
+                    credibilityLabel: "Low Credibility",
+                    credibilityScore: 0,
+                    aiVerdict: "Flagged by Admin",
+                    adminReviewed: true,
+                    reviewedAt: serverTimestamp(),
+                    analyzed_at: serverTimestamp(),
+                    timestamp: serverTimestamp()
+                });
+            }
+
             await deleteDoc(reqRef);
             if (rdata.notifyUser && rdata.userId && rdata.userId !== 'anonymous') {
                 await addDoc(collection(db, 'notifications'), {
@@ -624,12 +1251,28 @@
                     link: 'my-verifications.html'
                 });
             }
-            alert("Updated Status: Low Credibility");
+            showToast("Updated Status: Low Credibility");
             loadNewsRequests();
-        } catch (e) { alert("Error updating record: " + e.message); }
+        } catch (e) { showAlert("Error", "Error updating record: " + e.message); }
     }
 
 </script>
 
+<!-- Custom Modal -->
+<div id="admin-modal-overlay" class="feedback-overlay">
+    <div class="feedback-container">
+        <div class="feedback-header">
+            <h3 class="feedback-title" id="modal-title">Confirmation</h3>
+            <button class="feedback-close" id="modal-close-x">×</button>
+        </div>
+        <div class="feedback-body">
+            <p id="modal-message" style="margin: 0;">Are you sure?</p>
+        </div>
+        <div class="feedback-actions">
+            <button class="fb-btn" id="modal-cancel-btn">Cancel</button>
+            <button class="fb-btn primary" id="modal-confirm-btn">Confirm</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

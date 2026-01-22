@@ -52,6 +52,21 @@ class AuthManager {
                 }
             } catch(_e) {}
         }
+        
+        // --- NEW: Global Auth Listener for Main Site (Block Admin) ---
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                if (user.email === 'admin@credinews.com') {
+                    console.warn('⛔ Admin account detected on public site. Logging out...');
+                    firebase.auth().signOut().then(() => {
+                         this.showError('Admin account cannot be used on the public site.');
+                         setTimeout(() => window.location.reload(), 1500);
+                    });
+                    return;
+                }
+                // Normal user logic if needed...
+            }
+        });
 
         const googleSignIn = document.getElementById('googleSignIn');
         if (googleSignIn) {
@@ -318,7 +333,7 @@ class AuthManager {
             
             // Send email verification link
             const safeOrigin = (window.location.origin && window.location.origin.startsWith('http')) ? window.location.origin : `${window.location.protocol}//${window.location.host}`;
-            const actionCodeSettings = { url: `${safeOrigin}/login.html`, handleCodeInApp: true };
+            const actionCodeSettings = { url: `${safeOrigin}/CrediNews-main/public/login.html`, handleCodeInApp: true };
             try {
                 await user.sendEmailVerification(actionCodeSettings);
             } catch (err) {
@@ -459,7 +474,7 @@ class AuthManager {
                         ? window.location.origin
                         : `${window.location.protocol}//${window.location.host}`;
                     const actionCodeSettings = {
-                        url: `${safeOrigin}/login.html`,
+                        url: `${safeOrigin}/CrediNews-main/public/login.html`,
                         handleCodeInApp: true
                     };
                     try {
